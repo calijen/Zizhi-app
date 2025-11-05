@@ -43,6 +43,7 @@ const BookStyles = () => {
       color: #000000;
       background-color: #fdfbf3;
       user-select: text;
+      overflow-wrap: break-word;
     }
     @media (min-width: 768px) {
       .book-content-view {
@@ -487,47 +488,49 @@ const App: React.FC = () => {
   };
   
   const handleTextSelection = useCallback(() => {
-    const sel = window.getSelection();
-    if (!sel || sel.isCollapsed || !viewerRef.current?.contains(sel.anchorNode)) {
-      setSelection(null);
-      return;
-    }
-    const text = sel.toString().trim();
-    if (text.length > 0) {
-      const range = sel.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-      const viewerRect = viewerRef.current.getBoundingClientRect();
-
-      const anchorNode = sel.anchorNode;
-      if (!anchorNode) { setSelection(null); return; }
-
-      let currentNode: Node | null = anchorNode;
-      let chapterId: string | null = null;
-      while (currentNode && currentNode !== viewerRef.current) {
-          if (currentNode.nodeType === Node.ELEMENT_NODE) {
-              const element = currentNode as HTMLElement;
-              if (element.tagName.toLowerCase() === 'section' && element.id && selectedBook?.chapters.some(c => c.id === element.id)) {
-                  chapterId = element.id;
-                  break;
+    setTimeout(() => {
+        const sel = window.getSelection();
+        if (!sel || sel.isCollapsed || !viewerRef.current?.contains(sel.anchorNode)) {
+          setSelection(null);
+          return;
+        }
+        const text = sel.toString().trim();
+        if (text.length > 0) {
+          const range = sel.getRangeAt(0);
+          const rect = range.getBoundingClientRect();
+          const viewerRect = viewerRef.current.getBoundingClientRect();
+    
+          const anchorNode = sel.anchorNode;
+          if (!anchorNode) { setSelection(null); return; }
+    
+          let currentNode: Node | null = anchorNode;
+          let chapterId: string | null = null;
+          while (currentNode && currentNode !== viewerRef.current) {
+              if (currentNode.nodeType === Node.ELEMENT_NODE) {
+                  const element = currentNode as HTMLElement;
+                  if (element.tagName.toLowerCase() === 'section' && element.id && selectedBook?.chapters.some(c => c.id === element.id)) {
+                      chapterId = element.id;
+                      break;
+                  }
               }
+              currentNode = currentNode.parentNode;
           }
-          currentNode = currentNode.parentNode;
-      }
-
-      if (chapterId) {
-        setSelection({
-          text,
-          top: rect.top - viewerRect.top + viewerRef.current.scrollTop,
-          left: rect.left - viewerRect.left + (rect.width / 2),
-          right: rect.right - viewerRect.left,
-          chapterId: chapterId,
-        });
-      } else {
-        setSelection(null);
-      }
-    } else {
-        setSelection(null);
-    }
+    
+          if (chapterId) {
+            setSelection({
+              text,
+              top: rect.top - viewerRect.top + viewerRef.current.scrollTop,
+              left: rect.left - viewerRect.left + (rect.width / 2),
+              right: rect.right - viewerRect.left,
+              chapterId: chapterId,
+            });
+          } else {
+            setSelection(null);
+          }
+        } else {
+            setSelection(null);
+        }
+    }, 10);
   }, [selectedBook]);
 
   const handleCopy = () => {
