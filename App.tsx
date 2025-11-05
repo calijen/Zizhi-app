@@ -860,7 +860,14 @@ const App: React.FC = () => {
           </button>
         </header>
 
-        <div className="relative flex-grow overflow-y-auto" ref={viewerRef} onScroll={handleScroll} onMouseUp={handleTextSelection} onTouchEnd={handleTextSelection}>
+        <div 
+          className="relative flex-grow overflow-y-auto" 
+          ref={viewerRef} 
+          onScroll={handleScroll} 
+          onMouseUp={handleTextSelection} 
+          onTouchEnd={handleTextSelection}
+          onContextMenu={(e) => e.preventDefault()}
+        >
             <BookStyles />
             {selection && (
                 <TextSelectionPopup 
