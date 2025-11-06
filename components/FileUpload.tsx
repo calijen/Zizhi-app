@@ -1,5 +1,5 @@
 import React from 'react';
-import { IconClose } from './icons';
+import { IconClose, IconBookshelf } from './icons';
 
 export interface BookCardData {
   id: string;
@@ -82,8 +82,12 @@ const Library: React.FC<LibraryProps> = ({ books, onBookSelect, isLoading, error
         )}
 
         {!isLoading && books.length === 0 && (
-          <div className="flex items-center justify-center h-full text-center py-16">
-            <p className="text-xl text-secondary-text">Your library is empty.</p>
+          <div className="flex flex-col items-center justify-center h-full text-center py-16 px-4">
+              <IconBookshelf className="w-24 h-24 text-border-color/60 mb-6" />
+              <h2 className="text-2xl font-semibold font-serif text-primary-text mb-2">Your Library is Empty</h2>
+              <p className="max-w-md text-secondary-text">
+                  Click the upload button to add your first book. You can download free EPUB files for your favorite books from sites like <a href="https://welib.org/" target="_blank" rel="noopener noreferrer" className="text-primary underline">Welib</a>.
+              </p>
           </div>
         )}
         

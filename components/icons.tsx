@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 
 export const IconMenu: React.FC<{ className?: string }> = ({ className = 'w-6 h-6' }) => (
@@ -82,5 +83,27 @@ export const IconTrash: React.FC<{ className?: string }> = ({ className = 'w-6 h
 export const IconDownload: React.FC<{ className?: string }> = ({ className = 'w-6 h-6' }) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+    </svg>
+);
+
+export const IconBookshelf: React.FC<{ className?: string }> = ({ className = 'w-24 h-24' }) => (
+    <svg className={className} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M52 58H12C10.8954 58 10 57.1046 10 56V8C10 6.89543 10.8954 6 12 6H52C53.1046 6 54 6.89543 54 8V56C54 57.1046 53.1046 58 52 58Z" stroke="currentColor" strokeWidth="2" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M10 16H54" stroke="currentColor" strokeWidth="2" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M10 26H54" stroke="currentColor" strokeWidth="2" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M10 36H54" stroke="currentColor" strokeWidth="2" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M10 46H54" stroke="currentColor" strokeWidth="2" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M18 52V10" stroke="currentColor" strokeWidth="2" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M26 52V10" stroke="currentColor" strokeWidth="2" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M34 52V10" stroke="currentColor" strokeWidth="2" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M42 52V10" stroke="currentColor" strokeWidth="2" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+);
+
+export const IconQuoteBubble: React.FC<{ className?: string }> = ({ className = 'w-24 h-24' }) => (
+    <svg className={className} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M22 23H42" stroke="currentColor" strokeWidth="2" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M22 33H34" stroke="currentColor" strokeWidth="2" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M54 32C54 44.1503 44.1503 54 32 54C26.1363 54 20.8411 51.6842 16.9463 48.0537L10 54L15.9463 47.0537C12.3158 43.1589 10 37.8637 10 32C10 19.8497 19.8497 10 32 10C44.1503 10 54 19.8497 54 32Z" stroke="currentColor" strokeWidth="2" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
 );
