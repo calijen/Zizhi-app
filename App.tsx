@@ -6,7 +6,7 @@ import QuotesView from './components/QuotesView';
 import TextSelectionPopup from './components/TextSelectionPopup';
 import Toast from './components/Toast';
 import { 
-  IconMenu, IconClose, IconChevronLeft, IconUpload, IconDownload
+  IconMenu, IconClose, IconChevronLeft, IconUpload, IconDownload, IconSun, IconMoon
 } from './components/icons';
 
 declare global {
@@ -22,10 +22,11 @@ const BookStyles = () => {
       line-height: 1.7;
       font-size: 1rem;
       font-family: 'Lora', serif;
-      color: #000000;
-      background-color: #fdfbf3;
+      color: var(--color-primary-text);
+      background-color: var(--color-background);
       user-select: text;
       overflow-wrap: break-word;
+      transition: background-color 0.3s, color 0.3s;
     }
     @media (min-width: 768px) {
       .book-content-view {
@@ -35,7 +36,7 @@ const BookStyles = () => {
       }
     }
     .book-content-view ::selection {
-      background-color: #89674A;
+      background-color: var(--color-primary);
       color: #FFFFFF;
     }
     .book-content-view h1, .book-content-view h2, .book-content-view h3, .book-content-view h4, .book-content-view h5, .book-content-view h6 {
@@ -44,7 +45,7 @@ const BookStyles = () => {
       line-height: 1.3;
       font-weight: 600;
       font-family: 'Inter', sans-serif;
-      color: #000000;
+      color: var(--color-primary-text);
     }
      @media (min-width: 768px) {
         .book-content-view h1, .book-content-view h2, .book-content-view h3, .book-content-view h4, .book-content-view h5, .book-content-view h6 {
@@ -62,7 +63,7 @@ const BookStyles = () => {
       border-radius: 0.25rem;
     }
     .book-content-view a {
-      color: #89674A;
+      color: var(--color-primary);
       text-decoration: underline;
     }
     .book-content-view ul, .book-content-view ol {
@@ -70,11 +71,11 @@ const BookStyles = () => {
       padding-left: 1.5em;
     }
     .book-content-view blockquote {
-        border-left: 3px solid #89674A;
+        border-left: 3px solid var(--color-primary);
         padding-left: 1em;
         margin-left: 0;
         font-style: italic;
-        color: #202020;
+        color: var(--color-secondary-text);
     }
     .book-content-view style, .book-content-view link[rel=stylesheet] {
         display: none !important;
@@ -98,6 +99,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'library' | 'quotes'>('library');
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
   const [installPromptEvent, setInstallPromptEvent] = useState<any>(null);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('zizhi-theme') as 'light' | 'dark') || 'light');
 
 
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -107,6 +109,30 @@ const App: React.FC = () => {
   
   const selectedBook = library.find(b => b.id === selectedBookId) || null;
   
+  // Theme management
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('zizhi-theme');
+    if (!savedTheme) {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        setTheme(prefersDark ? 'dark' : 'light');
+    }
+  }, []);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const isDark = theme === 'dark';
+    
+    root.classList.remove(isDark ? 'light' : 'dark');
+    root.classList.add(theme);
+
+    localStorage.setItem('zizhi-theme', theme);
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', isDark ? '#111827' : '#fdfbf3');
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
+
   // Load library from DB on initial load
   useEffect(() => {
     async function loadLibrary() {
@@ -848,16 +874,25 @@ const App: React.FC = () => {
         <div className="flex flex-col h-screen bg-background text-primary-text">
             <header className="flex-shrink-0 p-4 sm:p-6 lg:p-8 flex justify-between items-center">
                 <h1 className="text-4xl sm:text-5xl font-bold font-serif">Zizhi</h1>
-                {installPromptEvent && (
+                <div className="flex items-center gap-4">
+                    {installPromptEvent && (
+                        <button 
+                            onClick={handleInstallClick}
+                            className="bg-primary text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:opacity-90 transition-opacity text-sm flex items-center gap-2"
+                            title="Install Zizhi on your device"
+                        >
+                            <IconDownload className="w-5 h-5" />
+                            <span>Install App</span>
+                        </button>
+                    )}
                     <button 
-                        onClick={handleInstallClick}
-                        className="bg-primary text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:opacity-90 transition-opacity text-sm flex items-center gap-2"
-                        title="Install Zizhi on your device"
+                        onClick={toggleTheme}
+                        className="p-2 rounded-full hover:bg-border-color/20 text-primary-text transition-colors"
+                        title="Toggle theme"
                     >
-                        <IconDownload className="w-5 h-5" />
-                        <span>Install App</span>
+                        {theme === 'dark' ? <IconSun className="w-6 h-6" /> : <IconMoon className="w-6 h-6" />}
                     </button>
-                )}
+                </div>
             </header>
 
             <div className="px-4 sm:px-6 lg:p-8 border-b border-border-color">
@@ -934,9 +969,18 @@ const App: React.FC = () => {
             <h1 className="font-bold text-sm md:text-lg truncate">{selectedBook.title}</h1>
             <p className="text-xs md:text-sm text-secondary-text truncate">{currentLocation}</p>
           </div>
-          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 rounded-full hover:bg-border-color/20">
-            {isSidebarOpen ? <IconClose /> : <IconMenu />}
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+                onClick={toggleTheme}
+                className="p-2 rounded-full hover:bg-border-color/20 text-primary-text transition-colors"
+                title="Toggle theme"
+            >
+                {theme === 'dark' ? <IconSun className="w-6 h-6" /> : <IconMoon className="w-6 h-6" />}
+            </button>
+            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 rounded-full hover:bg-border-color/20">
+                {isSidebarOpen ? <IconClose /> : <IconMenu />}
+            </button>
+          </div>
         </header>
 
         <div 
