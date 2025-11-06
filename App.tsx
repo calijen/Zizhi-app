@@ -1,35 +1,18 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import type { TocItem, Quote } from './types';
+import type { TocItem, Quote, Book, Chapter } from './types';
+import { getBooks, addBook, updateBook, deleteBook } from './lib/db';
 import Library, { BookCardData } from './components/FileUpload';
 import QuotesView from './components/QuotesView';
 import TextSelectionPopup from './components/TextSelectionPopup';
 import Toast from './components/Toast';
 import { 
-  IconMenu, IconClose, IconChevronLeft, IconUpload 
+  IconMenu, IconClose, IconChevronLeft, IconUpload, IconDownload
 } from './components/icons';
 
 declare global {
   interface Window {
     JSZip: any;
   }
-}
-
-interface Chapter {
-    id: string;
-    href: string;
-    html: string;
-    label: string;
-}
-
-interface Book {
-    id: string;
-    title: string;
-    author: string;
-    coverImageUrl: string | null;
-    chapters: Chapter[];
-    toc: TocItem[];
-    progress: number; // 0-1 (e.g. 0.5 for 50%)
-    lastScrollTop: number;
 }
 
 const BookStyles = () => {
@@ -114,6 +97,7 @@ const App: React.FC = () => {
   const [toast, setToast] = useState<{ message: string; action?: { label: string; onClick: () => void; } } | null>(null);
   const [activeTab, setActiveTab] = useState<'library' | 'quotes'>('library');
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
+  const [installPromptEvent, setInstallPromptEvent] = useState<any>(null);
 
 
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -122,6 +106,36 @@ const App: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const selectedBook = library.find(b => b.id === selectedBookId) || null;
+  
+  // Load library from DB on initial load
+  useEffect(() => {
+    async function loadLibrary() {
+        setIsLoading(true);
+        try {
+            const books = await getBooks();
+            setLibrary(books);
+        } catch (e) {
+            console.error("Failed to load library from DB", e);
+            setError("Could not load your library. Your browser might not support the required features.");
+        } finally {
+            setIsLoading(false);
+        }
+    }
+    loadLibrary();
+  }, []);
+
+  // Listen for PWA install prompt
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+        e.preventDefault();
+        setInstallPromptEvent(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => {
+        window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
 
   // Load quotes from local storage
   useEffect(() => {
@@ -371,6 +385,7 @@ const App: React.FC = () => {
     setIsLoading(true);
     try {
       const newBook = await parseEpub(selectedFile);
+      await addBook(newBook);
       setLibrary(prev => [...prev, newBook]);
       setSelectedBookId(newBook.id);
     } catch (e: any) {
@@ -386,11 +401,13 @@ const App: React.FC = () => {
     setSelectedBookId(bookId);
   };
   
-  const handleBackToLibrary = () => {
+  const handleBackToLibrary = async () => {
     if (selectedBook && viewerRef.current) {
       const { scrollTop } = viewerRef.current;
+      const updatedBook = { ...selectedBook, lastScrollTop: scrollTop };
+      await updateBook(updatedBook);
       setLibrary(lib => lib.map(b => 
-          b.id === selectedBook.id ? { ...b, lastScrollTop: scrollTop } : b
+          b.id === selectedBook.id ? updatedBook : b
       ));
     }
     setSelectedBookId(null);
@@ -460,17 +477,20 @@ const App: React.FC = () => {
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     if (scrollTimeout.current) window.clearTimeout(scrollTimeout.current);
-    scrollTimeout.current = window.setTimeout(() => {
+    scrollTimeout.current = window.setTimeout(async () => {
         if (!viewerRef.current || !selectedBookId) return;
         const { scrollTop, scrollHeight, clientHeight } = viewerRef.current;
         const totalScrollable = scrollHeight - clientHeight;
         const progress = totalScrollable > 0 ? scrollTop / totalScrollable : 1;
         
-        setLibrary(lib => lib.map(b => 
-            b.id === selectedBookId ? { ...b, progress: Math.min(progress, 1), lastScrollTop: scrollTop } : b
-        ));
-    }, 150);
-  }, [selectedBookId]);
+        const currentBook = library.find(b => b.id === selectedBookId);
+        if (currentBook) {
+            const updatedBook = { ...currentBook, progress: Math.min(progress, 1), lastScrollTop: scrollTop };
+            await updateBook(updatedBook);
+            setLibrary(lib => lib.map(b => b.id === selectedBookId ? updatedBook : b));
+        }
+    }, 250);
+  }, [selectedBookId, library]);
 
   const navigateTo = (href: string) => {
     const chapterIdWithAnchor = href.split('/').pop();
@@ -765,11 +785,11 @@ const App: React.FC = () => {
     handleBookSelect(quote.bookId);
   };
 
-  const handleDeleteBook = (id: string) => {
+  const handleDeleteBook = async (id: string) => {
+    await deleteBook(id);
     setLibrary(prev => {
         const bookToDelete = prev.find(b => b.id === id);
         if (bookToDelete?.coverImageUrl) {
-            // Revoke object URL to avoid memory leaks
             URL.revokeObjectURL(bookToDelete.coverImageUrl);
         }
         return prev.filter(b => b.id !== id);
@@ -786,6 +806,20 @@ const App: React.FC = () => {
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleInstallClick = () => {
+    if (installPromptEvent) {
+        installPromptEvent.prompt();
+        installPromptEvent.userChoice.then((choiceResult: any) => {
+            if (choiceResult.outcome === 'accepted') {
+                showToast('Zizhi installed successfully!');
+            } else {
+                showToast('Installation cancelled.');
+            }
+            setInstallPromptEvent(null);
+        });
+    }
   };
 
 
@@ -812,8 +846,18 @@ const App: React.FC = () => {
     }));
     return (
         <div className="flex flex-col h-screen bg-background text-primary-text">
-            <header className="flex-shrink-0 p-4 sm:p-6 lg:p-8">
+            <header className="flex-shrink-0 p-4 sm:p-6 lg:p-8 flex justify-between items-center">
                 <h1 className="text-4xl sm:text-5xl font-bold font-serif">Zizhi</h1>
+                {installPromptEvent && (
+                    <button 
+                        onClick={handleInstallClick}
+                        className="bg-primary text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:opacity-90 transition-opacity text-sm flex items-center gap-2"
+                        title="Install Zizhi on your device"
+                    >
+                        <IconDownload className="w-5 h-5" />
+                        <span>Install App</span>
+                    </button>
+                )}
             </header>
 
             <div className="px-4 sm:px-6 lg:p-8 border-b border-border-color">

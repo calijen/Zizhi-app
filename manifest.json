@@ -1,0 +1,21 @@
+{
+  "short_name": "Zizhi",
+  "name": "Zizhi EPUB Reader",
+  "description": "An elegant, vintage-inspired EPUB reader. With a clean design inspired by Medium, Zizhi offers a focused and beautiful reading experience.",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#fdfbf3",
+  "background_color": "#fdfbf3"
+}

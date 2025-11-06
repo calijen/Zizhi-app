@@ -1,4 +1,3 @@
-
 export interface TocItem {
   id: string;
   href: string;
@@ -13,4 +12,22 @@ export interface Quote {
   author: string;
   bookId: string;
   location?: string; // e.g. chapter ID
+}
+
+export interface Chapter {
+    id: string;
+    href: string;
+    html: string;
+    label: string;
+}
+
+export interface Book {
+    id: string;
+    title: string;
+    author: string;
+    coverImageUrl: string | null;
+    chapters: Chapter[];
+    toc: TocItem[];
+    progress: number; // 0-1 (e.g. 0.5 for 50%)
+    lastScrollTop: number;
 }
