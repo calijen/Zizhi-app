@@ -461,7 +461,6 @@ const App: React.FC = () => {
   }, [selectedBook?.id]);
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    setSelection(null);
     if (scrollTimeout.current) window.clearTimeout(scrollTimeout.current);
     scrollTimeout.current = window.setTimeout(() => {
         if (!viewerRef.current || !selectedBookId) return;
@@ -488,50 +487,62 @@ const App: React.FC = () => {
   };
   
   const handleTextSelection = useCallback(() => {
-    setTimeout(() => {
-        const sel = window.getSelection();
-        if (!sel || sel.isCollapsed || !viewerRef.current?.contains(sel.anchorNode)) {
-          setSelection(null);
-          return;
-        }
-        const text = sel.toString().trim();
-        if (text.length > 0) {
-          const range = sel.getRangeAt(0);
-          const rect = range.getBoundingClientRect();
-          const viewerRect = viewerRef.current.getBoundingClientRect();
+    const sel = window.getSelection();
+
+    if (
+      !sel ||
+      sel.isCollapsed ||
+      !viewerRef.current ||
+      !sel.anchorNode ||
+      !viewerRef.current.contains(sel.anchorNode)
+    ) {
+      setSelection(null);
+      return;
+    }
     
-          const anchorNode = sel.anchorNode;
-          if (!anchorNode) { setSelection(null); return; }
-    
-          let currentNode: Node | null = anchorNode;
-          let chapterId: string | null = null;
-          while (currentNode && currentNode !== viewerRef.current) {
-              if (currentNode.nodeType === Node.ELEMENT_NODE) {
-                  const element = currentNode as HTMLElement;
-                  if (element.tagName.toLowerCase() === 'section' && element.id && selectedBook?.chapters.some(c => c.id === element.id)) {
-                      chapterId = element.id;
-                      break;
-                  }
-              }
-              currentNode = currentNode.parentNode;
+    const text = sel.toString().trim();
+    if (text.length > 0) {
+      const range = sel.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      const viewerRect = viewerRef.current.getBoundingClientRect();
+
+      let currentNode: Node | null = sel.anchorNode;
+      let chapterId: string | null = null;
+      while (currentNode && currentNode !== viewerRef.current) {
+        if (currentNode.nodeType === Node.ELEMENT_NODE) {
+          const element = currentNode as HTMLElement;
+          if (element.tagName.toLowerCase() === 'section' && element.id && selectedBook?.chapters.some(c => c.id === element.id)) {
+            chapterId = element.id;
+            break;
           }
-    
-          if (chapterId) {
-            setSelection({
-              text,
-              top: rect.top - viewerRect.top + viewerRef.current.scrollTop,
-              left: rect.left - viewerRect.left + (rect.width / 2),
-              right: rect.right - viewerRect.left,
-              chapterId: chapterId,
-            });
-          } else {
-            setSelection(null);
-          }
-        } else {
-            setSelection(null);
         }
-    }, 10);
+        currentNode = currentNode.parentNode;
+      }
+
+      if (chapterId) {
+        setSelection({
+          text,
+          top: rect.top - viewerRect.top + viewerRef.current.scrollTop,
+          left: rect.left - viewerRect.left + rect.width / 2,
+          right: rect.right - viewerRect.left,
+          chapterId: chapterId,
+        });
+      } else {
+        setSelection(null);
+      }
+    } else {
+      setSelection(null);
+    }
   }, [selectedBook]);
+
+  useEffect(() => {
+    if (!selectedBook) return;
+
+    document.addEventListener('selectionchange', handleTextSelection);
+    return () => {
+      document.removeEventListener('selectionchange', handleTextSelection);
+    };
+  }, [selectedBook, handleTextSelection]);
 
   const handleCopy = () => {
     if(selection) {
@@ -867,8 +878,6 @@ const App: React.FC = () => {
           className="relative flex-grow overflow-y-auto" 
           ref={viewerRef} 
           onScroll={handleScroll} 
-          onMouseUp={handleTextSelection} 
-          onTouchEnd={handleTextSelection}
           onContextMenu={(e) => e.preventDefault()}
         >
             <BookStyles />
