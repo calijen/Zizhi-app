@@ -61,8 +61,9 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, onDelete, onShare, onGe
                 <span className="font-semibold text-primary-text">{quote.author}</span> in <span className="italic">{quote.bookTitle}</span>
             </div>
             <p 
-              className="text-lg text-primary-text font-serif leading-relaxed whitespace-pre-wrap cursor-pointer"
-              onClick={() => needsTruncation && toggleExpanded(quote.id)}
+              className={`text-lg text-primary-text font-serif leading-relaxed whitespace-pre-wrap ${quote.location ? 'cursor-pointer' : ''}`}
+              onClick={() => quote.location && onGoToQuote(quote)}
+              title={quote.location ? "View in book" : "Location not available for this quote"}
             >
                 {displayText}
             </p>
@@ -73,10 +74,9 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, onDelete, onShare, onGe
             )}
             <div className="flex items-center gap-6 mt-5">
                 <button 
-                    onClick={() => onGoToQuote(quote)} 
-                    disabled={!quote.location}
-                    title={quote.location ? "View in book" : "Location not available"}
-                    className="flex items-center gap-1.5 text-secondary-text hover:text-primary transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-secondary-text"
+                    onClick={() => onGenerateImage(quote)} 
+                    title="Download as image"
+                    className="flex items-center gap-1.5 text-secondary-text hover:text-primary transition-colors text-sm font-medium"
                 >
                     <IconDownload className="w-4 h-4" />
                     <span>Download</span>

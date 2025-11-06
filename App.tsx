@@ -3,7 +3,6 @@ import type { TocItem, Quote } from './types';
 import Library, { BookCardData } from './components/FileUpload';
 import QuotesView from './components/QuotesView';
 import TextSelectionPopup from './components/TextSelectionPopup';
-import SearchSidebar from './components/SearchSidebar';
 import Toast from './components/Toast';
 import { 
   IconMenu, IconClose, IconChevronLeft, IconUpload 
@@ -114,7 +113,6 @@ const App: React.FC = () => {
   const [selection, setSelection] = useState<{ text: string; top: number; left: number; right: number; chapterId: string; } | null>(null);
   const [toast, setToast] = useState<{ message: string; action?: { label: string; onClick: () => void; } } | null>(null);
   const [activeTab, setActiveTab] = useState<'library' | 'quotes'>('library');
-  const [searchQuery, setSearchQuery] = useState<string | null>(null);
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
 
 
@@ -603,12 +601,6 @@ const App: React.FC = () => {
         setSelection(null);
     }
   };
-  const handleSearch = () => {
-    if (selection) {
-      setSearchQuery(selection.text);
-      setSelection(null);
-    }
-  };
 
   const handleGenerateImage = async (quote: Quote) => {
     const canvas = document.createElement('canvas');
@@ -873,7 +865,6 @@ const App: React.FC = () => {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-primary-text">
       {toast && <Toast message={toast.message} action={toast.action} onClose={() => setToast(null)} />}
-      {searchQuery && <SearchSidebar query={searchQuery} onClose={() => setSearchQuery(null)} />}
 
       <aside className={`absolute lg:relative z-20 h-full bg-background border-r border-border-color shadow-lg transition-all duration-300 ease-in-out flex flex-col overflow-hidden ${isSidebarOpen ? 'w-full sm:w-80' : 'w-0 -translate-x-full lg:w-0 lg:translate-x-0'}`}>
         <div className="flex items-center justify-between p-4 border-b border-border-color flex-shrink-0">
@@ -917,7 +908,6 @@ const App: React.FC = () => {
                     left={selection.left}
                     onCopy={handleCopy}
                     onQuote={handleQuote}
-                    onSearch={handleSearch}
                 />
             )}
             <div className="book-content-view max-w-4xl mx-auto">
