@@ -432,7 +432,7 @@ const App: React.FC = () => {
   
     setTimeout(tryToScroll, 50);
   
-  }, [selectedBook?.id]);
+  }, [selectedBook?.id, pendingNavigation]);
 
   useEffect(() => {
     if (!selectedBook) return;
@@ -458,7 +458,7 @@ const App: React.FC = () => {
         if (el) observer.unobserve(el);
       });
     };
-  }, [selectedBook?.id]);
+  }, [selectedBook, selectedBook?.id, selectedBook?.chapters]);
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     if (scrollTimeout.current) window.clearTimeout(scrollTimeout.current);
@@ -486,63 +486,92 @@ const App: React.FC = () => {
     if(window.innerWidth < 1024) setIsSidebarOpen(false);
   };
   
-  const handleTextSelection = useCallback(() => {
-    const sel = window.getSelection();
-
-    if (
-      !sel ||
-      sel.isCollapsed ||
-      !viewerRef.current ||
-      !sel.anchorNode ||
-      !viewerRef.current.contains(sel.anchorNode)
-    ) {
-      setSelection(null);
-      return;
-    }
-    
-    const text = sel.toString().trim();
-    if (text.length > 0) {
-      const range = sel.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-      const viewerRect = viewerRef.current.getBoundingClientRect();
-
-      let currentNode: Node | null = sel.anchorNode;
-      let chapterId: string | null = null;
-      while (currentNode && currentNode !== viewerRef.current) {
-        if (currentNode.nodeType === Node.ELEMENT_NODE) {
-          const element = currentNode as HTMLElement;
-          if (element.tagName.toLowerCase() === 'section' && element.id && selectedBook?.chapters.some(c => c.id === element.id)) {
-            chapterId = element.id;
-            break;
-          }
-        }
-        currentNode = currentNode.parentNode;
-      }
-
-      if (chapterId) {
-        setSelection({
-          text,
-          top: rect.top - viewerRect.top + viewerRef.current.scrollTop,
-          left: rect.left - viewerRect.left + rect.width / 2,
-          right: rect.right - viewerRect.left,
-          chapterId: chapterId,
-        });
-      } else {
-        setSelection(null);
-      }
-    } else {
-      setSelection(null);
-    }
-  }, [selectedBook]);
-
   useEffect(() => {
     if (!selectedBook) return;
+    const viewer = viewerRef.current;
+    if (!viewer) return;
 
-    document.addEventListener('selectionchange', handleTextSelection);
-    return () => {
-      document.removeEventListener('selectionchange', handleTextSelection);
+    const updateSelectionState = () => {
+      const sel = window.getSelection();
+
+      // Condition to clear the selection popup
+      if (
+        !sel ||
+        sel.isCollapsed ||
+        !viewerRef.current ||
+        !sel.anchorNode ||
+        !viewerRef.current.contains(sel.anchorNode)
+      ) {
+        if (selection) {
+          setSelection(null);
+        }
+        return;
+      }
+
+      const text = sel.toString().trim();
+      if (text.length > 0) {
+        const range = sel.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        const viewerRect = viewerRef.current.getBoundingClientRect();
+
+        let currentNode: Node | null = sel.anchorNode;
+        let chapterId: string | null = null;
+        while (currentNode && currentNode !== viewerRef.current) {
+          if (currentNode.nodeType === Node.ELEMENT_NODE) {
+            const element = currentNode as HTMLElement;
+            if (element.tagName.toLowerCase() === 'section' && element.id && selectedBook.chapters.some(c => c.id === element.id)) {
+              chapterId = element.id;
+              break;
+            }
+          }
+          currentNode = currentNode.parentNode;
+        }
+
+        if (chapterId) {
+          setSelection({
+            text,
+            top: rect.top - viewerRect.top + viewerRef.current.scrollTop,
+            left: rect.left - viewerRect.left + rect.width / 2,
+            right: rect.right - viewerRect.left,
+            chapterId: chapterId,
+          });
+        } else if (selection) {
+          setSelection(null);
+        }
+      } else if (selection) {
+        setSelection(null);
+      }
     };
-  }, [selectedBook, handleTextSelection]);
+
+    const handleMouseUp = () => {
+      // We wrap this in a timeout to let the browser finalize the selection
+      setTimeout(updateSelectionState, 10);
+    };
+    
+    const handleTouchEnd = () => {
+      // On mobile, touchend is the event that signifies the user is done selecting.
+      setTimeout(updateSelectionState, 10);
+    };
+    
+    const handleSelectionChange = () => {
+      // This is for when the user drags the selection handles.
+      // We only update if a selection is already active.
+      if (selection) {
+        updateSelectionState();
+      }
+    };
+
+    viewer.addEventListener('mouseup', handleMouseUp);
+    viewer.addEventListener('touchend', handleTouchEnd);
+    document.addEventListener('selectionchange', handleSelectionChange);
+    
+    return () => {
+      viewer.removeEventListener('mouseup', handleMouseUp);
+      viewer.removeEventListener('touchend', handleTouchEnd);
+      document.removeEventListener('selectionchange', handleSelectionChange);
+    };
+  }, [selectedBook, selection]);
+
 
   const handleCopy = () => {
     if(selection) {
@@ -815,7 +844,8 @@ const App: React.FC = () => {
                     <QuotesView 
                         quotes={quotes} 
                         onDelete={handleDeleteQuote} 
-                        onShare={handleShare} 
+                        // FIX: Changed onShare to handleShare, as 'onShare' was not defined in this scope.
+                        onShare={handleShare}
                         onGenerateImage={handleGenerateImage}
                         onGoToQuote={handleGoToQuote}
                     />
