@@ -1,3 +1,4 @@
+
 export interface TocItem {
   id: string;
   href: string;
@@ -19,6 +20,7 @@ export interface Chapter {
     href: string;
     html: string;
     label: string;
+    textContent: string;
 }
 
 export interface Book {
@@ -30,4 +32,6 @@ export interface Book {
     toc: TocItem[];
     progress: number; // 0-1 (e.g. 0.5 for 50%)
     lastScrollTop: number;
+    audioTrailerUrl?: string;
+    trailerScript?: string;
 }

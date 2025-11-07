@@ -5,8 +5,6 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Zizhi EPUB Reader</title>
-    <meta name="theme-color" content="#fdfbf3">
-    <link rel="manifest" href="/manifest.json">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet">
@@ -20,12 +18,12 @@
               'serif': ['Lora', 'serif'],
             },
             colors: {
-              'primary': 'var(--color-primary)',
-              'secondary': 'var(--color-secondary)',
-              'background': 'var(--color-background)',
-              'primary-text': 'var(--color-primary-text)',
-              'secondary-text': 'var(--color-secondary-text)',
-              'border-color': 'var(--color-border-color)',
+              'primary': '#89674A',
+              'secondary': '#000000',
+              'background': '#fdfbf3',
+              'primary-text': '#000000',
+              'secondary-text': '#202020',
+              'border-color': '#9f9e9c',
             },
             transitionProperty: {
               'width': 'width',
@@ -37,28 +35,6 @@
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-      :root {
-        --color-primary: #89674A;
-        --color-secondary: #000000;
-        --color-background: #fdfbf3;
-        --color-primary-text: #000000;
-        --color-secondary-text: #202020;
-        --color-border-color: #9f9e9c;
-      }
-      .dark {
-        --color-primary: #a78b71;
-        --color-secondary: #ffffff;
-        --color-background: #111827;
-        --color-primary-text: #f3f4f6;
-        --color-secondary-text: #9ca3af;
-        --color-border-color: #374151;
-      }
-      body {
-        background-color: var(--color-background);
-        color: var(--color-primary-text);
-        transition: background-color 0.3s, color 0.3s;
-      }
-
       /* Custom scrollbar for a better look */
       ::-webkit-scrollbar {
         width: 8px;
@@ -70,17 +46,11 @@
       ::-webkit-scrollbar-thumb {
         background-color: #D1D5DB;
         border-radius: 20px;
-        border: 2px solid transparent;
+        border: 2px solid #FFFFFF;
         background-clip: content-box;
-      }
-      .dark ::-webkit-scrollbar-thumb {
-        background-color: #4B5563;
       }
       ::-webkit-scrollbar-thumb:hover {
         background-color: #9CA3AF;
-      }
-      .dark ::-webkit-scrollbar-thumb:hover {
-        background-color: #6B7280;
       }
 
       /* Animations */
@@ -117,7 +87,8 @@
   "imports": {
     "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.0"
   }
 }
 </script>

@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { TocItem, Quote, Book, Chapter } from './types';
-import { getBooks, addBook, updateBook, deleteBook } from './lib/db';
 import Library, { BookCardData } from './components/FileUpload';
 import QuotesView from './components/QuotesView';
 import TextSelectionPopup from './components/TextSelectionPopup';
 import Toast from './components/Toast';
+import TrailerView from './components/TrailerView';
 import { 
-  IconMenu, IconClose, IconChevronLeft, IconUpload, IconDownload, IconSun, IconMoon
+  IconMenu, IconClose, IconChevronLeft, IconUpload 
 } from './components/icons';
+import { GoogleGenAI, Modality } from "@google/genai";
+
 
 declare global {
   interface Window {
@@ -22,12 +24,45 @@ const BookStyles = () => {
       line-height: 1.7;
       font-size: 1rem;
       font-family: 'Lora', serif;
-      color: var(--color-primary-text);
-      background-color: var(--color-background);
+      color: #000000;
+      background-color: #fdfbf3;
       user-select: text;
       overflow-wrap: break-word;
-      transition: background-color 0.3s, color 0.3s;
+      width: 100%;
+      box-sizing: border-box;
     }
+    
+    /* AGGRESSIVE RESPONSIVE OVERRIDES */
+    .book-content-view * {
+        max-width: 100% !important;
+        min-width: 0 !important;
+        width: auto !important;
+        height: auto !important;
+        box-sizing: border-box !important;
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        /* Disable columns which can break single-column mobile layouts */
+        column-count: 1 !important;
+        column-width: auto !important;
+        column-gap: 0 !important;
+    }
+    .book-content-view table, .book-content-view pre {
+        white-space: pre-wrap !important;
+        width: 100% !important;
+    }
+    .book-content-view table {
+         table-layout: fixed !important;
+    }
+    .book-content-view img, .book-content-view video, .book-content-view svg {
+      margin: 1.5em auto !important;
+      display: block !important;
+      border-radius: 0.25rem;
+    }
+    .book-content-view style, .book-content-view link[rel=stylesheet] {
+        display: none !important;
+    }
+    
+    /* Keep existing typography styles */
     @media (min-width: 768px) {
       .book-content-view {
         padding: 2rem;
@@ -36,7 +71,7 @@ const BookStyles = () => {
       }
     }
     .book-content-view ::selection {
-      background-color: var(--color-primary);
+      background-color: #89674A;
       color: #FFFFFF;
     }
     .book-content-view h1, .book-content-view h2, .book-content-view h3, .book-content-view h4, .book-content-view h5, .book-content-view h6 {
@@ -45,7 +80,7 @@ const BookStyles = () => {
       line-height: 1.3;
       font-weight: 600;
       font-family: 'Inter', sans-serif;
-      color: var(--color-primary-text);
+      color: #000000;
     }
      @media (min-width: 768px) {
         .book-content-view h1, .book-content-view h2, .book-content-view h3, .book-content-view h4, .book-content-view h5, .book-content-view h6 {
@@ -55,15 +90,8 @@ const BookStyles = () => {
     .book-content-view p {
       margin-bottom: 1.2em;
     }
-    .book-content-view img {
-      max-width: 100%;
-      height: auto;
-      margin: 1.5em auto;
-      display: block;
-      border-radius: 0.25rem;
-    }
     .book-content-view a {
-      color: var(--color-primary);
+      color: #89674A;
       text-decoration: underline;
     }
     .book-content-view ul, .book-content-view ol {
@@ -71,14 +99,11 @@ const BookStyles = () => {
       padding-left: 1.5em;
     }
     .book-content-view blockquote {
-        border-left: 3px solid var(--color-primary);
+        border-left: 3px solid #89674A;
         padding-left: 1em;
         margin-left: 0;
         font-style: italic;
-        color: var(--color-secondary-text);
-    }
-    .book-content-view style, .book-content-view link[rel=stylesheet] {
-        display: none !important;
+        color: #202020;
     }
   `;
   return <style>{styles}</style>;
@@ -98,8 +123,8 @@ const App: React.FC = () => {
   const [toast, setToast] = useState<{ message: string; action?: { label: string; onClick: () => void; } } | null>(null);
   const [activeTab, setActiveTab] = useState<'library' | 'quotes'>('library');
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
-  const [installPromptEvent, setInstallPromptEvent] = useState<any>(null);
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('zizhi-theme') as 'light' | 'dark') || 'light');
+  const [generatingTrailerForBookId, setGeneratingTrailerForBookId] = useState<string | null>(null);
+  const [viewingTrailerForBook, setViewingTrailerForBook] = useState<Book | null>(null);
 
 
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -108,60 +133,6 @@ const App: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const selectedBook = library.find(b => b.id === selectedBookId) || null;
-  
-  // Theme management
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('zizhi-theme');
-    if (!savedTheme) {
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        setTheme(prefersDark ? 'dark' : 'light');
-    }
-  }, []);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    const isDark = theme === 'dark';
-    
-    root.classList.remove(isDark ? 'light' : 'dark');
-    root.classList.add(theme);
-
-    localStorage.setItem('zizhi-theme', theme);
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', isDark ? '#111827' : '#fdfbf3');
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
-  };
-
-  // Load library from DB on initial load
-  useEffect(() => {
-    async function loadLibrary() {
-        setIsLoading(true);
-        try {
-            const books = await getBooks();
-            setLibrary(books);
-        } catch (e) {
-            console.error("Failed to load library from DB", e);
-            setError("Could not load your library. Your browser might not support the required features.");
-        } finally {
-            setIsLoading(false);
-        }
-    }
-    loadLibrary();
-  }, []);
-
-  // Listen for PWA install prompt
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (e: Event) => {
-        e.preventDefault();
-        setInstallPromptEvent(e);
-    };
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    return () => {
-        window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    };
-  }, []);
-
 
   // Load quotes from local storage
   useEffect(() => {
@@ -382,10 +353,14 @@ const App: React.FC = () => {
             }
         }
         chapterDoc.querySelectorAll('link[rel="stylesheet"], style').forEach(el => el.remove());
-        const finalHtml = new XMLSerializer().serializeToString(chapterDoc.documentElement);
+        
+        const contentRoot = chapterDoc.body || chapterDoc.documentElement;
+        const finalHtml = contentRoot.innerHTML;
+        const textContent = contentRoot.textContent || '';
+
         const chapterId = path.split('/').pop()?.split('.')[0] || `chap-${Math.random()}`;
         loadedChapters.push({
-            id: chapterId, href: path, html: finalHtml,
+            id: chapterId, href: path, html: finalHtml, textContent,
             label: tocMap.get(path.split('#')[0])?.label || 'Chapter'
         });
       }
@@ -404,16 +379,14 @@ const App: React.FC = () => {
     }
     const bookId = `${selectedFile.name}-${selectedFile.size}`;
     if (library.some(b => b.id === bookId)) {
-      setSelectedBookId(bookId);
-      return;
+        showToast("This book is already in your library.");
+        return;
     }
     setError(null);
     setIsLoading(true);
     try {
       const newBook = await parseEpub(selectedFile);
-      await addBook(newBook);
       setLibrary(prev => [...prev, newBook]);
-      setSelectedBookId(newBook.id);
     } catch (e: any) {
       console.error(e);
       setError(`Failed to load book: ${e.message}`);
@@ -427,13 +400,11 @@ const App: React.FC = () => {
     setSelectedBookId(bookId);
   };
   
-  const handleBackToLibrary = async () => {
+  const handleBackToLibrary = () => {
     if (selectedBook && viewerRef.current) {
       const { scrollTop } = viewerRef.current;
-      const updatedBook = { ...selectedBook, lastScrollTop: scrollTop };
-      await updateBook(updatedBook);
       setLibrary(lib => lib.map(b => 
-          b.id === selectedBook.id ? updatedBook : b
+          b.id === selectedBook.id ? { ...b, lastScrollTop: scrollTop } : b
       ));
     }
     setSelectedBookId(null);
@@ -450,7 +421,6 @@ const App: React.FC = () => {
     }
   
     const tryToScroll = (attempt = 0) => {
-      // Give up after 2 seconds
       if (attempt > 20) {
         if (viewerRef.current) viewerRef.current.scrollTop = selectedBook.lastScrollTop;
         return;
@@ -464,7 +434,6 @@ const App: React.FC = () => {
           setTimeout(() => tryToScroll(attempt + 1), 100);
         }
       } else {
-        // Fallback to restoring last scroll position
         if (viewerRef.current) {
           viewerRef.current.scrollTop = selectedBook.lastScrollTop;
         }
@@ -503,20 +472,17 @@ const App: React.FC = () => {
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     if (scrollTimeout.current) window.clearTimeout(scrollTimeout.current);
-    scrollTimeout.current = window.setTimeout(async () => {
+    scrollTimeout.current = window.setTimeout(() => {
         if (!viewerRef.current || !selectedBookId) return;
         const { scrollTop, scrollHeight, clientHeight } = viewerRef.current;
         const totalScrollable = scrollHeight - clientHeight;
         const progress = totalScrollable > 0 ? scrollTop / totalScrollable : 1;
         
-        const currentBook = library.find(b => b.id === selectedBookId);
-        if (currentBook) {
-            const updatedBook = { ...currentBook, progress: Math.min(progress, 1), lastScrollTop: scrollTop };
-            await updateBook(updatedBook);
-            setLibrary(lib => lib.map(b => b.id === selectedBookId ? updatedBook : b));
-        }
-    }, 250);
-  }, [selectedBookId, library]);
+        setLibrary(lib => lib.map(b => 
+            b.id === selectedBookId ? { ...b, progress: Math.min(progress, 1), lastScrollTop: scrollTop } : b
+        ));
+    }, 150);
+  }, [selectedBookId]);
 
   const navigateTo = (href: string) => {
     const chapterIdWithAnchor = href.split('/').pop();
@@ -538,7 +504,6 @@ const App: React.FC = () => {
     const updateSelectionState = () => {
       const sel = window.getSelection();
 
-      // Condition to clear the selection popup
       if (
         !sel ||
         sel.isCollapsed ||
@@ -588,18 +553,14 @@ const App: React.FC = () => {
     };
 
     const handleMouseUp = () => {
-      // We wrap this in a timeout to let the browser finalize the selection
       setTimeout(updateSelectionState, 10);
     };
     
     const handleTouchEnd = () => {
-      // On mobile, touchend is the event that signifies the user is done selecting.
       setTimeout(updateSelectionState, 10);
     };
     
     const handleSelectionChange = () => {
-      // This is for when the user drags the selection handles.
-      // We only update if a selection is already active.
       if (selection) {
         updateSelectionState();
       }
@@ -648,7 +609,58 @@ const App: React.FC = () => {
     }
   };
 
+  const getAverageColorFromImageUrl = (imageUrl: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+      img.src = imageUrl;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Could not get canvas context'));
+          return;
+        }
+        canvas.width = 1;
+        canvas.height = 1;
+        ctx.drawImage(img, 0, 0, 1, 1);
+        const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+        
+        const getLuminance = (r: number, g: number, b: number) => {
+          const a = [r, g, b].map(v => {
+            v /= 255;
+            return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+          });
+          return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
+        };
+
+        const luminance = getLuminance(r, g, b);
+        let finalR = r, finalG = g, finalB = b;
+        
+        // Adjust color brightness for better contrast
+        if (luminance < 0.2) { // Too dark
+          finalR = Math.floor(r * 0.6 + 255 * 0.4);
+          finalG = Math.floor(g * 0.6 + 255 * 0.4);
+          finalB = Math.floor(b * 0.6 + 255 * 0.4);
+        } else if (luminance > 0.85) { // Too light
+          finalR = Math.floor(r * 0.7);
+          finalG = Math.floor(g * 0.7);
+          finalB = Math.floor(b * 0.7);
+        }
+        
+        resolve(`rgb(${finalR}, ${finalG}, ${finalB})`);
+      };
+      img.onerror = (err) => reject(err);
+    });
+  };
+
   const handleGenerateImage = async (quote: Quote) => {
+    const wordCount = quote.text.trim().split(/\s+/).length;
+    if (wordCount > 100) {
+      showToast("Quotes over 100 words are too long for an image.");
+      return;
+    }
+      
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -661,11 +673,24 @@ const App: React.FC = () => {
     canvas.width = width;
     canvas.height = height;
 
-    // Background
-    ctx.fillStyle = '#fdfbf3';
+    const defaultBg = '#fdfbf3';
+    let coverColor = defaultBg;
+    
+    if (book && book.coverImageUrl) {
+        try {
+            coverColor = await getAverageColorFromImageUrl(book.coverImageUrl);
+        } catch (e) {
+            console.error("Could not get average color from cover", e);
+            coverColor = '#EAEAEA';
+        }
+    }
+
+    const gradient = ctx.createRadialGradient(width, 0, 0, width, 0, width * 1.5);
+    gradient.addColorStop(0, coverColor);
+    gradient.addColorStop(1, defaultBg);
+    ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
 
-    // --- HEADER ---
     const headerY = padding;
     const coverSize = 120;
     const textPadding = 24;
@@ -713,7 +738,6 @@ const App: React.FC = () => {
     ctx.fillStyle = '#202020';
     ctx.fillText(quote.author, titleX, titleY + 22, width - titleX - padding);
 
-    // --- QUOTE TEXT ---
     ctx.fillStyle = '#000000';
     ctx.textAlign = 'left';
     
@@ -758,12 +782,10 @@ const App: React.FC = () => {
         ctx.fillText(line, padding, startY + (index * lineHeight));
     });
 
-    // --- FOOTER ---
     ctx.font = `bold 32px Inter, sans-serif`;
     ctx.fillStyle = '#000000';
     ctx.fillText('Zizhi', padding, height - padding);
 
-    // Download
     const dataUrl = canvas.toDataURL('image/png');
     const link = document.createElement('a');
     link.href = dataUrl;
@@ -811,12 +833,14 @@ const App: React.FC = () => {
     handleBookSelect(quote.bookId);
   };
 
-  const handleDeleteBook = async (id: string) => {
-    await deleteBook(id);
+  const handleDeleteBook = (id: string) => {
     setLibrary(prev => {
         const bookToDelete = prev.find(b => b.id === id);
         if (bookToDelete?.coverImageUrl) {
             URL.revokeObjectURL(bookToDelete.coverImageUrl);
+        }
+        if (bookToDelete?.audioTrailerUrl) {
+            URL.revokeObjectURL(bookToDelete.audioTrailerUrl);
         }
         return prev.filter(b => b.id !== id);
     });
@@ -834,20 +858,143 @@ const App: React.FC = () => {
     fileInputRef.current?.click();
   };
 
-  const handleInstallClick = () => {
-    if (installPromptEvent) {
-        installPromptEvent.prompt();
-        installPromptEvent.userChoice.then((choiceResult: any) => {
-            if (choiceResult.outcome === 'accepted') {
-                showToast('Zizhi installed successfully!');
-            } else {
-                showToast('Installation cancelled.');
-            }
-            setInstallPromptEvent(null);
-        });
+  const decodeBase64 = (base64: string) => {
+    const binaryString = atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
     }
+    return bytes;
+  }
+
+  const pcmToWav = (pcmData: Uint8Array, sampleRate: number, numChannels: number, bitsPerSample: number): Blob => {
+      const header = new ArrayBuffer(44);
+      const view = new DataView(header);
+      
+      const writeString = (view: DataView, offset: number, string: string) => {
+          for (let i = 0; i < string.length; i++) {
+              view.setUint8(offset + i, string.charCodeAt(i));
+          }
+      };
+
+      writeString(view, 0, 'RIFF');
+      view.setUint32(4, 36 + pcmData.byteLength, true);
+      writeString(view, 8, 'WAVE');
+      writeString(view, 12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true); // PCM
+      view.setUint16(22, numChannels, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * numChannels * (bitsPerSample / 8), true); // ByteRate
+      view.setUint16(32, numChannels * (bitsPerSample / 8), true); // BlockAlign
+      view.setUint16(34, bitsPerSample, true);
+      writeString(view, 36, 'data');
+      view.setUint32(40, pcmData.byteLength, true);
+
+      return new Blob([header, pcmData], { type: 'audio/wav' });
   };
 
+
+  const handleGenerateTrailer = async (bookId: string) => {
+      const book = library.find(b => b.id === bookId);
+      if (!book) {
+          showToast("Book not found.");
+          return;
+      }
+
+      setGeneratingTrailerForBookId(bookId);
+      showToast("Creating cinematic trailer...");
+
+      try {
+          let accumulatedText = '';
+          for (const chapter of book.chapters) {
+              const parser = new DOMParser();
+              const doc = parser.parseFromString(chapter.html, 'text/html');
+              accumulatedText += (doc.body.textContent || '') + ' ';
+              if (accumulatedText.length >= 5000) {
+                  break;
+              }
+          }
+
+          const textToSummarize = accumulatedText.replace(/\s+/g, ' ').slice(0, 5000);
+          
+          if (textToSummarize.length < 100) {
+              throw new Error("Book content is too short to generate a trailer.");
+          }
+
+          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+          
+          // Step 1: Generate the cinematic script
+          const summaryPrompt = `You are a world-class movie trailer scriptwriter. Your task is to create a short, dramatic, and cinematic monologue summarizing the beginning of the following book text. The summary should be captivating, create suspense, and feel like a Netflix adaptation trailer.
+
+**IMPORTANT RULES:**
+- The output must be a single block of text, suitable for a single narrator.
+- DO NOT include character names or dialogue prefixes (e.g., "CHARACTER:").
+- DO NOT include performance cues in parentheses (e.g., "(dramatically)").
+- The script should be around 150-200 words.
+- Do not spoil major plot points. Hint at the central conflict and themes.
+
+Here is the beginning of the book:
+${textToSummarize}`;
+
+          const summaryResponse = await ai.models.generateContent({
+              model: 'gemini-2.5-flash',
+              contents: summaryPrompt,
+          });
+
+          const script = summaryResponse.text;
+          
+          if (!script) {
+            throw new Error("Could not generate trailer script.");
+          }
+
+          // Step 2: Generate speech from the script
+          const ttsResponse = await ai.models.generateContent({
+            model: "gemini-2.5-flash-preview-tts",
+            contents: [{ parts: [{ text: script }] }],
+            config: {
+              responseModalities: [Modality.AUDIO],
+              speechConfig: {
+                  voiceConfig: {
+                    prebuiltVoiceConfig: { voiceName: 'Fenrir' },
+                  },
+              },
+            },
+          });
+          
+          const base64Audio = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+          if (!base64Audio) {
+            throw new Error("Failed to generate audio data.");
+          }
+          
+          const pcmData = decodeBase64(base64Audio);
+          const wavBlob = pcmToWav(pcmData, 24000, 1, 16);
+          const audioUrl = URL.createObjectURL(wavBlob);
+          
+          setLibrary(prev => prev.map(b => 
+            b.id === bookId ? { ...b, audioTrailerUrl: audioUrl, trailerScript: script } : b
+          ));
+          showToast("Trailer is ready!");
+
+      } catch(e: any) {
+          console.error("Trailer generation failed:", e);
+          showToast(`Error: ${e.message || 'Could not generate trailer'}`);
+      } finally {
+          setGeneratingTrailerForBookId(null);
+      }
+  };
+
+  const handleViewTrailer = (bookId: string) => {
+      const book = library.find(b => b.id === bookId);
+      if (book) {
+          setViewingTrailerForBook(book);
+      }
+  };
+
+  const handleCloseTrailer = () => {
+      setViewingTrailerForBook(null);
+  };
 
   const TocItemComponent: React.FC<{ item: TocItem; onNavigate: (href: string) => void }> = ({ item, onNavigate }) => (
     <li className="my-1">
@@ -868,31 +1015,13 @@ const App: React.FC = () => {
   if (!selectedBook) {
     const libraryCards: BookCardData[] = library.map(b => ({
         id: b.id, title: b.title, author: b.author, 
-        coverImageUrl: b.coverImageUrl, progress: b.progress
+        coverImageUrl: b.coverImageUrl, progress: b.progress,
+        audioTrailerUrl: b.audioTrailerUrl,
     }));
     return (
         <div className="flex flex-col h-screen bg-background text-primary-text">
-            <header className="flex-shrink-0 p-4 sm:p-6 lg:p-8 flex justify-between items-center">
+            <header className="flex-shrink-0 p-4 sm:p-6 lg:p-8">
                 <h1 className="text-4xl sm:text-5xl font-bold font-serif">Zizhi</h1>
-                <div className="flex items-center gap-4">
-                    {installPromptEvent && (
-                        <button 
-                            onClick={handleInstallClick}
-                            className="bg-primary text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:opacity-90 transition-opacity text-sm flex items-center gap-2"
-                            title="Install Zizhi on your device"
-                        >
-                            <IconDownload className="w-5 h-5" />
-                            <span>Install App</span>
-                        </button>
-                    )}
-                    <button 
-                        onClick={toggleTheme}
-                        className="p-2 rounded-full hover:bg-border-color/20 text-primary-text transition-colors"
-                        title="Toggle theme"
-                    >
-                        {theme === 'dark' ? <IconSun className="w-6 h-6" /> : <IconMoon className="w-6 h-6" />}
-                    </button>
-                </div>
             </header>
 
             <div className="px-4 sm:px-6 lg:p-8 border-b border-border-color">
@@ -910,25 +1039,31 @@ const App: React.FC = () => {
                         isLoading={isLoading} 
                         error={error} 
                         onDelete={handleDeleteBook}
+                        onGenerateTrailer={handleGenerateTrailer}
+                        generatingTrailerForBookId={generatingTrailerForBookId}
+                        onViewTrailer={handleViewTrailer}
                     />
                 ) : (
                     <QuotesView 
                         quotes={quotes} 
                         onDelete={handleDeleteQuote} 
-                        // FIX: Changed onShare to handleShare, as 'onShare' was not defined in this scope.
                         onShare={handleShare}
                         onGenerateImage={handleGenerateImage}
                         onGoToQuote={handleGoToQuote}
                     />
                 )}
             </main>
+            
+            {viewingTrailerForBook && (
+                <TrailerView book={viewingTrailerForBook} onClose={handleCloseTrailer} />
+            )}
 
             {activeTab === 'library' && (
                 <>
                     <button
                         onClick={handleUploadClick}
                         className="fixed bottom-6 right-6 flex items-center justify-center p-4 bg-primary text-white font-semibold rounded-full shadow-lg hover:opacity-90 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed z-10"
-                        disabled={isLoading}
+                        disabled={isLoading || !!generatingTrailerForBookId}
                         title="Upload a file"
                     >
                         <IconUpload className="w-6 h-6" />
@@ -942,7 +1077,7 @@ const App: React.FC = () => {
   }
   
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background text-primary-text">
+    <div className="flex h-screen w-full overflow-hidden bg-background text-primary-text">
       {toast && <Toast message={toast.message} action={toast.action} onClose={() => setToast(null)} />}
 
       <aside className={`absolute lg:relative z-20 h-full bg-background border-r border-border-color shadow-lg transition-all duration-300 ease-in-out flex flex-col overflow-hidden ${isSidebarOpen ? 'w-full sm:w-80' : 'w-0 -translate-x-full lg:w-0 lg:translate-x-0'}`}>
@@ -959,7 +1094,7 @@ const App: React.FC = () => {
         </nav>
       </aside>
 
-      <main className="flex-1 flex flex-col relative">
+      <main className="flex-1 flex flex-col relative min-w-0">
         <header className="flex items-center justify-between p-2 md:p-4 bg-background border-b border-border-color z-10 w-full flex-shrink-0">
           <button onClick={handleBackToLibrary} className="flex items-center p-2 rounded-lg hover:bg-border-color/20 text-sm transition-colors">
             <IconChevronLeft className="w-5 h-5 mr-1" />
@@ -969,18 +1104,9 @@ const App: React.FC = () => {
             <h1 className="font-bold text-sm md:text-lg truncate">{selectedBook.title}</h1>
             <p className="text-xs md:text-sm text-secondary-text truncate">{currentLocation}</p>
           </div>
-          <div className="flex items-center gap-2">
-            <button 
-                onClick={toggleTheme}
-                className="p-2 rounded-full hover:bg-border-color/20 text-primary-text transition-colors"
-                title="Toggle theme"
-            >
-                {theme === 'dark' ? <IconSun className="w-6 h-6" /> : <IconMoon className="w-6 h-6" />}
-            </button>
-            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 rounded-full hover:bg-border-color/20">
-                {isSidebarOpen ? <IconClose /> : <IconMenu />}
-            </button>
-          </div>
+          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 rounded-full hover:bg-border-color/20">
+            {isSidebarOpen ? <IconClose /> : <IconMenu />}
+          </button>
         </header>
 
         <div 

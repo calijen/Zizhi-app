@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { Quote } from '../types';
-import { IconDownload, IconTrash, IconQuoteBubble } from './icons';
+import { IconDownload, IconTrash } from './icons';
 
 interface QuotesViewProps {
   quotes: Quote[];
@@ -51,8 +51,10 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, onDelete, onShare, onGe
 
   const QuoteItem: React.FC<{ quote: Quote }> = ({ quote }) => {
     const isExpanded = expandedQuotes.has(quote.id);
-    const words = quote.text.split(' ');
-    const needsTruncation = words.length > 50;
+    const words = quote.text.trim().split(/\s+/);
+    const wordCount = words.length;
+    const isTooLongForImage = wordCount > 100;
+    const needsTruncation = wordCount > 50;
     const displayText = needsTruncation && !isExpanded ? words.slice(0, 50).join(' ') + '...' : quote.text;
 
     return (
@@ -75,8 +77,9 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, onDelete, onShare, onGe
             <div className="flex items-center gap-6 mt-5">
                 <button 
                     onClick={() => onGenerateImage(quote)} 
-                    title="Download as image"
-                    className="flex items-center gap-1.5 text-secondary-text hover:text-primary transition-colors text-sm font-medium"
+                    title={isTooLongForImage ? "Quote is too long to download as an image (max 100 words)" : "Download as image"}
+                    disabled={isTooLongForImage}
+                    className={`flex items-center gap-1.5 text-secondary-text hover:text-primary transition-colors text-sm font-medium ${isTooLongForImage ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                     <IconDownload className="w-4 h-4" />
                     <span>Download</span>
@@ -92,13 +95,9 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, onDelete, onShare, onGe
 
   if (quotes.length === 0) {
     return (
-        <div className="flex flex-col items-center justify-center h-full text-center py-16 px-4">
-            <IconQuoteBubble className="w-24 h-24 text-border-color/60 mb-6" />
-            <h2 className="text-2xl font-semibold font-serif text-primary-text mb-2">No Quotes Saved</h2>
-            <p className="max-w-md text-secondary-text">
-                Highlight text while reading a book to save your favorite passages here.
-            </p>
-        </div>
+      <div className="flex items-center justify-center h-full text-center p-8">
+        <p className="text-xl text-secondary-text">You haven't saved any quotes yet.</p>
+      </div>
     );
   }
 
