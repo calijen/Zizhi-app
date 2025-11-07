@@ -27,6 +27,36 @@ const TrailerView: React.FC<TrailerViewProps> = ({ book, onClose }) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [timedScript, setTimedScript] = useState<TimedSentence[] | null>(null);
 
+  const titleContainerRef = useRef<HTMLDivElement>(null);
+  const titleTextRef = useRef<HTMLHeadingElement>(null);
+  const [titleMarquee, setTitleMarquee] = useState({ enabled: false, duration: '10s' });
+
+
+  useEffect(() => {
+    const checkOverflow = () => {
+        if (titleContainerRef.current && titleTextRef.current) {
+            const container = titleContainerRef.current;
+            const text = titleTextRef.current;
+            const isOverflow = text.scrollWidth > container.clientWidth;
+
+            if (isOverflow) {
+                const duration = text.scrollWidth / 40; // Speed: 40px/sec
+                setTitleMarquee({ enabled: true, duration: `${duration}s` });
+            } else {
+                setTitleMarquee({ enabled: false, duration: '10s' });
+            }
+        }
+    };
+
+    // A short delay allows the browser to render and calculate widths correctly
+    const timer = setTimeout(checkOverflow, 100); 
+    window.addEventListener('resize', checkOverflow);
+    return () => {
+        clearTimeout(timer);
+        window.removeEventListener('resize', checkOverflow);
+    };
+  }, [book.title]);
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -209,7 +239,7 @@ const TrailerView: React.FC<TrailerViewProps> = ({ book, onClose }) => {
 
         {/* Mobile Layout */}
         <div className="md:hidden flex flex-col h-full w-full p-4 pt-16">
-            <div className="flex items-center gap-4 p-2 rounded-lg bg-border-color/10 mb-6 flex-shrink-0">
+            <div className="flex items-center gap-4 p-2 mb-6 flex-shrink-0">
                 <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
                     {book.coverImageUrl ? (
                         <img src={book.coverImageUrl} alt={book.title} className="w-full h-full object-cover" />
@@ -217,8 +247,24 @@ const TrailerView: React.FC<TrailerViewProps> = ({ book, onClose }) => {
                         <div className="w-full h-full bg-border-color/10"></div>
                     )}
                 </div>
-                <div>
-                    <h2 className="font-bold text-lg truncate">{book.title}</h2>
+                <div ref={titleContainerRef} className="min-w-0 flex-1">
+                    <div className="relative h-6 flex items-center">
+                        <h2 ref={titleTextRef} className="font-bold text-lg whitespace-nowrap absolute opacity-0 -z-10" aria-hidden="true">
+                            {book.title}
+                        </h2>
+                        {titleMarquee.enabled ? (
+                            <div className="marquee-parent w-full h-full">
+                                <div className="marquee-child items-center" style={{ animationDuration: titleMarquee.duration }}>
+                                    <span className="font-bold text-lg pr-8">{book.title}</span>
+                                    <span className="font-bold text-lg pr-8" aria-hidden="true">{book.title}</span>
+                                </div>
+                            </div>
+                        ) : (
+                            <h2 className="font-bold text-lg truncate">
+                                {book.title}
+                            </h2>
+                        )}
+                    </div>
                     <p className="text-sm text-secondary-text truncate">{book.author}</p>
                 </div>
             </div>

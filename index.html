@@ -81,6 +81,22 @@
           animation-name: slideInRight;
         }
       }
+
+      @keyframes marquee {
+        from { transform: translateX(0); }
+        to { transform: translateX(-50%); }
+      }
+      .marquee-parent {
+        position: relative;
+        overflow: hidden;
+      }
+      .marquee-child {
+        display: flex;
+        position: absolute;
+        animation-name: marquee;
+        animation-timing-function: linear;
+        animation-iteration-count: infinite;
+      }
     </style>
   <script type="importmap">
 {

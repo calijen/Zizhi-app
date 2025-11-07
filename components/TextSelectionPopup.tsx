@@ -10,6 +10,7 @@ interface TextSelectionPopupProps {
 const TextSelectionPopup: React.FC<TextSelectionPopupProps> = ({ top, left, onCopy, onQuote }) => {
   return (
     <div
+      data-selection-popup="true"
       className="absolute z-30 flex items-center bg-secondary-text text-background rounded-md shadow-xl"
       style={{ top: top, left, transform: 'translate(-50%, -120%)' }}
       // Prevent mouse up on the popup from re-triggering a new selection event

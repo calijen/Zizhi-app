@@ -125,14 +125,47 @@ const App: React.FC = () => {
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
   const [generatingTrailerForBookId, setGeneratingTrailerForBookId] = useState<string | null>(null);
   const [viewingTrailerForBook, setViewingTrailerForBook] = useState<Book | null>(null);
+  const [titleMarquee, setTitleMarquee] = useState({ enabled: false, duration: '20s' });
 
 
   const viewerRef = useRef<HTMLDivElement>(null);
   const chapterRefs = useRef<{[key: string]: HTMLElement}>({});
   const scrollTimeout = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const titleContainerRef = useRef<HTMLDivElement>(null);
+  const titleTextRef = useRef<HTMLHeadingElement>(null);
   
   const selectedBook = library.find(b => b.id === selectedBookId) || null;
+
+  useEffect(() => {
+    const checkOverflow = () => {
+        if (titleContainerRef.current && titleTextRef.current) {
+            const container = titleContainerRef.current;
+            const text = titleTextRef.current;
+            const isOverflow = text.scrollWidth > container.clientWidth;
+            
+            if (isOverflow) {
+                const duration = text.scrollWidth / 40; // Speed: 40px/sec
+                setTitleMarquee({ enabled: true, duration: `${duration}s` });
+            } else {
+                setTitleMarquee({ enabled: false, duration: '20s' });
+            }
+        }
+    };
+
+    if (selectedBook) {
+        // A short delay allows the browser to render and calculate widths correctly
+        const timer = setTimeout(checkOverflow, 50); 
+        window.addEventListener('resize', checkOverflow);
+        return () => {
+            clearTimeout(timer);
+            window.removeEventListener('resize', checkOverflow);
+        };
+    } else {
+        // Reset when returning to the library
+        setTitleMarquee({ enabled: false, duration: '20s' });
+    }
+}, [selectedBook]);
 
   // Load quotes from local storage
   useEffect(() => {
@@ -577,6 +610,31 @@ const App: React.FC = () => {
     };
   }, [selectedBook, selection]);
 
+  useEffect(() => {
+    const handleMouseDown = (e: MouseEvent) => {
+        if (!selection) return;
+
+        const target = e.target as HTMLElement;
+
+        const popupEl = document.querySelector('[data-selection-popup="true"]');
+        if (popupEl?.contains(target)) {
+            return;
+        }
+
+        if (viewerRef.current?.contains(target)) {
+            return;
+        }
+
+        e.preventDefault();
+    };
+
+    document.addEventListener('mousedown', handleMouseDown, true);
+
+    return () => {
+        document.removeEventListener('mousedown', handleMouseDown, true);
+    };
+  }, [selection]);
+
 
   const handleCopy = () => {
     if(selection) {
@@ -668,11 +726,13 @@ const App: React.FC = () => {
     const book = library.find(b => b.id === quote.bookId);
 
     const width = 1080;
-    const height = 1080;
+    const height = 1350; // Portrait aspect ratio
     const padding = 80;
+    const borderRadius = 48;
     canvas.width = width;
     canvas.height = height;
 
+    // --- Background Gradient ---
     const defaultBg = '#fdfbf3';
     let coverColor = defaultBg;
     
@@ -691,37 +751,59 @@ const App: React.FC = () => {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
 
+    // --- Main Card with Rounded Corners & Inner Border ---
+    const drawRoundedRect = (x: number, y: number, w: number, h: number, r: number) => {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+    };
+
+    // Use a clipping path for the main card shape
+    ctx.save();
+    drawRoundedRect(padding / 2, padding / 2, width - padding, height - padding, borderRadius);
+    ctx.clip(); 
+    ctx.fillRect(0, 0, width, height); // Redraw background inside clipped area
+
+    // Inner border
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.lineWidth = 3;
+    drawRoundedRect(padding / 2 + 1.5, padding / 2 + 1.5, width - padding - 3, height - padding - 3, borderRadius - 1);
+    ctx.stroke();
+    
+    // --- Header Section ---
     const headerY = padding;
-    const coverSize = 120;
-    const textPadding = 24;
+    const coverSize = 150;
+    const coverBorderRadius = 24;
+    const textPadding = 30;
 
     if (book && book.coverImageUrl) {
       try {
         const coverImage = new Image();
         coverImage.crossOrigin = 'anonymous';
         coverImage.src = book.coverImageUrl;
-        await new Promise((resolve, reject) => {
-          coverImage.onload = resolve;
-          coverImage.onerror = (err) => {
-            console.error("Failed to load cover image for canvas", err);
-            reject(err);
-          };
+        await new Promise<void>((resolve, reject) => {
+          coverImage.onload = () => resolve();
+          coverImage.onerror = reject;
         });
         
         ctx.save();
-        ctx.beginPath();
-        ctx.rect(padding, headerY, coverSize, coverSize);
+        drawRoundedRect(padding, headerY, coverSize, coverSize, coverBorderRadius);
         ctx.clip();
         ctx.drawImage(coverImage, padding, headerY, coverSize, coverSize);
         ctx.restore();
-
       } catch (e) {
         ctx.fillStyle = '#EAEAEA';
-        ctx.fillRect(padding, headerY, coverSize, coverSize);
+        drawRoundedRect(padding, headerY, coverSize, coverSize, coverBorderRadius);
+        ctx.fill();
       }
     } else {
         ctx.fillStyle = '#EAEAEA';
-        ctx.fillRect(padding, headerY, coverSize, coverSize);
+        drawRoundedRect(padding, headerY, coverSize, coverSize, coverBorderRadius);
+        ctx.fill();
     }
     
     ctx.fillStyle = '#000000';
@@ -731,61 +813,90 @@ const App: React.FC = () => {
     const titleX = padding + coverSize + textPadding;
     const titleY = headerY + coverSize / 2;
 
-    ctx.font = `bold 40px Inter, sans-serif`;
-    ctx.fillText(quote.bookTitle, titleX, titleY - 22, width - titleX - padding);
+    ctx.font = `bold 48px Inter, sans-serif`;
+    ctx.fillText(quote.bookTitle, titleX, titleY - 28, width - titleX - padding);
     
-    ctx.font = `32px Inter, sans-serif`;
+    ctx.font = `36px Inter, sans-serif`;
     ctx.fillStyle = '#202020';
-    ctx.fillText(quote.author, titleX, titleY + 22, width - titleX - padding);
+    ctx.fillText(quote.author, titleX, titleY + 28, width - titleX - padding);
 
+    // --- Quote Text ---
     ctx.fillStyle = '#000000';
-    ctx.textAlign = 'left';
-    
     const maxTextWidth = width - (padding * 2);
+    const quoteStartY = headerY + coverSize + 80;
     
-    let fontSize = 72;
-    ctx.font = `600 ${fontSize}px Lora, serif`;
+    let fontSize = 64;
+    ctx.font = `500 ${fontSize}px Lora, serif`;
     
     const wrapText = (text: string, maxWidth: number) => {
-        let lines: string[] = [];
-        if (!text) return lines;
-        let words = text.split(' ');
-        let currentLine = words[0] || '';
-        for (let i = 1; i < words.length; i++) {
-            let word = words[i];
-            let testLine = currentLine + " " + word;
-            if (ctx.measureText(testLine).width < maxWidth) {
-                currentLine = testLine;
-            } else {
-                lines.push(currentLine);
-                currentLine = word;
+        const paragraphs = text.split('\n');
+        const lines: string[] = [];
+        for (const paragraph of paragraphs) {
+            const words = paragraph.split(' ');
+            let currentLine = words[0] || '';
+            for (let i = 1; i < words.length; i++) {
+                const word = words[i];
+                const testLine = currentLine + " " + word;
+                if (ctx.measureText(testLine).width < maxWidth) {
+                    currentLine = testLine;
+                } else {
+                    lines.push(currentLine);
+                    currentLine = word;
+                }
             }
+            lines.push(currentLine);
         }
-        lines.push(currentLine);
         return lines;
     };
     
     let lines = wrapText(quote.text, maxTextWidth);
-    let lineHeight = fontSize * 1.4;
+    let lineHeight = fontSize * 1.5;
     
-    while((lines.length * lineHeight > (height / 2.5)) && fontSize > 24) {
+    const availableHeight = height - quoteStartY - padding - 150; // Reserve space for logo
+    while ((lines.length * lineHeight > availableHeight) && fontSize > 24) {
         fontSize -= 2;
-        lineHeight = fontSize * 1.4;
-        ctx.font = `600 ${fontSize}px Lora, serif`;
+        lineHeight = fontSize * 1.5;
+        ctx.font = `500 ${fontSize}px Lora, serif`;
         lines = wrapText(quote.text, maxTextWidth);
     }
     
-    const textBlockHeight = lines.length * lineHeight;
-    const startY = (height - textBlockHeight) / 2;
-
     lines.forEach((line, index) => {
-        ctx.fillText(line, padding, startY + (index * lineHeight));
+        ctx.fillText(line, padding, quoteStartY + (index * lineHeight));
     });
 
-    ctx.font = `bold 32px Inter, sans-serif`;
-    ctx.fillStyle = '#000000';
-    ctx.fillText('Zizhi', padding, height - padding);
+    // --- Zizhi Logo ---
+    const logoRadius = 60;
+    const logoX = padding + logoRadius;
+    const logoY = height - padding - logoRadius - (padding/2);
 
+    ctx.fillStyle = '#2c3e50'; // Dark blue circle
+    ctx.beginPath();
+    ctx.arc(logoX, logoY, logoRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#ecf0f1';
+    ctx.font = `bold 28px Inter, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('zizhi', logoX, logoY + 18);
+
+    // Icon (stylized book/heart)
+    ctx.beginPath();
+    ctx.moveTo(logoX - 25, logoY - 25);
+    ctx.quadraticCurveTo(logoX - 35, logoY - 15, logoX - 25, logoY - 5);
+    ctx.lineTo(logoX - 2, logoY - 15);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(logoX + 25, logoY - 25);
+    ctx.quadraticCurveTo(logoX + 35, logoY - 15, logoX + 25, logoY - 5);
+    ctx.lineTo(logoX + 2, logoY - 15);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore(); // Restore context from main card clipping
+
+    // --- Finalize and Download ---
     const dataUrl = canvas.toDataURL('image/png');
     const link = document.createElement('a');
     link.href = dataUrl;
@@ -1100,8 +1211,26 @@ ${textToSummarize}`;
             <IconChevronLeft className="w-5 h-5 mr-1" />
             <span className="hidden sm:inline">Back to Library</span>
           </button>
-          <div className="text-center truncate mx-2">
-            <h1 className="font-bold text-sm md:text-lg truncate">{selectedBook.title}</h1>
+          <div ref={titleContainerRef} className="text-center mx-2 flex-1 min-w-0">
+            <div className="relative h-6 md:h-7 flex items-center justify-center">
+              {/* Hidden element for measurement. */}
+              <h1 ref={titleTextRef} className="font-bold text-sm md:text-lg whitespace-nowrap absolute opacity-0 -z-10" aria-hidden="true">
+                  {selectedBook.title}
+              </h1>
+
+              {titleMarquee.enabled ? (
+                  <div className="marquee-parent w-full h-full">
+                      <div className="marquee-child items-center" style={{ animationDuration: titleMarquee.duration }}>
+                          <span className="font-bold text-sm md:text-lg pr-8">{selectedBook.title}</span>
+                          <span className="font-bold text-sm md:text-lg pr-8" aria-hidden="true">{selectedBook.title}</span>
+                      </div>
+                  </div>
+              ) : (
+                  <h1 className="font-bold text-sm md:text-lg truncate">
+                      {selectedBook.title}
+                  </h1>
+              )}
+            </div>
             <p className="text-xs md:text-sm text-secondary-text truncate">{currentLocation}</p>
           </div>
           <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 rounded-full hover:bg-border-color/20">
