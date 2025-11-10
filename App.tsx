@@ -389,6 +389,7 @@ const App: React.FC = () => {
                         id: bookData.id,
                         progress: bookData.progress,
                         lastScrollTop: bookData.lastScrollTop,
+                        lastOpened: bookData.lastOpened,
                         audioTrailerUrl: bookData.audioTrailerBlob ? URL.createObjectURL(bookData.audioTrailerBlob) : undefined,
                         trailerScript: bookData.trailerScript,
                         epubFile: epubFile,
@@ -452,7 +453,13 @@ const App: React.FC = () => {
     }
   }, [library]);
 
-  const handleBookSelect = (bookId: string) => {
+  const handleBookSelect = async (bookId: string) => {
+    const book = library.find(b => b.id === bookId);
+    if (book) {
+        const updatedBook = { ...book, lastOpened: Date.now() };
+        await db.saveBook(updatedBook); // Save to DB
+        setLibrary(lib => lib.map(b => b.id === bookId ? updatedBook : b));
+    }
     chapterRefs.current = {};
     setSelectedBookId(bookId);
   };
@@ -1163,7 +1170,8 @@ ${textToSummarize}
   );
   
   if (!selectedBook) {
-    const libraryCards: BookCardData[] = library.map(b => ({
+    const sortedLibrary = [...library].sort((a, b) => (b.lastOpened || 0) - (a.lastOpened || 0));
+    const libraryCards: BookCardData[] = sortedLibrary.map(b => ({
         id: b.id, title: b.title, author: b.author, 
         coverImageUrl: b.coverImageUrl, progress: b.progress,
         audioTrailerUrl: b.audioTrailerUrl,

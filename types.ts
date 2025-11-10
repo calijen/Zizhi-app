@@ -32,6 +32,7 @@ export interface Book {
     toc: TocItem[];
     progress: number; // 0-1 (e.g. 0.5 for 50%)
     lastScrollTop: number;
+    lastOpened?: number; // Timestamp
     audioTrailerUrl?: string;
     trailerScript?: string;
 
