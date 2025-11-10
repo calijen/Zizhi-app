@@ -567,13 +567,26 @@ const App: React.FC = () => {
   const navigateTo = (href: string) => {
     const chapterIdWithAnchor = href.split('/').pop();
     if (!chapterIdWithAnchor) return;
-    const [chapterFile, elementId] = chapterIdWithAnchor.split('#');
-    const chapterId = chapterFile.split('.')[0];
-    const targetElement = elementId 
-      ? document.getElementById(elementId) 
-      : chapterRefs.current[chapterId];
-    targetElement?.scrollIntoView({ behavior: 'smooth' });
-    if(window.innerWidth < 1024) setIsSidebarOpen(false);
+    
+    const doScroll = () => {
+      const [chapterFile, elementId] = chapterIdWithAnchor.split('#');
+      const chapterId = chapterFile.split('.')[0];
+      const targetElement = elementId 
+        ? document.getElementById(elementId) 
+        : chapterRefs.current[chapterId];
+      // Added block: 'start' for more predictable scrolling
+      targetElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    // On mobile screens, if the sidebar is open, close it first and then scroll.
+    if (window.innerWidth < 1024 && isSidebarOpen) {
+      setIsSidebarOpen(false);
+      // Wait for the closing animation (300ms) to complete before scrolling.
+      setTimeout(doScroll, 300); 
+    } else {
+      // On desktop, or if sidebar is already closed, scroll immediately.
+      doScroll();
+    }
   };
   
   const handleSelection = useCallback(() => {
