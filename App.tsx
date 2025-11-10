@@ -570,72 +570,122 @@ const App: React.FC = () => {
     if(window.innerWidth < 1024) setIsSidebarOpen(false);
   };
   
-  // Refactored text selection logic for better mobile reliability
+  // A more robust text selection handler to address mobile issues and performance.
+  const handleSelection = useCallback(() => {
+    const viewer = viewerRef.current;
+    if (!selectedBook || !viewer) return;
+
+    // Use a small timeout to let the selection stabilize after touchend/mouseup
+    setTimeout(() => {
+      const sel = window.getSelection();
+
+      if (!sel || !viewer.contains(sel.anchorNode)) {
+        return;
+      }
+      
+      const text = sel.toString().trim();
+      
+      if (text.length === 0) {
+        // This can happen on a simple click. We let the `handleClickOutside` handler
+        // manage dismissal rather than clearing it here. This prevents the popup
+        // from vanishing if the user just clicks on already-selected text.
+        return;
+      }
+      
+      const range = sel.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      const viewerRect = viewer.getBoundingClientRect();
+
+      if (rect.width < 1 && rect.height < 1) {
+        return;
+      }
+      
+      let chapterId: string | null = null;
+      let currentNode: Node | null = sel.anchorNode;
+      while (currentNode && currentNode !== viewer) {
+          if (currentNode.nodeType === Node.ELEMENT_NODE) {
+              const element = currentNode as HTMLElement;
+              if (element.tagName.toLowerCase() === 'section' && element.id && selectedBook.chapters.some(c => c.id === element.id)) {
+                  chapterId = element.id;
+                  break;
+              }
+          }
+          currentNode = currentNode.parentNode;
+      }
+
+      if (chapterId) {
+        setSelection({
+          text,
+          top: rect.top - viewerRect.top + viewer.scrollTop,
+          left: rect.left - viewerRect.left + rect.width / 2,
+          right: rect.right - viewerRect.left,
+          chapterId: chapterId,
+        });
+      }
+    }, 10);
+  }, [selectedBook]);
+  
+  // This effect sets up the listeners that SHOW or UPDATE the selection popup.
   useEffect(() => {
-    if (!selectedBook) return;
     const viewer = viewerRef.current;
     if (!viewer) return;
+    
+    viewer.addEventListener('mouseup', handleSelection);
+    viewer.addEventListener('touchend', handleSelection);
+    // `selectionchange` is useful for tracking selection drags on desktop.
+    document.addEventListener('selectionchange', handleSelection);
+    
+    return () => {
+      viewer.removeEventListener('mouseup', handleSelection);
+      viewer.removeEventListener('touchend', handleSelection);
+      document.removeEventListener('selectionchange', handleSelection);
+    };
+  }, [handleSelection]);
 
-    const debounceTimeout = { current: 0 };
+  // This effect handles DISMISSING the selection popup.
+  useEffect(() => {
+    if (!selection) return;
 
-    const handleSelectionChange = () => {
-        window.clearTimeout(debounceTimeout.current);
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+        const target = event.target as HTMLElement;
 
-        debounceTimeout.current = window.setTimeout(() => {
-            const sel = window.getSelection();
+        // Don't dismiss if clicking on the popup itself
+        if (target.closest('[data-selection-popup="true"]')) {
+            return;
+        }
 
-            // Condition to SHOW/UPDATE the popup
-            if (sel && !sel.isCollapsed && viewer.contains(sel.anchorNode)) {
-                const text = sel.toString().trim();
-                if (text.length > 0) {
-                    const range = sel.getRangeAt(0);
-                    const rect = range.getBoundingClientRect();
-                    
-                    if (rect.width < 1 && rect.height < 1) {
-                        setSelection(null);
-                        return;
-                    }
-
-                    const viewerRect = viewer.getBoundingClientRect();
-        
-                    let currentNode: Node | null = sel.anchorNode;
-                    let chapterId: string | null = null;
-                    while (currentNode && currentNode !== viewer) {
-                        if (currentNode.nodeType === Node.ELEMENT_NODE) {
-                            const element = currentNode as HTMLElement;
-                            if (element.tagName.toLowerCase() === 'section' && element.id && selectedBook.chapters.some(c => c.id === element.id)) {
-                                chapterId = element.id;
-                                break;
-                            }
-                        }
-                        currentNode = currentNode.parentNode;
-                    }
-        
-                    if (chapterId) {
-                        setSelection({
-                            text,
-                            top: rect.top - viewerRect.top + viewer.scrollTop,
-                            left: rect.left - viewerRect.left + rect.width / 2,
-                            right: rect.right - viewerRect.left,
-                            chapterId: chapterId,
-                        });
-                    }
-                    return;
-                }
-            }
+        // Don't dismiss if clicking back on the selected text.
+        // This allows the user to re-adjust the selection handles.
+        const sel = window.getSelection();
+        if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
+            const range = sel.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
             
-            // Condition to HIDE the popup: selection is collapsed or outside the viewer.
-            setSelection(null);
-        }, 100); // Debounce to prevent flicker and excessive updates while dragging.
+            const e = event as MouseEvent & TouchEvent;
+            const clientX = e.touches?.[0]?.clientX ?? e.clientX;
+            const clientY = e.touches?.[0]?.clientY ?? e.clientY;
+
+            if (
+                clientX >= rect.left && clientX <= rect.right &&
+                clientY >= rect.top && clientY <= rect.bottom
+            ) {
+                return;
+            }
+        }
+        
+        // If we reach here, it's a click outside, so dismiss.
+        setSelection(null);
+        window.getSelection()?.removeAllRanges();
     };
 
-    document.addEventListener('selectionchange', handleSelectionChange);
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
 
     return () => {
-        document.removeEventListener('selectionchange', handleSelectionChange);
-        window.clearTimeout(debounceTimeout.current);
+        document.removeEventListener('mousedown', handleClickOutside);
+        document.removeEventListener('touchstart', handleClickOutside);
     };
-  }, [selectedBook]);
+  }, [selection]);
 
 
   const handleCopy = () => {
