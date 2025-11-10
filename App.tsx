@@ -127,6 +127,7 @@ const App: React.FC = () => {
   const [generatingTrailerForBookId, setGeneratingTrailerForBookId] = useState<string | null>(null);
   const [viewingTrailerForBook, setViewingTrailerForBook] = useState<Book | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
 
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -135,6 +136,11 @@ const App: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const selectedBook = library.find(b => b.id === selectedBookId) || null;
+
+  useEffect(() => {
+    // Set this once on mount
+    setIsMobile('ontouchstart' in window && navigator.maxTouchPoints > 0);
+  }, []);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -570,59 +576,67 @@ const App: React.FC = () => {
     if(window.innerWidth < 1024) setIsSidebarOpen(false);
   };
   
-  // A more robust text selection handler to address mobile issues and performance.
   const handleSelection = useCallback(() => {
     const viewer = viewerRef.current;
     if (!selectedBook || !viewer) return;
 
-    // Use a small timeout to let the selection stabilize after touchend/mouseup
-    setTimeout(() => {
-      const sel = window.getSelection();
+    const sel = window.getSelection();
 
-      if (!sel || !viewer.contains(sel.anchorNode)) {
-        return;
-      }
-      
-      const text = sel.toString().trim();
-      
-      if (text.length === 0) {
-        // This can happen on a simple click. We let the `handleClickOutside` handler
-        // manage dismissal rather than clearing it here. This prevents the popup
-        // from vanishing if the user just clicks on already-selected text.
-        return;
-      }
-      
-      const range = sel.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-      const viewerRect = viewer.getBoundingClientRect();
+    if (!sel || !viewer.contains(sel.anchorNode)) {
+      return;
+    }
+    
+    const text = sel.toString().trim();
+    
+    if (text.length === 0) {
+      // Don't clear the selection here on a simple click.
+      // The `handleClickOutside` handler is responsible for dismissal.
+      return;
+    }
+    
+    const range = sel.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    const viewerRect = viewer.getBoundingClientRect();
 
-      if (rect.width < 1 && rect.height < 1) {
-        return;
+    if (rect.width < 1 && rect.height < 1) {
+      return;
+    }
+    
+    let chapterId: string | null = null;
+    let currentNode: Node | null = sel.anchorNode;
+    while (currentNode && currentNode !== viewer) {
+        if (currentNode.nodeType === Node.ELEMENT_NODE) {
+            const element = currentNode as HTMLElement;
+            if (element.tagName.toLowerCase() === 'section' && element.id && selectedBook.chapters.some(c => c.id === element.id)) {
+                chapterId = element.id;
+                break;
+            }
+        }
+        currentNode = currentNode.parentNode;
+    }
+
+    if (chapterId) {
+      const POPUP_WIDTH_ESTIMATE = 130;
+      const PADDING = 16;
+
+      let left = rect.left - viewerRect.left + rect.width / 2;
+
+      // Constrain left position to be within the viewer bounds
+      if (left - POPUP_WIDTH_ESTIMATE / 2 < PADDING) {
+        left = POPUP_WIDTH_ESTIMATE / 2 + PADDING;
+      }
+      if (left + POPUP_WIDTH_ESTIMATE / 2 > viewerRect.width - PADDING) {
+        left = viewerRect.width - POPUP_WIDTH_ESTIMATE / 2 - PADDING;
       }
       
-      let chapterId: string | null = null;
-      let currentNode: Node | null = sel.anchorNode;
-      while (currentNode && currentNode !== viewer) {
-          if (currentNode.nodeType === Node.ELEMENT_NODE) {
-              const element = currentNode as HTMLElement;
-              if (element.tagName.toLowerCase() === 'section' && element.id && selectedBook.chapters.some(c => c.id === element.id)) {
-                  chapterId = element.id;
-                  break;
-              }
-          }
-          currentNode = currentNode.parentNode;
-      }
-
-      if (chapterId) {
-        setSelection({
-          text,
-          top: rect.top - viewerRect.top + viewer.scrollTop,
-          left: rect.left - viewerRect.left + rect.width / 2,
-          right: rect.right - viewerRect.left,
-          chapterId: chapterId,
-        });
-      }
-    }, 10);
+      setSelection({
+        text,
+        top: rect.top - viewerRect.top + viewer.scrollTop,
+        left: left,
+        right: rect.right - viewerRect.left, // This isn't used for positioning, but might be useful
+        chapterId: chapterId,
+      });
+    }
   }, [selectedBook]);
   
   // This effect sets up the listeners that SHOW or UPDATE the selection popup.
@@ -630,17 +644,29 @@ const App: React.FC = () => {
     const viewer = viewerRef.current;
     if (!viewer) return;
     
-    viewer.addEventListener('mouseup', handleSelection);
-    viewer.addEventListener('touchend', handleSelection);
-    // `selectionchange` is useful for tracking selection drags on desktop.
-    document.addEventListener('selectionchange', handleSelection);
+    const handleDesktopMouseUp = () => {
+      const selectionText = window.getSelection()?.toString().trim();
+      if (selectionText && selectionText.length > 0) {
+        handleSelection();
+      }
+    };
+
+    if (isMobile) {
+      document.addEventListener('selectionchange', handleSelection);
+      viewer.addEventListener('touchend', handleSelection);
+    } else {
+      viewer.addEventListener('mouseup', handleDesktopMouseUp);
+    }
     
     return () => {
-      viewer.removeEventListener('mouseup', handleSelection);
-      viewer.removeEventListener('touchend', handleSelection);
-      document.removeEventListener('selectionchange', handleSelection);
+      if (isMobile) {
+        document.removeEventListener('selectionchange', handleSelection);
+        viewer.removeEventListener('touchend', handleSelection);
+      } else {
+        viewer.removeEventListener('mouseup', handleDesktopMouseUp);
+      }
     };
-  }, [handleSelection]);
+  }, [isMobile, handleSelection]);
 
   // This effect handles DISMISSING the selection popup.
   useEffect(() => {
