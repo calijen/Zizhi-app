@@ -2,6 +2,8 @@ const CACHE_NAME = 'zizhi-cache-v1';
 const urlsToCache = [
   '/',
   '/index.html',
+  '/manifest.json',
+  '/logo.svg',
   '/index.tsx',
   '/App.tsx',
   '/types.ts',
@@ -9,6 +11,7 @@ const urlsToCache = [
   '/components/FileUpload.tsx',
   '/components/icons.tsx',
   '/components/QuotesView.tsx',
+  '/components/SearchSidebar.tsx',
   '/components/TextSelectionPopup.tsx',
   '/components/Toast.tsx',
   '/components/TrailerView.tsx',
@@ -36,41 +39,39 @@ self.addEventListener('install', event => {
 
 self.addEventListener('fetch', event => {
   event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        // Cache hit - return response
-        if (response) {
-          return response;
-        }
+    caches.open(CACHE_NAME).then(async (cache) => {
+      // Try the cache first.
+      const cachedResponse = await cache.match(event.request);
+      if (cachedResponse) {
+        return cachedResponse;
+      }
 
-        // Clone the request because it's a stream and can only be consumed once.
-        const fetchRequest = event.request.clone();
+      // If it's not in the cache, try the network.
+      try {
+        const networkResponse = await fetch(event.request);
 
-        return fetch(fetchRequest).then(
-          response => {
-            // Check if we received a valid response
-            if (!response || response.status !== 200 || response.type !== 'basic' && response.type !== 'cors') {
-              return response;
-            }
-
-            // Clone the response because it's a stream and can only be consumed once.
-            const responseToCache = response.clone();
-
-            caches.open(CACHE_NAME)
-              .then(cache => {
-                // We don't cache POST requests or Gemini API calls
-                if (event.request.method !== 'GET' || event.request.url.includes('generativelanguage')) {
-                    return;
-                }
-                cache.put(event.request, responseToCache);
-              });
-
-            return response;
+        // If the network request is successful, cache it and return it.
+        if (networkResponse.ok) {
+          // We don't cache POST requests or Gemini API calls
+          if (event.request.method === 'GET' && !event.request.url.includes('generativelanguage')) {
+            await cache.put(event.request, networkResponse.clone());
           }
-        );
-      })
+        }
+        return networkResponse;
+      } catch (error) {
+        // The network failed.
+        // For navigation requests, serve the main app shell from the cache.
+        if (event.request.mode === 'navigate') {
+          const indexResponse = await cache.match('/index.html');
+          if (indexResponse) return indexResponse;
+        }
+        // For other requests, we can't do anything, so let the error propagate.
+        throw error;
+      }
+    })
   );
 });
+
 
 self.addEventListener('activate', event => {
   const cacheWhitelist = [CACHE_NAME];
