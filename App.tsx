@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { TocItem, Quote, Book, Chapter } from './types';
+import * as db from './db';
 import Library, { BookCardData } from './components/FileUpload';
 import QuotesView from './components/QuotesView';
 import TextSelectionPopup from './components/TextSelectionPopup';
 import Toast from './components/Toast';
 import TrailerView from './components/TrailerView';
 import { 
-  IconMenu, IconClose, IconChevronLeft, IconUpload 
+  IconMenu, IconClose, IconChevronLeft, IconUpload, IconDownload, Logo
 } from './components/icons';
 import { GoogleGenAI, Modality } from "@google/genai";
 
@@ -24,8 +25,8 @@ const BookStyles = () => {
       line-height: 1.7;
       font-size: 1rem;
       font-family: 'Lora', serif;
-      color: #000000;
-      background-color: #fdfbf3;
+      color: #333333;
+      background-color: #FAFAFA;
       user-select: text;
       overflow-wrap: break-word;
       width: 100%;
@@ -71,7 +72,7 @@ const BookStyles = () => {
       }
     }
     .book-content-view ::selection {
-      background-color: #89674A;
+      background-color: #5D8BF4;
       color: #FFFFFF;
     }
     .book-content-view h1, .book-content-view h2, .book-content-view h3, .book-content-view h4, .book-content-view h5, .book-content-view h6 {
@@ -80,7 +81,7 @@ const BookStyles = () => {
       line-height: 1.3;
       font-weight: 600;
       font-family: 'Inter', sans-serif;
-      color: #000000;
+      color: #1A2B6D;
     }
      @media (min-width: 768px) {
         .book-content-view h1, .book-content-view h2, .book-content-view h3, .book-content-view h4, .book-content-view h5, .book-content-view h6 {
@@ -91,7 +92,7 @@ const BookStyles = () => {
       margin-bottom: 1.2em;
     }
     .book-content-view a {
-      color: #89674A;
+      color: #1A2B6D;
       text-decoration: underline;
     }
     .book-content-view ul, .book-content-view ol {
@@ -99,11 +100,11 @@ const BookStyles = () => {
       padding-left: 1.5em;
     }
     .book-content-view blockquote {
-        border-left: 3px solid #89674A;
+        border-left: 3px solid #1A2B6D;
         padding-left: 1em;
         margin-left: 0;
         font-style: italic;
-        color: #202020;
+        color: #333333;
     }
   `;
   return <style>{styles}</style>;
@@ -113,7 +114,7 @@ const App: React.FC = () => {
   const [library, setLibrary] = useState<Book[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -125,67 +126,33 @@ const App: React.FC = () => {
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
   const [generatingTrailerForBookId, setGeneratingTrailerForBookId] = useState<string | null>(null);
   const [viewingTrailerForBook, setViewingTrailerForBook] = useState<Book | null>(null);
-  const [titleMarquee, setTitleMarquee] = useState({ enabled: false, duration: '20s' });
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
 
 
   const viewerRef = useRef<HTMLDivElement>(null);
   const chapterRefs = useRef<{[key: string]: HTMLElement}>({});
   const scrollTimeout = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const titleContainerRef = useRef<HTMLDivElement>(null);
-  const titleTextRef = useRef<HTMLHeadingElement>(null);
   
   const selectedBook = library.find(b => b.id === selectedBookId) || null;
 
   useEffect(() => {
-    const checkOverflow = () => {
-        if (titleContainerRef.current && titleTextRef.current) {
-            const container = titleContainerRef.current;
-            const text = titleTextRef.current;
-            const isOverflow = text.scrollWidth > container.clientWidth;
-            
-            if (isOverflow) {
-                const duration = text.scrollWidth / 40; // Speed: 40px/sec
-                setTitleMarquee({ enabled: true, duration: `${duration}s` });
-            } else {
-                setTitleMarquee({ enabled: false, duration: '20s' });
-            }
-        }
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e);
     };
-
-    if (selectedBook) {
-        // A short delay allows the browser to render and calculate widths correctly
-        const timer = setTimeout(checkOverflow, 50); 
-        window.addEventListener('resize', checkOverflow);
-        return () => {
-            clearTimeout(timer);
-            window.removeEventListener('resize', checkOverflow);
-        };
-    } else {
-        // Reset when returning to the library
-        setTitleMarquee({ enabled: false, duration: '20s' });
-    }
-}, [selectedBook]);
-
-  // Load quotes from local storage
-  useEffect(() => {
-    try {
-      const storedQuotes = localStorage.getItem('zizhi-quotes');
-      if (storedQuotes) setQuotes(JSON.parse(storedQuotes));
-    } catch (e) {
-      console.error("Failed to access localStorage", e);
-    }
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
-  // Save quotes to local storage
-  useEffect(() => {
-    try {
-        localStorage.setItem('zizhi-quotes', JSON.stringify(quotes));
-    } catch (e) { console.error("Failed to save quotes to localStorage", e); }
-  }, [quotes]);
-
-  const showToast = (message: string, action?: { label: string; onClick: () => void; }) => {
-    setToast({ message, action });
+  const handleInstallClick = async () => {
+    if (installPrompt) {
+      installPrompt.prompt();
+      const { outcome } = await installPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setInstallPrompt(null);
+      }
+    }
   };
   
   const parseEpub = async (file: File): Promise<Book> => {
@@ -401,10 +368,66 @@ const App: React.FC = () => {
     
     return {
         id: `${file.name}-${file.size}`, title, author, coverImageUrl,
-        chapters: loadedChapters, toc: tocNav, progress: 0, lastScrollTop: 0
+        chapters: loadedChapters, toc: tocNav, progress: 0, lastScrollTop: 0,
+        epubFile: file,
     };
   };
 
+  useEffect(() => {
+    const loadLibraryFromDB = async () => {
+        setIsLoading(true);
+        try {
+            const booksFromDb = await db.getBooks();
+            const loadedBooks: Book[] = [];
+            for (const bookData of booksFromDb) {
+                if (bookData.epubFile) {
+                    const epubFile = new File([bookData.epubFile], bookData.id, { type: 'application/epub+zip' });
+                    const parsedData = await parseEpub(epubFile);
+                    
+                    loadedBooks.push({
+                        ...parsedData,
+                        id: bookData.id,
+                        progress: bookData.progress,
+                        lastScrollTop: bookData.lastScrollTop,
+                        audioTrailerUrl: bookData.audioTrailerBlob ? URL.createObjectURL(bookData.audioTrailerBlob) : undefined,
+                        trailerScript: bookData.trailerScript,
+                        epubFile: epubFile,
+                        audioTrailerBlob: bookData.audioTrailerBlob
+                    });
+                }
+            }
+            setLibrary(loadedBooks);
+        } catch (e) {
+            console.error("Failed to load library from DB", e);
+            setError("Could not load saved books.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    loadLibraryFromDB();
+  }, []);
+
+  // Load quotes from local storage
+  useEffect(() => {
+    try {
+      const storedQuotes = localStorage.getItem('zizhi-quotes');
+      if (storedQuotes) setQuotes(JSON.parse(storedQuotes));
+    } catch (e) {
+      console.error("Failed to access localStorage", e);
+    }
+  }, []);
+
+  // Save quotes to local storage
+  useEffect(() => {
+    try {
+        localStorage.setItem('zizhi-quotes', JSON.stringify(quotes));
+    } catch (e) { console.error("Failed to save quotes to localStorage", e); }
+  }, [quotes]);
+
+  const showToast = (message: string, action?: { label: string; onClick: () => void; }) => {
+    setToast({ message, action });
+  };
+  
   const handleFileSelect = useCallback(async (selectedFile: File) => {
     if (selectedFile?.type !== 'application/epub+zip') {
       setError('Invalid file type. Please upload an EPUB file.');
@@ -419,6 +442,7 @@ const App: React.FC = () => {
     setIsLoading(true);
     try {
       const newBook = await parseEpub(selectedFile);
+      await db.saveBook(newBook);
       setLibrary(prev => [...prev, newBook]);
     } catch (e: any) {
       console.error(e);
@@ -436,9 +460,11 @@ const App: React.FC = () => {
   const handleBackToLibrary = () => {
     if (selectedBook && viewerRef.current) {
       const { scrollTop } = viewerRef.current;
+      const updatedBook = { ...selectedBook, lastScrollTop: scrollTop };
       setLibrary(lib => lib.map(b => 
-          b.id === selectedBook.id ? { ...b, lastScrollTop: scrollTop } : b
+          b.id === selectedBook.id ? updatedBook : b
       ));
+      db.saveBook(updatedBook);
     }
     setSelectedBookId(null);
     setCurrentLocation('');
@@ -450,7 +476,7 @@ const App: React.FC = () => {
   
     const scrollTarget = pendingNavigation;
     if (pendingNavigation) {
-      setPendingNavigation(null); // Consume it
+      setPendingNavigation(null);
     }
   
     const tryToScroll = (attempt = 0) => {
@@ -511,11 +537,18 @@ const App: React.FC = () => {
         const totalScrollable = scrollHeight - clientHeight;
         const progress = totalScrollable > 0 ? scrollTop / totalScrollable : 1;
         
-        setLibrary(lib => lib.map(b => 
-            b.id === selectedBookId ? { ...b, progress: Math.min(progress, 1), lastScrollTop: scrollTop } : b
-        ));
+        const currentBook = library.find(b => b.id === selectedBookId);
+        if (currentBook) {
+            const updatedBook = {
+                ...currentBook,
+                progress: Math.min(progress, 1),
+                lastScrollTop: scrollTop
+            };
+            setLibrary(lib => lib.map(b => b.id === selectedBookId ? updatedBook : b));
+            db.saveBook(updatedBook);
+        }
     }, 150);
-  }, [selectedBookId]);
+  }, [selectedBookId, library]);
 
   const navigateTo = (href: string) => {
     const chapterIdWithAnchor = href.split('/').pop();
@@ -529,6 +562,7 @@ const App: React.FC = () => {
     if(window.innerWidth < 1024) setIsSidebarOpen(false);
   };
   
+  // Effect to show/update the selection popup
   useEffect(() => {
     if (!selectedBook) return;
     const viewer = viewerRef.current;
@@ -539,17 +573,15 @@ const App: React.FC = () => {
 
       if (
         !sel ||
-        sel.isCollapsed ||
         !viewerRef.current ||
         !sel.anchorNode ||
         !viewerRef.current.contains(sel.anchorNode)
       ) {
-        if (selection) {
-          setSelection(null);
-        }
+        // This case is for selections outside the viewer, which we ignore.
+        // The popup is hidden by the click handler anyway.
         return;
       }
-
+      
       const text = sel.toString().trim();
       if (text.length > 0) {
         const range = sel.getRangeAt(0);
@@ -577,64 +609,47 @@ const App: React.FC = () => {
             right: rect.right - viewerRect.left,
             chapterId: chapterId,
           });
-        } else if (selection) {
-          setSelection(null);
         }
-      } else if (selection) {
+      } else {
+        // A click without selection, or an empty selection.
         setSelection(null);
       }
     };
 
     const handleMouseUp = () => {
+      // Timeout to allow the browser to register the selection change.
       setTimeout(updateSelectionState, 10);
     };
     
-    const handleTouchEnd = () => {
-      setTimeout(updateSelectionState, 10);
-    };
-    
-    const handleSelectionChange = () => {
-      if (selection) {
-        updateSelectionState();
-      }
-    };
-
     viewer.addEventListener('mouseup', handleMouseUp);
-    viewer.addEventListener('touchend', handleTouchEnd);
-    document.addEventListener('selectionchange', handleSelectionChange);
+    viewer.addEventListener('touchend', handleMouseUp);
     
     return () => {
       viewer.removeEventListener('mouseup', handleMouseUp);
-      viewer.removeEventListener('touchend', handleTouchEnd);
-      document.removeEventListener('selectionchange', handleSelectionChange);
+      viewer.removeEventListener('touchend', handleMouseUp);
     };
-  }, [selectedBook, selection]);
+  }, [selectedBook]);
 
+  // Effect to hide the selection popup
   useEffect(() => {
-    const handleMouseDown = (e: MouseEvent) => {
-        if (!selection) return;
+    if (!selection) return;
 
-        const target = e.target as HTMLElement;
-
-        const popupEl = document.querySelector('[data-selection-popup="true"]');
-        if (popupEl?.contains(target)) {
-            return;
-        }
-
-        if (viewerRef.current?.contains(target)) {
-            return;
-        }
-
-        e.preventDefault();
+    const handleMouseDown = (event: MouseEvent) => {
+      const popupEl = document.querySelector('[data-selection-popup="true"]');
+      if (popupEl?.contains(event.target as Node)) {
+        // Clicked inside the popup, do nothing.
+        return;
+      }
+      // Clicked outside the popup, so hide it.
+      setSelection(null);
     };
 
     document.addEventListener('mousedown', handleMouseDown, true);
-
+    
     return () => {
-        document.removeEventListener('mousedown', handleMouseDown, true);
+      document.removeEventListener('mousedown', handleMouseDown, true);
     };
   }, [selection]);
-
 
   const handleCopy = () => {
     if(selection) {
@@ -693,20 +708,13 @@ const App: React.FC = () => {
         };
 
         const luminance = getLuminance(r, g, b);
-        let finalR = r, finalG = g, finalB = b;
-        
-        // Adjust color brightness for better contrast
-        if (luminance < 0.2) { // Too dark
-          finalR = Math.floor(r * 0.6 + 255 * 0.4);
-          finalG = Math.floor(g * 0.6 + 255 * 0.4);
-          finalB = Math.floor(b * 0.6 + 255 * 0.4);
-        } else if (luminance > 0.85) { // Too light
-          finalR = Math.floor(r * 0.7);
-          finalG = Math.floor(g * 0.7);
-          finalB = Math.floor(b * 0.7);
+        if (luminance > 0.8) {
+             resolve(`rgb(${Math.floor(r * 0.8)}, ${Math.floor(g * 0.8)}, ${Math.floor(b*0.8)})`);
+        } else if (luminance < 0.2) {
+             resolve(`rgb(${Math.min(255, r + 50)}, ${Math.min(255, g + 50)}, ${Math.min(255, b + 50)})`);
+        } else {
+             resolve(`rgb(${r}, ${g}, ${b})`);
         }
-        
-        resolve(`rgb(${finalR}, ${finalG}, ${finalB})`);
       };
       img.onerror = (err) => reject(err);
     });
@@ -726,32 +734,29 @@ const App: React.FC = () => {
     const book = library.find(b => b.id === quote.bookId);
 
     const width = 1080;
-    const height = 1350; // Portrait aspect ratio
+    const height = 1350;
     const padding = 80;
     const borderRadius = 48;
     canvas.width = width;
     canvas.height = height;
 
-    // --- Background Gradient ---
-    const defaultBg = '#fdfbf3';
-    let coverColor = defaultBg;
+    const defaultBg = '#FAFAFA';
+    let coverColor = '#E0E0E0';
     
     if (book && book.coverImageUrl) {
         try {
             coverColor = await getAverageColorFromImageUrl(book.coverImageUrl);
         } catch (e) {
             console.error("Could not get average color from cover", e);
-            coverColor = '#EAEAEA';
         }
     }
 
-    const gradient = ctx.createRadialGradient(width, 0, 0, width, 0, width * 1.5);
+    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, width * 1.5);
     gradient.addColorStop(0, coverColor);
     gradient.addColorStop(1, defaultBg);
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
 
-    // --- Main Card with Rounded Corners & Inner Border ---
     const drawRoundedRect = (x: number, y: number, w: number, h: number, r: number) => {
         ctx.beginPath();
         ctx.moveTo(x + r, y);
@@ -761,20 +766,7 @@ const App: React.FC = () => {
         ctx.arcTo(x, y, x + w, y, r);
         ctx.closePath();
     };
-
-    // Use a clipping path for the main card shape
-    ctx.save();
-    drawRoundedRect(padding / 2, padding / 2, width - padding, height - padding, borderRadius);
-    ctx.clip(); 
-    ctx.fillRect(0, 0, width, height); // Redraw background inside clipped area
-
-    // Inner border
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.lineWidth = 3;
-    drawRoundedRect(padding / 2 + 1.5, padding / 2 + 1.5, width - padding - 3, height - padding - 3, borderRadius - 1);
-    ctx.stroke();
     
-    // --- Header Section ---
     const headerY = padding;
     const coverSize = 150;
     const coverBorderRadius = 24;
@@ -796,32 +788,31 @@ const App: React.FC = () => {
         ctx.drawImage(coverImage, padding, headerY, coverSize, coverSize);
         ctx.restore();
       } catch (e) {
-        ctx.fillStyle = '#EAEAEA';
+        ctx.fillStyle = '#E0E0E0';
         drawRoundedRect(padding, headerY, coverSize, coverSize, coverBorderRadius);
         ctx.fill();
       }
     } else {
-        ctx.fillStyle = '#EAEAEA';
+        ctx.fillStyle = '#E0E0E0';
         drawRoundedRect(padding, headerY, coverSize, coverSize, coverBorderRadius);
         ctx.fill();
     }
     
-    ctx.fillStyle = '#000000';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     
     const titleX = padding + coverSize + textPadding;
     const titleY = headerY + coverSize / 2;
 
+    ctx.fillStyle = '#1A2B6D';
     ctx.font = `bold 48px Inter, sans-serif`;
     ctx.fillText(quote.bookTitle, titleX, titleY - 28, width - titleX - padding);
     
+    ctx.fillStyle = '#333333';
     ctx.font = `36px Inter, sans-serif`;
-    ctx.fillStyle = '#202020';
     ctx.fillText(quote.author, titleX, titleY + 28, width - titleX - padding);
 
-    // --- Quote Text ---
-    ctx.fillStyle = '#000000';
+    ctx.fillStyle = '#333333';
     const maxTextWidth = width - (padding * 2);
     const quoteStartY = headerY + coverSize + 80;
     
@@ -852,7 +843,7 @@ const App: React.FC = () => {
     let lines = wrapText(quote.text, maxTextWidth);
     let lineHeight = fontSize * 1.5;
     
-    const availableHeight = height - quoteStartY - padding - 150; // Reserve space for logo
+    const availableHeight = height - quoteStartY - padding - 100; // Reserve space for logo
     while ((lines.length * lineHeight > availableHeight) && fontSize > 24) {
         fontSize -= 2;
         lineHeight = fontSize * 1.5;
@@ -864,39 +855,39 @@ const App: React.FC = () => {
         ctx.fillText(line, padding, quoteStartY + (index * lineHeight));
     });
 
-    // --- Zizhi Logo ---
-    const logoRadius = 60;
-    const logoX = padding + logoRadius;
-    const logoY = height - padding - logoRadius - (padding/2);
+    const logoImage = new Image();
+    try {
+        const svgText = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="500" zoomAndPan="magnify" viewBox="0 0 375 374.999991" height="500" preserveAspectRatio="xMidYMid meet" version="1.0"><defs><g/></defs><path stroke-linecap="round" transform="matrix(0, 0.75, -0.75, 0, 49.498384, 101.0039)" fill="none" stroke-linejoin="miter" d="M 14.00001 13.997846 L 216.661481 13.997846 " stroke="#071108" stroke-width="28" stroke-opacity="1" stroke-miterlimit="4"/><path stroke-linecap="round" transform="matrix(0.000000001309, 0.75, -0.75, 0.000000001309, 91.115571, 163.063672)" fill="none" stroke-linejoin="miter" d="M 13.998439 13.997846 L 133.920322 13.997846 " stroke="#071108" stroke-width="28" stroke-opacity="1" stroke-miterlimit="4"/><path stroke-linecap="round" transform="matrix(0.252893, 0.706077, -0.706077, 0.252893, 121.425897, 155.549815)" fill="none" stroke-linejoin="miter" d="M 14.001778 13.999631 L 143.73484 13.999655 " stroke="#071108" stroke-width="28" stroke-opacity="1" stroke-miterlimit="4"/><g fill="#071108" fill-opacity="1"><g transform="translate(182.267174, 257.847684)"><g><path d="M 5.9375 0 C 5 0 4.238281 -0.1875 3.65625 -0.5625 C 3.082031 -0.9375 2.691406 -1.445312 2.484375 -2.09375 C 2.285156 -2.75 2.285156 -3.476562 2.484375 -4.28125 C 2.691406 -5.082031 3.113281 -5.914062 3.75 -6.78125 L 25.140625 -35.78125 L 25.140625 -33.484375 L 5.375 -33.484375 C 4.332031 -33.484375 3.539062 -33.742188 3 -34.265625 C 2.457031 -34.796875 2.1875 -35.546875 2.1875 -36.515625 C 2.1875 -37.484375 2.457031 -38.21875 3 -38.71875 C 3.539062 -39.226562 4.332031 -39.484375 5.375 -39.484375 L 28.5625 -39.484375 C 29.488281 -39.484375 30.242188 -39.296875 30.828125 -38.921875 C 31.410156 -38.546875 31.800781 -38.039062 32 -37.40625 C 32.207031 -36.769531 32.207031 -36.039062 32 -35.21875 C 31.800781 -34.394531 31.382812 -33.554688 30.75 -32.703125 L 9.359375 -3.75 L 9.359375 -5.984375 L 29.953125 -5.984375 C 31.003906 -5.984375 31.800781 -5.734375 32.34375 -5.234375 C 32.882812 -4.734375 33.15625 -4 33.15625 -3.03125 C 33.15625 -2.050781 32.882812 -1.300781 32.34375 -0.78125 C 31.800781 -0.257812 31.003906 0 29.953125 0 Z M 5.9375 0 "/></g></g></g><g fill="#071108" fill-opacity="1"><g transform="translate(218.94243, 257.847684)"><g><path d="M 7.890625 0.453125 C 6.734375 0.453125 5.847656 0.125 5.234375 -0.53125 C 4.617188 -1.1875 4.3125 -2.09375 4.3125 -3.25 L 4.3125 -36.234375 C 4.3125 -37.429688 4.617188 -38.34375 5.234375 -38.96875 C 5.847656 -39.601562 6.734375 -39.921875 7.890625 -39.921875 C 9.046875 -39.921875 9.929688 -39.601562 10.546875 -38.96875 C 11.171875 -38.34375 11.484375 -37.429688 11.484375 -36.234375 L 11.484375 -3.25 C 11.484375 -2.09375 11.179688 -1.1875 10.578125 -0.53125 C 9.984375 0.125 9.085938 0.453125 7.890625 0.453125 Z M 7.890625 0.453125 "/></g></g></g><g fill="#071108" fill-opacity="1"><g transform="translate(237.532212, 257.847684)"><g><path d="M 5.9375 0 C 5 0 4.238281 -0.1875 3.65625 -0.5625 C 3.082031 -0.9375 2.691406 -1.445312 2.484375 -2.09375 C 2.285156 -2.75 2.285156 -3.476562 2.484375 -4.28125 C 2.691406 -5.082031 3.113281 -5.914062 3.75 -6.78125 L 25.140625 -35.78125 L 25.140625 -33.484375 L 5.375 -33.484375 C 4.332031 -33.484375 3.539062 -33.742188 3 -34.265625 C 2.457031 -34.796875 2.1875 -35.546875 2.1875 -36.515625 C 2.1875 -37.484375 2.457031 -38.21875 3 -38.71875 C 3.539062 -39.226562 4.332031 -39.484375 5.375 -39.484375 L 28.5625 -39.484375 C 29.488281 -39.484375 30.242188 -39.296875 30.828125 -38.921875 C 31.410156 -38.546875 31.800781 -38.039062 32 -37.40625 C 32.207031 -36.769531 32.207031 -36.039062 32 -35.21875 C 31.800781 -34.394531 31.382812 -33.554688 30.75 -32.703125 L 9.359375 -3.75 L 9.359375 -5.984375 L 29.953125 -5.984375 C 31.003906 -5.984375 31.800781 -5.734375 32.34375 -5.234375 C 32.882812 -4.734375 33.15625 -4 33.15625 -3.03125 C 33.15625 -2.050781 32.882812 -1.300781 32.34375 -0.78125 C 31.800781 -0.257812 31.003906 0 29.953125 0 Z M 5.9375 0 "/></g></g></g><g fill="#071108" fill-opacity="1"><g transform="translate(274.207468, 257.847684)"><g><path d="M 7.890625 0.453125 C 6.734375 0.453125 5.847656 0.125 5.234375 -0.53125 C 4.617188 -1.1875 4.3125 -2.09375 4.3125 -3.25 L 4.3125 -36.234375 C 4.3125 -37.429688 4.617188 -38.34375 5.234375 -38.96875 C 5.847656 -39.601562 6.734375 -39.921875 7.890625 -39.921875 C 9.046875 -39.921875 9.929688 -39.601562 10.546875 -38.96875 C 11.171875 -38.34375 11.484375 -37.429688 11.484375 -36.234375 L 11.484375 -23.015625 L 31.8125 -23.015625 L 31.8125 -36.234375 C 31.8125 -37.429688 32.117188 -38.34375 32.734375 -38.96875 C 33.347656 -39.601562 34.234375 -39.921875 35.390625 -39.921875 C 36.546875 -39.921875 37.429688 -39.601562 38.046875 -38.96875 C 38.660156 -38.34375 38.96875 -37.429688 38.96875 -36.234375 L 38.96875 -3.25 C 38.96875 -2.09375 38.660156 -1.1875 38.046875 -0.53125 C 37.429688 0.125 36.546875 0.453125 35.390625 0.453125 C 34.234375 0.453125 33.347656 0.125 32.734375 -0.53125 C 32.117188 -1.1875 31.8125 -2.09375 31.8125 -3.25 L 31.8125 -17.03125 L 11.484375 -17.03125 L 11.484375 -3.25 C 11.484375 -2.09375 11.179688 -1.1875 10.578125 -0.53125 C 9.984375 0.125 9.085938 0.453125 7.890625 0.453125 Z M 7.890625 0.453125 "/></g></g></g><g fill="#071108" fill-opacity="1"><g transform="translate(320.289412, 257.847684)"><g><path d="M 7.890625 0.453125 C 6.734375 0.453125 5.847656 0.125 5.234375 -0.53125 C 4.617188 -1.1875 4.3125 -2.09375 4.3125 -3.25 L 4.3125 -36.234375 C 4.3125 -37.429688 4.617188 -38.34375 5.234375 -38.96875 C 5.847656 -39.601562 6.734375 -39.921875 7.890625 -39.921875 C 9.046875 -39.921875 9.929688 -39.601562 10.546875 -38.96875 C 11.171875 -38.34375 11.484375 -37.429688 11.484375 -36.234375 L 11.484375 -3.25 C 11.484375 -2.09375 11.179688 -1.1875 10.578125 -0.53125 C 9.984375 0.125 9.085938 0.453125 7.890625 0.453125 Z M 7.890625 0.453125 "/></g></g></g></svg>`;
 
-    ctx.fillStyle = '#2c3e50'; // Dark blue circle
-    ctx.beginPath();
-    ctx.arc(logoX, logoY, logoRadius, 0, Math.PI * 2);
-    ctx.fill();
+        // Create a data URL from the SVG text to use as the image source
+        const logoSrc = `data:image/svg+xml;base64,${btoa(svgText)}`;
+        
+        logoImage.src = logoSrc;
+        
+        // Wait for the logo to load
+        await new Promise<void>((resolve) => {
+            logoImage.onload = () => resolve();
+            logoImage.onerror = () => {
+                console.error("Failed to load logo SVG for canvas.");
+                resolve(); // Resolve anyway to not break image generation
+            };
+        });
 
-    ctx.fillStyle = '#ecf0f1';
-    ctx.font = `bold 28px Inter, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('zizhi', logoX, logoY + 18);
+        // Draw the logo if it loaded correctly
+        if (logoImage.complete && logoImage.naturalHeight !== 0) {
+            const logoHeight = 50;
+            const logoWidth = (logoImage.width / logoImage.height) * logoHeight;
+            const logoX = (width - logoWidth) / 2;
+            const logoY = height - padding - logoHeight + 20;
+            ctx.globalAlpha = 0.8;
+            ctx.drawImage(logoImage, logoX, logoY, logoWidth, logoHeight);
+            ctx.globalAlpha = 1.0;
+        }
+    } catch (e) {
+        console.warn("Could not load and draw the logo onto the quote image.", e);
+    }
 
-    // Icon (stylized book/heart)
-    ctx.beginPath();
-    ctx.moveTo(logoX - 25, logoY - 25);
-    ctx.quadraticCurveTo(logoX - 35, logoY - 15, logoX - 25, logoY - 5);
-    ctx.lineTo(logoX - 2, logoY - 15);
-    ctx.closePath();
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(logoX + 25, logoY - 25);
-    ctx.quadraticCurveTo(logoX + 35, logoY - 15, logoX + 25, logoY - 5);
-    ctx.lineTo(logoX + 2, logoY - 15);
-    ctx.closePath();
-    ctx.fill();
 
-    ctx.restore(); // Restore context from main card clipping
-
-    // --- Finalize and Download ---
     const dataUrl = canvas.toDataURL('image/png');
     const link = document.createElement('a');
     link.href = dataUrl;
@@ -944,17 +935,13 @@ const App: React.FC = () => {
     handleBookSelect(quote.bookId);
   };
 
-  const handleDeleteBook = (id: string) => {
-    setLibrary(prev => {
-        const bookToDelete = prev.find(b => b.id === id);
-        if (bookToDelete?.coverImageUrl) {
-            URL.revokeObjectURL(bookToDelete.coverImageUrl);
-        }
-        if (bookToDelete?.audioTrailerUrl) {
-            URL.revokeObjectURL(bookToDelete.audioTrailerUrl);
-        }
-        return prev.filter(b => b.id !== id);
-    });
+  const handleDeleteBook = async (id: string) => {
+    const bookToDelete = library.find(b => b.id === id);
+    if (bookToDelete?.coverImageUrl) URL.revokeObjectURL(bookToDelete.coverImageUrl);
+    if (bookToDelete?.audioTrailerUrl) URL.revokeObjectURL(bookToDelete.audioTrailerUrl);
+    
+    setLibrary(prev => prev.filter(b => b.id !== id));
+    await db.deleteBook(id);
     showToast('Book deleted.');
   };
 
@@ -1023,9 +1010,7 @@ const App: React.FC = () => {
               const parser = new DOMParser();
               const doc = parser.parseFromString(chapter.html, 'text/html');
               accumulatedText += (doc.body.textContent || '') + ' ';
-              if (accumulatedText.length >= 5000) {
-                  break;
-              }
+              if (accumulatedText.length >= 5000) break;
           }
 
           const textToSummarize = accumulatedText.replace(/\s+/g, ' ').slice(0, 5000);
@@ -1036,18 +1021,17 @@ const App: React.FC = () => {
 
           const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
           
-          // Step 1: Generate the cinematic script
-          const summaryPrompt = `You are a world-class movie trailer scriptwriter. Your task is to create a short, dramatic, and cinematic monologue summarizing the beginning of the following book text. The summary should be captivating, create suspense, and feel like a Netflix adaptation trailer.
+          const summaryPrompt = `You are a world-class movie trailer scriptwriter. Your task is to write the narration for a short, dramatic, and captivating movie-style trailer based on the following text from a book.
 
-**IMPORTANT RULES:**
-- The output must be a single block of text, suitable for a single narrator.
-- DO NOT include character names or dialogue prefixes (e.g., "CHARACTER:").
-- DO NOT include performance cues in parentheses (e.g., "(dramatically)").
-- The script should be around 150-200 words.
-- Do not spoil major plot points. Hint at the central conflict and themes.
+The narration should be concise (around 100-150 words), build suspense, and make someone want to read the book. Use short, impactful sentences. The tone should be cinematic.
 
-Here is the beginning of the book:
-${textToSummarize}`;
+Your output must ONLY be the text for the narration. Do NOT include any sound effects, music cues, or descriptions of the voice (like "VOICEOVER:"). Just provide the raw text to be spoken.
+
+Here is the text from the book:
+---
+${textToSummarize}
+---
+`;
 
           const summaryResponse = await ai.models.generateContent({
               model: 'gemini-2.5-flash',
@@ -1056,36 +1040,27 @@ ${textToSummarize}`;
 
           const script = summaryResponse.text;
           
-          if (!script) {
-            throw new Error("Could not generate trailer script.");
-          }
+          if (!script) throw new Error("Could not generate trailer script.");
 
-          // Step 2: Generate speech from the script
           const ttsResponse = await ai.models.generateContent({
             model: "gemini-2.5-flash-preview-tts",
             contents: [{ parts: [{ text: script }] }],
             config: {
               responseModalities: [Modality.AUDIO],
-              speechConfig: {
-                  voiceConfig: {
-                    prebuiltVoiceConfig: { voiceName: 'Fenrir' },
-                  },
-              },
+              speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Fenrir' } } },
             },
           });
           
           const base64Audio = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-          if (!base64Audio) {
-            throw new Error("Failed to generate audio data.");
-          }
+          if (!base64Audio) throw new Error("Failed to generate audio data.");
           
           const pcmData = decodeBase64(base64Audio);
           const wavBlob = pcmToWav(pcmData, 24000, 1, 16);
           const audioUrl = URL.createObjectURL(wavBlob);
           
-          setLibrary(prev => prev.map(b => 
-            b.id === bookId ? { ...b, audioTrailerUrl: audioUrl, trailerScript: script } : b
-          ));
+          const updatedBook = { ...book, audioTrailerUrl: audioUrl, trailerScript: script, audioTrailerBlob: wavBlob };
+          setLibrary(prev => prev.map(b => b.id === bookId ? updatedBook : b));
+          await db.saveBook(updatedBook);
           showToast("Trailer is ready!");
 
       } catch(e: any) {
@@ -1131,8 +1106,18 @@ ${textToSummarize}`;
     }));
     return (
         <div className="flex flex-col h-screen bg-background text-primary-text">
-            <header className="flex-shrink-0 p-4 sm:p-6 lg:p-8">
-                <h1 className="text-4xl sm:text-5xl font-bold font-serif">Zizhi</h1>
+            <header className="flex-shrink-0 p-4 sm:p-6 lg:p-8 flex justify-between items-center">
+                <Logo className="h-10 sm:h-12 w-auto" />
+                {installPrompt && (
+                  <button
+                    onClick={handleInstallClick}
+                    title="Install Zizhi App"
+                    className="flex items-center gap-2 bg-secondary text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-opacity-90 transition-opacity"
+                  >
+                    <IconDownload className="w-5 h-5" />
+                    <span className="text-sm hidden sm:inline">Install App</span>
+                  </button>
+                )}
             </header>
 
             <div className="px-4 sm:px-6 lg:p-8 border-b border-border-color">
@@ -1142,7 +1127,7 @@ ${textToSummarize}`;
                 </nav>
             </div>
             
-            <main className="flex-1 overflow-y-auto bg-border-color/5">
+            <main className="flex-1 overflow-y-auto bg-black/5">
                 {activeTab === 'library' ? (
                     <Library 
                         books={libraryCards} 
@@ -1195,7 +1180,7 @@ ${textToSummarize}`;
         <div className="flex items-center justify-between p-4 border-b border-border-color flex-shrink-0">
           <h2 className="text-lg font-bold truncate">Table of Contents</h2>
           <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-1 rounded-full hover:bg-border-color/20">
-            <IconClose />
+            <IconClose className="w-6 h-6" />
           </button>
         </div>
         <nav className="overflow-y-auto flex-grow p-2">
@@ -1211,30 +1196,14 @@ ${textToSummarize}`;
             <IconChevronLeft className="w-5 h-5 mr-1" />
             <span className="hidden sm:inline">Back to Library</span>
           </button>
-          <div ref={titleContainerRef} className="text-center mx-2 flex-1 min-w-0">
-            <div className="relative h-6 md:h-7 flex items-center justify-center">
-              {/* Hidden element for measurement. */}
-              <h1 ref={titleTextRef} className="font-bold text-sm md:text-lg whitespace-nowrap absolute opacity-0 -z-10" aria-hidden="true">
-                  {selectedBook.title}
-              </h1>
-
-              {titleMarquee.enabled ? (
-                  <div className="marquee-parent w-full h-full">
-                      <div className="marquee-child items-center" style={{ animationDuration: titleMarquee.duration }}>
-                          <span className="font-bold text-sm md:text-lg pr-8">{selectedBook.title}</span>
-                          <span className="font-bold text-sm md:text-lg pr-8" aria-hidden="true">{selectedBook.title}</span>
-                      </div>
-                  </div>
-              ) : (
-                  <h1 className="font-bold text-sm md:text-lg truncate">
-                      {selectedBook.title}
-                  </h1>
-              )}
-            </div>
+          <div className="text-center mx-2 flex-1 min-w-0">
+            <h1 className="font-bold text-sm md:text-lg truncate">
+                {selectedBook.title}
+            </h1>
             <p className="text-xs md:text-sm text-secondary-text truncate">{currentLocation}</p>
           </div>
           <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 rounded-full hover:bg-border-color/20">
-            {isSidebarOpen ? <IconClose /> : <IconMenu />}
+            {isSidebarOpen ? <IconClose className="w-6 h-6" /> : <IconMenu className="w-6 h-6" />}
           </button>
         </header>
 

@@ -34,4 +34,8 @@ export interface Book {
     lastScrollTop: number;
     audioTrailerUrl?: string;
     trailerScript?: string;
+
+    // For persistence
+    epubFile?: File | Blob;
+    audioTrailerBlob?: Blob;
 }

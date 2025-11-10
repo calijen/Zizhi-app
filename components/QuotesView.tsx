@@ -123,8 +123,7 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, onDelete, onShare, onGe
       
       <div className="bg-background border border-border-color rounded-lg px-4 sm:px-8">
         {sortBy === 'date' && sortedByDate.map(quote => <QuoteItem key={quote.id} quote={quote} />)}
-
-        {/* FIX: Replaced Object.entries with Object.keys to prevent a type inference issue where bookQuotes was being treated as 'unknown'. This ensures it's correctly typed as Quote[]. */}
+        
         {sortBy === 'book' && groupedByBook && Object.keys(groupedByBook).map((bookTitle) => {
             const bookQuotes = groupedByBook[bookTitle];
             return (
