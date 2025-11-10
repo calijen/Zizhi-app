@@ -530,6 +530,7 @@ const App: React.FC = () => {
   }, [selectedBook, selectedBook?.id, selectedBook?.chapters]);
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    setSelection(null); // Hide popup immediately on scroll
     if (scrollTimeout.current) window.clearTimeout(scrollTimeout.current);
     scrollTimeout.current = window.setTimeout(() => {
         if (!viewerRef.current || !selectedBookId) return;
@@ -562,67 +563,70 @@ const App: React.FC = () => {
     if(window.innerWidth < 1024) setIsSidebarOpen(false);
   };
   
-  // Consolidated effect for showing/hiding the selection popup
+  // Refactored text selection logic for better mobile reliability
   useEffect(() => {
     if (!selectedBook) return;
     const viewer = viewerRef.current;
     if (!viewer) return;
 
-    const handleInteraction = (event: MouseEvent | TouchEvent) => {
-      const popupEl = document.querySelector('[data-selection-popup="true"]');
-      if (popupEl?.contains(event.target as Node)) {
-        return; // Ignore clicks on the popup itself.
-      }
-  
-      // Use a short timeout to allow the browser to update the selection object.
-      setTimeout(() => {
-        const sel = window.getSelection();
-  
-        // Condition to show: a non-empty selection exists *inside* the viewer.
-        if (sel && !sel.isCollapsed && viewer.contains(sel.anchorNode)) {
-          const text = sel.toString().trim();
-          if (text.length > 0) {
-            const range = sel.getRangeAt(0);
-            const rect = range.getBoundingClientRect();
-            const viewerRect = viewer.getBoundingClientRect();
-  
-            let currentNode: Node | null = sel.anchorNode;
-            let chapterId: string | null = null;
-            while (currentNode && currentNode !== viewer) {
-              if (currentNode.nodeType === Node.ELEMENT_NODE) {
-                const element = currentNode as HTMLElement;
-                if (element.tagName.toLowerCase() === 'section' && element.id && selectedBook.chapters.some(c => c.id === element.id)) {
-                  chapterId = element.id;
-                  break;
-                }
-              }
-              currentNode = currentNode.parentNode;
-            }
-  
-            if (chapterId) {
-              setSelection({
-                text,
-                top: rect.top - viewerRect.top + viewer.scrollTop,
-                left: rect.left - viewerRect.left + rect.width / 2,
-                right: rect.right - viewerRect.left,
-                chapterId: chapterId,
-              });
-            }
-            return; // Exit after successfully showing the popup.
-          }
-        }
+    const debounceTimeout = { current: 0 };
+
+    const handleSelectionChange = () => {
+        window.clearTimeout(debounceTimeout.current);
+
+        debounceTimeout.current = window.setTimeout(() => {
+            const sel = window.getSelection();
+
+            // Condition to SHOW/UPDATE the popup
+            if (sel && !sel.isCollapsed && viewer.contains(sel.anchorNode)) {
+                const text = sel.toString().trim();
+                if (text.length > 0) {
+                    const range = sel.getRangeAt(0);
+                    const rect = range.getBoundingClientRect();
+                    
+                    if (rect.width < 1 && rect.height < 1) {
+                        setSelection(null);
+                        return;
+                    }
+
+                    const viewerRect = viewer.getBoundingClientRect();
         
-        // In all other cases (no selection, selection outside viewer, etc.), hide the popup.
-        setSelection(null);
-      }, 50);
+                    let currentNode: Node | null = sel.anchorNode;
+                    let chapterId: string | null = null;
+                    while (currentNode && currentNode !== viewer) {
+                        if (currentNode.nodeType === Node.ELEMENT_NODE) {
+                            const element = currentNode as HTMLElement;
+                            if (element.tagName.toLowerCase() === 'section' && element.id && selectedBook.chapters.some(c => c.id === element.id)) {
+                                chapterId = element.id;
+                                break;
+                            }
+                        }
+                        currentNode = currentNode.parentNode;
+                    }
+        
+                    if (chapterId) {
+                        setSelection({
+                            text,
+                            top: rect.top - viewerRect.top + viewer.scrollTop,
+                            left: rect.left - viewerRect.left + rect.width / 2,
+                            right: rect.right - viewerRect.left,
+                            chapterId: chapterId,
+                        });
+                    }
+                    return;
+                }
+            }
+            
+            // Condition to HIDE the popup: selection is collapsed or outside the viewer.
+            setSelection(null);
+        }, 100); // Debounce to prevent flicker and excessive updates while dragging.
     };
-  
-    document.addEventListener('mouseup', handleInteraction);
-    document.addEventListener('touchend', handleInteraction);
-  
+
+    document.addEventListener('selectionchange', handleSelectionChange);
+
     return () => {
-      document.removeEventListener('mouseup', handleInteraction);
-      document.removeEventListener('touchend', handleInteraction);
+        document.removeEventListener('selectionchange', handleSelectionChange);
+        window.clearTimeout(debounceTimeout.current);
     };
   }, [selectedBook]);
 
