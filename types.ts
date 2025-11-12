@@ -40,3 +40,24 @@ export interface Book {
     epubFile?: File | Blob;
     audioTrailerBlob?: Blob;
 }
+
+export interface ThemeColors {
+  'primary': string;
+  'secondary': string;
+  'background': string;
+  'primary-text': string;
+  'secondary-text': string;
+  'border-color': string;
+}
+
+export interface ThemeFont {
+  name: string;
+  sans: string;
+  serif: string;
+}
+
+export interface Theme {
+  name: string;
+  colors: ThemeColors;
+  font: ThemeFont;
+}

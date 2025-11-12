@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import type { TocItem, Quote, Book, Chapter } from './types';
+import type { TocItem, Quote, Book, Chapter, Theme, ThemeFont, ThemeColors } from './types';
 import * as db from './db';
 import Library, { BookCardData } from './components/FileUpload';
 import QuotesView from './components/QuotesView';
+import SettingsView from './components/SettingsView';
 import TextSelectionPopup from './components/TextSelectionPopup';
 import Toast from './components/Toast';
 import TrailerView from './components/TrailerView';
 import { 
-  IconMenu, IconClose, IconChevronLeft, IconUpload, IconDownload, Logo
+  IconMenu, IconClose, IconChevronLeft, IconUpload, IconDownload, Logo, IconSettings
 } from './components/icons';
 import { GoogleGenAI, Modality } from "@google/genai";
 
@@ -18,15 +19,59 @@ declare global {
   }
 }
 
+const FONTS: ThemeFont[] = [
+    { name: 'Vintage', sans: 'Inter', serif: 'Lora' },
+    { name: 'Modern', sans: 'Roboto', serif: 'Roboto Slab' },
+];
+
+const THEMES: { [key: string]: Theme } = {
+  vintage: {
+    name: 'Vintage',
+    font: FONTS[0],
+    colors: {
+      'primary': '#1A2B6D',
+      'secondary': '#5D8BF4',
+      'background': '#FAFAFA',
+      'primary-text': '#333333',
+      'secondary-text': '#666666',
+      'border-color': '#E0E0E0',
+    },
+  },
+  black_and_white: {
+    name: 'Black & White',
+    font: FONTS[0],
+    colors: {
+      'primary': '#242424',
+      'secondary': '#437aff',
+      'background': '#FFFFFF',
+      'primary-text': 'rgba(0,0,0,0.8)',
+      'secondary-text': '#6b6b6b',
+      'border-color': '#f2f2f2',
+    }
+  },
+  night: {
+    name: 'Night',
+    font: FONTS[0],
+    colors: {
+        'primary': '#A7C7E7',
+        'secondary': '#89CFF0',
+        'background': '#121212',
+        'primary-text': '#E0E0E0',
+        'secondary-text': '#A0A0A0',
+        'border-color': '#2A2A2A',
+    }
+  }
+};
+
 const BookStyles = () => {
   const styles = `
     .book-content-view {
       padding: 1rem 1rem 2rem 1rem;
       line-height: 1.7;
       font-size: 1rem;
-      font-family: 'Lora', serif;
-      color: #333333;
-      background-color: #FAFAFA;
+      font-family: var(--font-serif), serif;
+      color: var(--color-primary-text);
+      background-color: var(--color-background);
       user-select: text;
       overflow-wrap: break-word;
       width: 100%;
@@ -72,16 +117,16 @@ const BookStyles = () => {
       }
     }
     .book-content-view ::selection {
-      background-color: #5D8BF4;
-      color: #FFFFFF;
+      background-color: var(--color-secondary);
+      color: white;
     }
     .book-content-view h1, .book-content-view h2, .book-content-view h3, .book-content-view h4, .book-content-view h5, .book-content-view h6 {
       margin-top: 1.5em;
       margin-bottom: 0.5em;
       line-height: 1.3;
       font-weight: 600;
-      font-family: 'Inter', sans-serif;
-      color: #1A2B6D;
+      font-family: var(--font-sans), sans-serif;
+      color: var(--color-primary);
     }
      @media (min-width: 768px) {
         .book-content-view h1, .book-content-view h2, .book-content-view h3, .book-content-view h4, .book-content-view h5, .book-content-view h6 {
@@ -92,7 +137,7 @@ const BookStyles = () => {
       margin-bottom: 1.2em;
     }
     .book-content-view a {
-      color: #1A2B6D;
+      color: var(--color-primary);
       text-decoration: underline;
     }
     .book-content-view ul, .book-content-view ol {
@@ -100,11 +145,11 @@ const BookStyles = () => {
       padding-left: 1.5em;
     }
     .book-content-view blockquote {
-        border-left: 3px solid #1A2B6D;
+        border-left: 3px solid var(--color-primary);
         padding-left: 1em;
         margin-left: 0;
         font-style: italic;
-        color: #333333;
+        color: var(--color-primary-text);
     }
   `;
   return <style>{styles}</style>;
@@ -122,12 +167,13 @@ const App: React.FC = () => {
 
   const [selection, setSelection] = useState<{ text: string; top: number; left: number; right: number; chapterId: string; } | null>(null);
   const [toast, setToast] = useState<{ message: string; action?: { label: string; onClick: () => void; } } | null>(null);
-  const [activeTab, setActiveTab] = useState<'library' | 'quotes'>('library');
+  const [activeTab, setActiveTab] = useState<'library' | 'quotes' | 'settings'>('library');
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
   const [generatingTrailerForBookId, setGeneratingTrailerForBookId] = useState<string | null>(null);
   const [viewingTrailerForBook, setViewingTrailerForBook] = useState<Book | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [theme, setTheme] = useState<Theme>(THEMES.black_and_white);
 
 
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -136,6 +182,55 @@ const App: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const selectedBook = library.find(b => b.id === selectedBookId) || null;
+
+  useEffect(() => {
+    try {
+      const savedTheme = localStorage.getItem('zizhi-theme');
+      if (savedTheme) {
+        setTheme(JSON.parse(savedTheme));
+      }
+    } catch (e) {
+      console.error("Failed to load theme from localStorage", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('zizhi-theme', JSON.stringify(theme));
+      
+      const styleEl = document.getElementById('zizhi-theme-styles') || document.createElement('style');
+      styleEl.id = 'zizhi-theme-styles';
+
+      const hexToRgb = (hex: string): string | null => {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : null;
+      };
+      
+      const colorStyles = Object.entries(theme.colors).map(([key, value]) => {
+        let rules = `--color-${key}: ${value};`;
+        if(!value.startsWith('rgba')) {
+            const rgbValue = hexToRgb(value);
+            if(rgbValue) rules += `--color-${key}-rgb: ${rgbValue};`;
+        }
+        return rules;
+      }).join('\n');
+      
+      const fontStyles = `
+        --font-sans: '${theme.font.sans}';
+        --font-serif: '${theme.font.serif}';
+      `;
+      
+      styleEl.innerHTML = `:root { ${colorStyles} ${fontStyles} }`;
+      
+      if (!document.head.contains(styleEl)) {
+        document.head.appendChild(styleEl);
+      }
+      document.body.style.fontFamily = `var(--font-sans), sans-serif`;
+
+    } catch(e) {
+      console.error("Failed to apply theme", e);
+    }
+  }, [theme]);
 
   useEffect(() => {
     // Set this once on mount
@@ -943,7 +1038,7 @@ const App: React.FC = () => {
 
     // Title drawing with wrapping
     ctx.fillStyle = palette.textPrimary;
-    ctx.font = `600 18px Inter, sans-serif`;
+    ctx.font = `600 18px ${theme.font.sans}, sans-serif`;
     ctx.textAlign = 'right';
     ctx.textBaseline = 'top';
 
@@ -966,7 +1061,7 @@ const App: React.FC = () => {
 
     // Author drawing
     ctx.fillStyle = palette.textSecondary;
-    ctx.font = `600 16px Inter, sans-serif`;
+    ctx.font = `600 16px ${theme.font.sans}, sans-serif`;
     ctx.fillText(quote.author, titleAuthorX + titleAuthorWidth, authorY + 4, titleAuthorWidth);
     
     currentY += headerHeight + gap;
@@ -983,7 +1078,7 @@ const App: React.FC = () => {
 
         while (fontSize >= minFontSize) {
             const lineHeight = fontSize * 1.8; // line height is 180% of font size
-            ctx.font = `600 ${fontSize}px Lora, serif`;
+            ctx.font = `600 ${fontSize}px ${theme.font.serif}, serif`;
             const lines = wrapText(quote.text, contentWidth);
             const totalHeight = lines.length * lineHeight;
 
@@ -995,7 +1090,7 @@ const App: React.FC = () => {
         
         // Fallback: If it still doesn't fit at min font size, truncate.
         const lineHeight = minFontSize * 1.8;
-        ctx.font = `600 ${minFontSize}px Lora, serif`;
+        ctx.font = `600 ${minFontSize}px ${theme.font.serif}, serif`;
         const lines = wrapText(quote.text, contentWidth);
         const maxLines = Math.floor(quoteHeight / lineHeight);
         if (lines.length > maxLines) {
@@ -1246,12 +1341,12 @@ ${textToSummarize}
     <li className="my-1">
       <button 
         onClick={() => onNavigate(item.href)}
-        className="w-full text-left p-2 rounded-md hover:bg-border-color/20 transition-colors duration-200 text-sm"
+        className="w-full text-left p-2 rounded-md hover:bg-[rgba(var(--color-border-color-rgb),0.2)] transition-colors duration-200 text-sm"
       >
         {item.label.trim()}
       </button>
       {item.subitems && item.subitems.length > 0 && (
-        <ul className="pl-4 border-l border-border-color ml-2">
+        <ul className="pl-4 border-l border-[var(--color-border-color)] ml-2">
           {item.subitems.map(subitem => <TocItemComponent key={subitem.id} item={subitem} onNavigate={onNavigate} />)}
         </ul>
       )}
@@ -1266,29 +1361,40 @@ ${textToSummarize}
         audioTrailerUrl: b.audioTrailerUrl,
     }));
     return (
-        <div className="flex flex-col h-screen bg-background text-primary-text">
-            <header className="flex-shrink-0 p-4 sm:p-6 lg:p-8 flex justify-between items-center">
+        <div className="flex flex-col h-screen bg-[var(--color-background)] text-[var(--color-primary-text)]">
+            <header className="flex-shrink-0 p-4 sm:p-6 lg:p-8 flex justify-between items-center gap-4">
                 <Logo className="h-10 sm:h-12 w-auto" />
-                {installPrompt && (
-                  <button
-                    onClick={handleInstallClick}
-                    title="Install Zizhi App"
-                    className="flex items-center gap-2 bg-secondary text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-opacity-90 transition-opacity"
-                  >
-                    <IconDownload className="w-5 h-5" />
-                    <span className="text-sm hidden sm:inline">Install App</span>
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                    {installPrompt && (
+                      <button
+                        onClick={handleInstallClick}
+                        title="Install Zizhi App"
+                        className="flex items-center gap-2 bg-[var(--color-secondary)] text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-opacity-90 transition-opacity"
+                      >
+                        <IconDownload className="w-5 h-5" />
+                        <span className="text-sm hidden sm:inline">Install App</span>
+                      </button>
+                    )}
+                    <button 
+                        onClick={() => setActiveTab('settings')}
+                        title="Settings"
+                        className="p-2 rounded-lg hover:bg-[rgba(var(--color-border-color-rgb),0.5)] transition-colors"
+                        aria-label="Open Settings"
+                    >
+                        <IconSettings className="w-6 h-6"/>
+                    </button>
+                </div>
             </header>
 
-            <div className="px-4 sm:px-6 lg:p-8 border-b border-border-color">
+            <div className="px-4 sm:px-6 lg:p-8 border-b border-[var(--color-border-color)]">
                 <nav className="flex space-x-4">
-                    <button onClick={() => setActiveTab('library')} className={`py-3 px-1 text-sm font-medium transition-colors focus:outline-none ${activeTab === 'library' ? 'text-primary-text border-b-2 border-primary' : 'text-secondary-text hover:text-primary-text'}`}>Library</button>
-                    <button onClick={() => setActiveTab('quotes')} className={`py-3 px-1 text-sm font-medium transition-colors focus:outline-none ${activeTab === 'quotes' ? 'text-primary-text border-b-2 border-primary' : 'text-secondary-text hover:text-primary-text'}`}>Quotes</button>
+                    <button onClick={() => setActiveTab('library')} className={`py-3 px-1 text-sm font-medium transition-colors focus:outline-none ${activeTab === 'library' ? 'text-[var(--color-primary-text)] border-b-2 border-[var(--color-primary)]' : 'text-[var(--color-secondary-text)] hover:text-[var(--color-primary-text)]'}`}>Library</button>
+                    <button onClick={() => setActiveTab('quotes')} className={`py-3 px-1 text-sm font-medium transition-colors focus:outline-none ${activeTab === 'quotes' ? 'text-[var(--color-primary-text)] border-b-2 border-[var(--color-primary)]' : 'text-[var(--color-secondary-text)] hover:text-[var(--color-primary-text)]'}`}>Quotes</button>
+                    <button onClick={() => setActiveTab('settings')} className={`py-3 px-1 text-sm font-medium transition-colors focus:outline-none ${activeTab === 'settings' ? 'text-[var(--color-primary-text)] border-b-2 border-[var(--color-primary)]' : 'text-[var(--color-secondary-text)] hover:text-[var(--color-primary-text)]'}`}>Settings</button>
                 </nav>
             </div>
             
-            <main className="flex-1 overflow-y-auto bg-black/5">
+            <main className="flex-1 overflow-y-auto bg-[rgba(0,0,0,0.02)]">
                 {activeTab === 'library' ? (
                     <Library 
                         books={libraryCards} 
@@ -1300,13 +1406,20 @@ ${textToSummarize}
                         generatingTrailerForBookId={generatingTrailerForBookId}
                         onViewTrailer={handleViewTrailer}
                     />
-                ) : (
+                ) : activeTab === 'quotes' ? (
                     <QuotesView 
                         quotes={quotes} 
                         onDelete={handleDeleteQuote} 
                         onShare={handleShare}
                         onGenerateImage={handleGenerateImage}
                         onGoToQuote={handleGoToQuote}
+                    />
+                ) : (
+                    <SettingsView 
+                        currentTheme={theme}
+                        onThemeChange={setTheme}
+                        themes={THEMES}
+                        fonts={FONTS}
                     />
                 )}
             </main>
@@ -1319,7 +1432,7 @@ ${textToSummarize}
                 <>
                     <button
                         onClick={handleUploadClick}
-                        className="fixed bottom-6 right-6 flex items-center justify-center p-4 bg-primary text-white font-semibold rounded-full shadow-lg hover:opacity-90 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed z-10"
+                        className="fixed bottom-6 right-6 flex items-center justify-center p-4 bg-[var(--color-primary)] text-white font-semibold rounded-full shadow-lg hover:opacity-90 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--color-primary)] disabled:opacity-50 disabled:cursor-not-allowed z-10"
                         disabled={isLoading || !!generatingTrailerForBookId}
                         title="Upload a file"
                     >
@@ -1334,13 +1447,13 @@ ${textToSummarize}
   }
   
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background text-primary-text">
+    <div className="flex h-screen w-full overflow-hidden bg-[var(--color-background)] text-[var(--color-primary-text)]">
       {toast && <Toast message={toast.message} action={toast.action} onClose={() => setToast(null)} />}
 
-      <aside className={`absolute lg:relative z-20 h-full bg-background border-r border-border-color shadow-lg transition-all duration-300 ease-in-out flex flex-col overflow-hidden ${isSidebarOpen ? 'w-full sm:w-80' : 'w-0 -translate-x-full lg:w-0 lg:translate-x-0'}`}>
-        <div className="flex items-center justify-between p-4 border-b border-border-color flex-shrink-0">
+      <aside className={`absolute lg:relative z-20 h-full bg-[var(--color-background)] border-r border-[var(--color-border-color)] shadow-lg transition-all duration-300 ease-in-out flex flex-col overflow-hidden ${isSidebarOpen ? 'w-full sm:w-80' : 'w-0 -translate-x-full lg:w-0 lg:translate-x-0'}`}>
+        <div className="flex items-center justify-between p-4 border-b border-[var(--color-border-color)] flex-shrink-0">
           <h2 className="text-lg font-bold truncate">Table of Contents</h2>
-          <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-1 rounded-full hover:bg-border-color/20">
+          <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-1 rounded-full hover:bg-[rgba(var(--color-border-color-rgb),0.2)]">
             <IconClose className="w-6 h-6" />
           </button>
         </div>
@@ -1352,8 +1465,8 @@ ${textToSummarize}
       </aside>
 
       <main className="flex-1 flex flex-col relative min-w-0">
-        <header className="flex items-center justify-between p-2 md:p-4 bg-background border-b border-border-color z-10 w-full flex-shrink-0">
-          <button onClick={handleBackToLibrary} className="flex items-center p-2 rounded-lg hover:bg-border-color/20 text-sm transition-colors">
+        <header className="flex items-center justify-between p-2 md:p-4 bg-[var(--color-background)] border-b border-[var(--color-border-color)] z-10 w-full flex-shrink-0">
+          <button onClick={handleBackToLibrary} className="flex items-center p-2 rounded-lg hover:bg-[rgba(var(--color-border-color-rgb),0.2)] text-sm transition-colors">
             <IconChevronLeft className="w-5 h-5 mr-1" />
             <span className="hidden sm:inline">Back to Library</span>
           </button>
@@ -1361,9 +1474,9 @@ ${textToSummarize}
             <h1 className="font-bold text-sm md:text-lg truncate">
                 {selectedBook.title}
             </h1>
-            <p className="text-xs md:text-sm text-secondary-text truncate">{currentLocation}</p>
+            <p className="text-xs md:text-sm text-[var(--color-secondary-text)] truncate">{currentLocation}</p>
           </div>
-          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 rounded-full hover:bg-border-color/20">
+          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 rounded-full hover:bg-[rgba(var(--color-border-color-rgb),0.2)]">
             {isSidebarOpen ? <IconClose className="w-6 h-6" /> : <IconMenu className="w-6 h-6" />}
           </button>
         </header>
@@ -1386,7 +1499,7 @@ ${textToSummarize}
             <div className="book-content-view max-w-4xl mx-auto">
                 {isLoading ? (
                      <div className="mt-8 flex items-center justify-center space-x-2">
-                        <div className="w-8 h-8 rounded-full animate-spin border-2 border-solid border-primary border-t-transparent"></div>
+                        <div className="w-8 h-8 rounded-full animate-spin border-2 border-solid border-[var(--color-primary)] border-t-transparent"></div>
                         <span>Parsing Book...</span>
                     </div>
                 ) : selectedBook.chapters.map(chapter => (

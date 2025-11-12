@@ -170,7 +170,7 @@ const TrailerView: React.FC<TrailerViewProps> = ({ book, onClose }) => {
   const CaptionDisplay = () => (
     <div className="flex items-center justify-center text-center h-full w-full p-4">
         {currentSentence ? (
-            <p className="text-primary-text font-serif text-2xl lg:text-4xl leading-relaxed transition-opacity duration-300">
+            <p className="text-[var(--color-primary-text)] font-serif text-2xl lg:text-4xl leading-relaxed transition-opacity duration-300">
                 {currentSentence.words.map((word, index) => {
                     // Add a small buffer to the end time to keep the word highlighted a bit longer
                     const isCurrent = currentTime >= word.start && currentTime < word.end + 0.1;
@@ -192,10 +192,10 @@ const TrailerView: React.FC<TrailerViewProps> = ({ book, onClose }) => {
   }
   
   return (
-    <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col animate-search-panel-in" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-50 bg-[var(--color-background)]/95 backdrop-blur-sm flex flex-col animate-search-panel-in" role="dialog" aria-modal="true">
         <audio ref={audioRef} src={book.audioTrailerUrl} />
-        <button onClick={onClose} className="absolute top-4 right-4 z-10 p-2 rounded-full hover:bg-border-color/20 transition-colors" aria-label="Close trailer">
-            <IconClose className="w-6 h-6 text-primary-text" />
+        <button onClick={onClose} className="absolute top-4 right-4 z-10 p-2 rounded-full hover:bg-[rgba(var(--color-border-color-rgb),0.2)] transition-colors" aria-label="Close trailer">
+            <IconClose className="w-6 h-6 text-[var(--color-primary-text)]" />
         </button>
 
         {/* Desktop Layout */}
@@ -205,7 +205,7 @@ const TrailerView: React.FC<TrailerViewProps> = ({ book, onClose }) => {
                     {book.coverImageUrl ? (
                         <img src={book.coverImageUrl} alt={book.title} className="w-full h-full object-cover" />
                     ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-border-color/10 text-center text-secondary-text/50 p-4">
+                        <div className="w-full h-full flex items-center justify-center bg-[rgba(var(--color-border-color-rgb),0.1)] text-center text-[rgba(var(--color-secondary-text-rgb),0.5)] p-4">
                             <span className="font-serif text-2xl">{book.title}</span>
                         </div>
                     )}
@@ -217,18 +217,18 @@ const TrailerView: React.FC<TrailerViewProps> = ({ book, onClose }) => {
                         max={duration || 1}
                         value={currentTime}
                         onChange={handleSeek}
-                        className="w-full h-1.5 bg-border-color/30 rounded-lg appearance-none cursor-pointer range-sm accent-primary"
+                        className="w-full h-1.5 bg-[rgba(var(--color-border-color-rgb),0.3)] rounded-lg appearance-none cursor-pointer range-sm accent-[var(--color-primary)]"
                     />
-                     <div className="flex items-center justify-between text-xs text-secondary-text mt-1">
+                     <div className="flex items-center justify-between text-xs text-[var(--color-secondary-text)] mt-1">
                         <span>{formatTime(currentTime)}</span>
                         <span>{formatTime(duration)}</span>
                     </div>
                     <div className="flex items-center justify-center gap-8 mt-4">
-                        <button onClick={handleRewind} className="text-primary-text/70 hover:text-primary-text"><IconRewind className="w-8 h-8" /></button>
-                        <button onClick={handlePlayPause} className="bg-primary text-white w-16 h-16 rounded-full flex items-center justify-center shadow-lg">
+                        <button onClick={handleRewind} className="text-[rgba(var(--color-primary-text-rgb),0.7)] hover:text-[var(--color-primary-text)]"><IconRewind className="w-8 h-8" /></button>
+                        <button onClick={handlePlayPause} className="bg-[var(--color-primary)] text-white w-16 h-16 rounded-full flex items-center justify-center shadow-lg">
                             {isPlaying ? <IconPause className="w-8 h-8" /> : <IconPlay className="w-8 h-8" />}
                         </button>
-                        <button onClick={handleForward} className="text-primary-text/70 hover:text-primary-text"><IconForward className="w-8 h-8" /></button>
+                        <button onClick={handleForward} className="text-[rgba(var(--color-primary-text-rgb),0.7)] hover:text-[var(--color-primary-text)]"><IconForward className="w-8 h-8" /></button>
                     </div>
                 </div>
             </div>
@@ -244,7 +244,7 @@ const TrailerView: React.FC<TrailerViewProps> = ({ book, onClose }) => {
                     {book.coverImageUrl ? (
                         <img src={book.coverImageUrl} alt={book.title} className="w-full h-full object-cover" />
                     ) : (
-                        <div className="w-full h-full bg-border-color/10"></div>
+                        <div className="w-full h-full bg-[rgba(var(--color-border-color-rgb),0.1)]"></div>
                     )}
                 </div>
                 <div ref={titleContainerRef} className="min-w-0 flex-1">
@@ -265,7 +265,7 @@ const TrailerView: React.FC<TrailerViewProps> = ({ book, onClose }) => {
                             </h2>
                         )}
                     </div>
-                    <p className="text-sm text-secondary-text truncate">{book.author}</p>
+                    <p className="text-sm text-[var(--color-secondary-text)] truncate">{book.author}</p>
                 </div>
             </div>
 
@@ -280,18 +280,18 @@ const TrailerView: React.FC<TrailerViewProps> = ({ book, onClose }) => {
                     max={duration || 1}
                     value={currentTime}
                     onChange={handleSeek}
-                    className="w-full h-1.5 bg-border-color/30 rounded-lg appearance-none cursor-pointer accent-primary"
+                    className="w-full h-1.5 bg-[rgba(var(--color-border-color-rgb),0.3)] rounded-lg appearance-none cursor-pointer accent-[var(--color-primary)]"
                 />
-                <div className="flex items-center justify-between text-xs text-secondary-text mt-1">
+                <div className="flex items-center justify-between text-xs text-[var(--color-secondary-text)] mt-1">
                     <span>{formatTime(currentTime)}</span>
                     <span>{formatTime(duration)}</span>
                 </div>
                 <div className="flex items-center justify-center gap-8 mt-4">
-                    <button onClick={handleRewind} className="text-primary-text/70 hover:text-primary-text"><IconRewind className="w-7 h-7" /></button>
-                    <button onClick={handlePlayPause} className="bg-primary text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg">
+                    <button onClick={handleRewind} className="text-[rgba(var(--color-primary-text-rgb),0.7)] hover:text-[var(--color-primary-text)]"><IconRewind className="w-7 h-7" /></button>
+                    <button onClick={handlePlayPause} className="bg-[var(--color-primary)] text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg">
                         {isPlaying ? <IconPause className="w-7 h-7" /> : <IconPlay className="w-7 h-7" />}
                     </button>
-                    <button onClick={handleForward} className="text-primary-text/70 hover:text-primary-text"><IconForward className="w-7 h-7" /></button>
+                    <button onClick={handleForward} className="text-[rgba(var(--color-primary-text-rgb),0.7)] hover:text-[var(--color-primary-text)]"><IconForward className="w-7 h-7" /></button>
                 </div>
             </div>
         </div>
