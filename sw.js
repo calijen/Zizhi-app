@@ -18,7 +18,7 @@ const urlsToCache = [
   '/components/SettingsView.tsx',
   'https://cdn.tailwindcss.com',
   'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:ital,wght@0,400..700;1,400..700&family=Roboto+Slab:wght@400;700&family=Roboto:wght@400;500;700&display=swap',
+  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:ital,wght@0,400..700;1,400..700&family=Merriweather:ital,wght@0,400;0,700;1,400;1,700&family=Montserrat:wght@400;700&family=Nunito:wght@400;700&family=Roboto+Slab:wght@400;700&family=Roboto:wght@400;500;700&family=Source+Serif+Pro:wght@400;700&display=swap',
   'https://aistudiocdn.com/react@^19.2.0/',
   'https://aistudiocdn.com/react-dom@^19.2.0/',
   'https://aistudiocdn.com/@google/genai@^1.29.0',

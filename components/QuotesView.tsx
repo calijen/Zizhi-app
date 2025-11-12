@@ -95,8 +95,19 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, onDelete, onShare, onGe
 
   if (quotes.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-center p-8">
-        <p className="text-xl text-[var(--color-secondary-text)]">You haven't saved any quotes yet.</p>
+      <div className="flex flex-col items-center justify-center h-full text-center p-8 space-y-4">
+        <div className="w-24 h-24 text-[var(--color-border-color)]">
+          <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+            <path d="M12 11C12 9.34315 13.3431 8 15 8H33C34.6569 8 36 9.34315 36 11V37C36 38.6569 34.6569 40 33 40H15C13.3431 40 12 38.6569 12 37V11Z" stroke="currentColor" strokeOpacity="0.5" strokeWidth="2" strokeLinejoin="round"/>
+            <path d="M20 18H28" stroke="currentColor" strokeOpacity="0.7" strokeWidth="2" strokeLinecap="round"/>
+            <path d="M20 26H28" stroke="currentColor" strokeOpacity="0.7" strokeWidth="2" strokeLinecap="round"/>
+            <rect x="18" y="24" width="12" height="4" fill="var(--color-secondary)" fillOpacity="0.3"/>
+          </svg>
+        </div>
+        <h3 className="text-xl font-semibold text-[var(--color-primary-text)]">Your quotes will appear here</h3>
+        <p className="max-w-md text-[var(--color-secondary-text)]">
+          To save a quote, highlight text while reading a book and select the 'Quote' option.
+        </p>
       </div>
     );
   }

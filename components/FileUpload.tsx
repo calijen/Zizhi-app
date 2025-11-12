@@ -126,8 +126,21 @@ const Library: React.FC<LibraryProps> = ({ books, onBookSelect, isLoading, error
         )}
 
         {!isLoading && books.length === 0 && (
-          <div className="flex items-center justify-center h-full text-center py-16">
-            <p className="text-xl text-[var(--color-secondary-text)]">Your library is empty.</p>
+          <div className="flex flex-col items-center justify-center h-full text-center py-16 px-4 space-y-4">
+            <div className="w-24 h-24 text-[var(--color-border-color)]">
+              <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+                <path d="M8 6H40" stroke="currentColor" strokeOpacity="0.7" strokeWidth="2" strokeLinecap="round"/>
+                <path d="M8 42H40" stroke="currentColor" strokeOpacity="0.7" strokeWidth="2" strokeLinecap="round"/>
+                <path d="M12 6L8 42" stroke="currentColor" strokeOpacity="0.7" strokeWidth="2" strokeLinecap="round"/>
+                <path d="M36 6L40 42" stroke="currentColor" strokeOpacity="0.7" strokeWidth="2" strokeLinecap="round"/>
+                <path d="M8.88892 18H39.1111" stroke="currentColor" strokeOpacity="0.7" strokeWidth="2" strokeLinecap="round"/>
+                <path d="M8.44446 30H39.5556" stroke="currentColor" strokeOpacity="0.7" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold text-[var(--color-primary-text)]">Your library is empty</h3>
+            <p className="max-w-md text-[var(--color-secondary-text)]">
+              Click the upload button to add your first EPUB file. You can download e-books from public sources like Welib or OceanPDF.
+            </p>
           </div>
         )}
         

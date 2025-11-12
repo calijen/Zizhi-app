@@ -60,4 +60,6 @@ export interface Theme {
   name: string;
   colors: ThemeColors;
   font: ThemeFont;
+  fontSize: number; // in rem
+  lineHeight: number; // unitless
 }

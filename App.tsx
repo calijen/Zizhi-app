@@ -22,12 +22,30 @@ declare global {
 const FONTS: ThemeFont[] = [
     { name: 'Vintage', sans: 'Inter', serif: 'Lora' },
     { name: 'Modern', sans: 'Roboto', serif: 'Roboto Slab' },
+    { name: 'Playful', sans: 'Nunito', serif: 'Merriweather' },
+    { name: 'Minimalist', sans: 'Montserrat', serif: 'Source Serif Pro' },
 ];
 
 const THEMES: { [key: string]: Theme } = {
   vintage: {
     name: 'Vintage',
     font: FONTS[0],
+    fontSize: 1,
+    lineHeight: 1.7,
+    colors: {
+        'primary': '#5E4630',
+        'secondary': '#B08D57',
+        'background': '#FBF8EE',
+        'primary-text': '#000000',
+        'secondary-text': '#202020',
+        'border-color': '#9f9e9c',
+    }
+  },
+  modern: {
+    name: 'Modern',
+    font: FONTS[0],
+    fontSize: 1,
+    lineHeight: 1.7,
     colors: {
       'primary': '#1A2B6D',
       'secondary': '#5D8BF4',
@@ -40,6 +58,8 @@ const THEMES: { [key: string]: Theme } = {
   black_and_white: {
     name: 'Black & White',
     font: FONTS[0],
+    fontSize: 1,
+    lineHeight: 1.7,
     colors: {
       'primary': '#242424',
       'secondary': '#437aff',
@@ -52,8 +72,10 @@ const THEMES: { [key: string]: Theme } = {
   night: {
     name: 'Night',
     font: FONTS[0],
+    fontSize: 1,
+    lineHeight: 1.7,
     colors: {
-        'primary': '#A7C7E7',
+        'primary': '#0582ff',
         'secondary': '#89CFF0',
         'background': '#121212',
         'primary-text': '#E0E0E0',
@@ -67,8 +89,8 @@ const BookStyles = () => {
   const styles = `
     .book-content-view {
       padding: 1rem 1rem 2rem 1rem;
-      line-height: 1.7;
-      font-size: 1rem;
+      line-height: var(--line-height, 1.7);
+      font-size: var(--font-size, 1rem);
       font-family: var(--font-serif), serif;
       color: var(--color-primary-text);
       background-color: var(--color-background);
@@ -112,8 +134,8 @@ const BookStyles = () => {
     @media (min-width: 768px) {
       .book-content-view {
         padding: 2rem;
-        line-height: 1.8;
-        font-size: 1.125rem;
+        line-height: calc(var(--line-height, 1.7) + 0.1);
+        font-size: calc(var(--font-size, 1rem) + 0.125rem);
       }
     }
     .book-content-view ::selection {
@@ -173,7 +195,7 @@ const App: React.FC = () => {
   const [viewingTrailerForBook, setViewingTrailerForBook] = useState<Book | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [isMobile, setIsMobile] = useState(false);
-  const [theme, setTheme] = useState<Theme>(THEMES.black_and_white);
+  const [theme, setTheme] = useState<Theme>(THEMES.vintage);
 
 
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -185,9 +207,11 @@ const App: React.FC = () => {
 
   useEffect(() => {
     try {
-      const savedTheme = localStorage.getItem('zizhi-theme');
-      if (savedTheme) {
-        setTheme(JSON.parse(savedTheme));
+      const savedThemeRaw = localStorage.getItem('zizhi-theme');
+      if (savedThemeRaw) {
+        const savedTheme = JSON.parse(savedThemeRaw);
+        // Merge with a default to ensure new properties like fontSize are present
+        setTheme(prev => ({ ...prev, ...savedTheme }));
       }
     } catch (e) {
       console.error("Failed to load theme from localStorage", e);
@@ -218,6 +242,8 @@ const App: React.FC = () => {
       const fontStyles = `
         --font-sans: '${theme.font.sans}';
         --font-serif: '${theme.font.serif}';
+        --font-size: ${theme.fontSize}rem;
+        --line-height: ${theme.lineHeight};
       `;
       
       styleEl.innerHTML = `:root { ${colorStyles} ${fontStyles} }`;
