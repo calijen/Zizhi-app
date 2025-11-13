@@ -170,12 +170,19 @@ const TrailerView: React.FC<TrailerViewProps> = ({ book, onClose }) => {
   const CaptionDisplay = () => (
     <div className="flex items-center justify-center text-center h-full w-full p-4">
         {currentSentence ? (
-            <p className="text-[var(--color-primary-text)] font-serif text-2xl lg:text-4xl leading-relaxed transition-opacity duration-300">
+            <p className="text-[var(--color-primary-text)] font-serif text-2xl lg:text-4xl leading-relaxed">
                 {currentSentence.words.map((word, index) => {
                     // Add a small buffer to the end time to keep the word highlighted a bit longer
                     const isCurrent = currentTime >= word.start && currentTime < word.end + 0.1;
                     return (
-                        <span key={index} className={`transition-opacity duration-200 ${isCurrent ? 'opacity-100 font-semibold' : 'opacity-60'}`}>
+                        <span
+                            key={index}
+                            className={`transition-all duration-200 ${
+                            isCurrent
+                                ? 'text-[var(--color-primary)] font-semibold opacity-100'
+                                : 'opacity-60'
+                            }`}
+                        >
                             {word.word}{' '}
                         </span>
                     );
@@ -192,7 +199,7 @@ const TrailerView: React.FC<TrailerViewProps> = ({ book, onClose }) => {
   }
   
   return (
-    <div className="fixed inset-0 z-50 bg-[var(--color-background)]/95 backdrop-blur-sm flex flex-col animate-search-panel-in" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-50 bg-[var(--color-background)] flex flex-col animate-search-panel-in" role="dialog" aria-modal="true">
         <audio ref={audioRef} src={book.audioTrailerUrl} />
         <button onClick={onClose} className="absolute top-4 right-4 z-10 p-2 rounded-full hover:bg-[rgba(var(--color-border-color-rgb),0.2)] transition-colors" aria-label="Close trailer">
             <IconClose className="w-6 h-6 text-[var(--color-primary-text)]" />
