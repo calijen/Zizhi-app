@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenAI, Modality } from "@google/genai";
 import Library, { BookCardData } from './components/FileUpload';
@@ -237,7 +238,7 @@ const App: React.FC = () => {
   const [viewingTrailerForBook, setViewingTrailerForBook] = useState<Book | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [isMobile, setIsMobile] = useState(false);
-  const [theme, setTheme] = useState<Theme>(THEMES.vintage);
+  const [theme, setTheme] = useState<Theme>(THEMES.dark);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
 
 

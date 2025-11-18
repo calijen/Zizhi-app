@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { IconClose, IconMicrophone, IconSpinner, IconPlay } from './icons';
 
@@ -39,22 +38,22 @@ const BookCard: React.FC<{
     
     return (
         <div 
-            className="bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-lg shadow-sm transition-shadow duration-300 overflow-hidden flex flex-row sm:flex-col group text-[var(--color-primary-text)]"
+            className="bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-lg shadow-sm transition-shadow duration-300 overflow-hidden flex flex-row group text-[var(--color-primary-text)] h-full"
             aria-label={`${book.title} by ${book.author}`}
         >
-            <div className="relative w-1/3 sm:w-full flex-shrink-0 aspect-[3/4] bg-[rgba(var(--color-border-color-rgb),0.5)]">
+            <div className="relative w-1/3 flex-shrink-0 aspect-[2/3] bg-[rgba(var(--color-border-color-rgb),0.5)]">
                 {book.coverImageUrl ? (
                     <img src={book.coverImageUrl} alt={book.title} className="w-full h-full object-cover" />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center text-center text-[rgba(var(--color-secondary-text-rgb),0.5)] p-2">
-                        <span className="text-sm font-serif">{book.title}</span>
+                        <span className="text-xs sm:text-sm font-serif break-words">{book.title}</span>
                     </div>
                 )}
             </div>
-            <div className="w-2/3 sm:w-full flex flex-col flex-grow justify-between border-l sm:border-l-0 border-[rgba(var(--color-border-color-rgb),0.5)]">
-                <div className="p-3 flex flex-col w-full space-y-2 flex-grow">
+            <div className="w-2/3 flex flex-col flex-grow justify-between border-l border-[rgba(var(--color-border-color-rgb),0.5)]">
+                <div className="p-3 flex flex-col w-full space-y-1 flex-grow overflow-hidden">
                     <div className="flex justify-between items-start gap-2">
-                         <h3 className="font-bold text-md truncate flex-grow" title={book.title}>{book.title}</h3>
+                         <h3 className="font-bold text-base sm:text-lg leading-tight truncate flex-grow" title={book.title}>{book.title}</h3>
                          <button
                             onClick={handleDelete}
                             className="p-1 -mr-2 -mt-1 flex-shrink-0 text-[rgba(var(--color-secondary-text-rgb),0.5)] hover:text-[var(--color-primary)] transition-colors z-10"
@@ -64,41 +63,41 @@ const BookCard: React.FC<{
                             <IconClose className="w-4 h-4" />
                          </button>
                     </div>
-                    <p className="text-sm text-[var(--color-secondary-text)] truncate" title={book.author}>{book.author || 'Unknown Author'}</p>
-                    <div className="pt-1">
-                        <div className="w-full bg-[rgba(var(--color-border-color-rgb),0.3)] rounded-full h-1.5">
-                            <div className="bg-[var(--color-primary)] h-1.5 rounded-full" style={{ width: `${book.progress * 100}%` }}></div>
+                    <p className="text-xs sm:text-sm text-[var(--color-secondary-text)] truncate" title={book.author}>{book.author || 'Unknown Author'}</p>
+                    <div className="pt-2 mt-auto">
+                        <div className="w-full bg-[rgba(var(--color-border-color-rgb),0.3)] rounded-full h-1">
+                            <div className="bg-[var(--color-primary)] h-1 rounded-full" style={{ width: `${book.progress * 100}%` }}></div>
                         </div>
-                        <p className="text-xs text-right mt-1 text-[var(--color-secondary-text)]">{Math.round(book.progress * 100)}%</p>
+                        <p className="text-[10px] text-right mt-1 text-[var(--color-secondary-text)]">{Math.round(book.progress * 100)}%</p>
                     </div>
                 </div>
-                <div className="p-3 pt-0 border-t border-[rgba(var(--color-border-color-rgb),0.5)] sm:mt-2 grid grid-cols-2 gap-2 text-sm font-medium">
+                <div className="p-3 pt-0 border-t border-[rgba(var(--color-border-color-rgb),0.5)] grid grid-cols-2 gap-2 text-xs sm:text-sm font-medium">
                     <button 
                         onClick={() => onSelect(book.id)}
-                        className="w-full py-2 px-3 bg-[rgba(var(--color-primary-rgb),0.1)] text-[var(--color-primary)] rounded-md hover:bg-[rgba(var(--color-primary-rgb),0.2)] transition-colors text-center"
+                        className="w-full py-2 px-2 bg-[rgba(var(--color-primary-rgb),0.1)] text-[var(--color-primary)] rounded-md hover:bg-[rgba(var(--color-primary-rgb),0.2)] transition-colors text-center truncate"
                     >
                         Read
                     </button>
                     <div className="relative">
                         {isGenerating ? (
-                            <button className="w-full py-2 px-3 bg-[rgba(var(--color-secondary-text-rgb),0.1)] text-[var(--color-secondary-text)] rounded-md transition-colors flex items-center justify-center gap-2" disabled>
-                                <IconSpinner className="w-4 h-4" />
+                            <button className="w-full py-2 px-2 bg-[rgba(var(--color-secondary-text-rgb),0.1)] text-[var(--color-secondary-text)] rounded-md transition-colors flex items-center justify-center gap-1 truncate" disabled>
+                                <IconSpinner className="w-3 h-3 sm:w-4 sm:h-4" />
                                 <span>Creating...</span>
                             </button>
                         ) : book.audioTrailerUrl ? (
                              <button 
                                 onClick={() => onViewTrailer(book.id)}
-                                className="w-full py-2 px-3 bg-[rgba(var(--color-secondary-text-rgb),0.1)] text-[var(--color-secondary-text)] rounded-md hover:bg-[rgba(var(--color-secondary-text-rgb),0.2)] transition-colors flex items-center justify-center gap-2"
+                                className="w-full py-2 px-2 bg-[rgba(var(--color-secondary-text-rgb),0.1)] text-[var(--color-secondary-text)] rounded-md hover:bg-[rgba(var(--color-secondary-text-rgb),0.2)] transition-colors flex items-center justify-center gap-1 truncate"
                              >
-                                <IconPlay className="w-4 h-4" />
+                                <IconPlay className="w-3 h-3 sm:w-4 sm:h-4" />
                                 <span>Play</span>
                              </button>
                         ) : (
                             <button 
                                 onClick={() => onGenerateTrailer(book.id)}
-                                className="w-full py-2 px-3 bg-[rgba(var(--color-secondary-text-rgb),0.1)] text-[var(--color-secondary-text)] rounded-md hover:bg-[rgba(var(--color-secondary-text-rgb),0.2)] transition-colors flex items-center justify-center gap-2"
+                                className="w-full py-2 px-2 bg-[rgba(var(--color-secondary-text-rgb),0.1)] text-[var(--color-secondary-text)] rounded-md hover:bg-[rgba(var(--color-secondary-text-rgb),0.2)] transition-colors flex items-center justify-center gap-1 truncate"
                             >
-                                <IconMicrophone className="w-4 h-4" />
+                                <IconMicrophone className="w-3 h-3 sm:w-4 sm:h-4" />
                                 <span>Trailer</span>
                             </button>
                         )}
@@ -141,7 +140,7 @@ const Library: React.FC<LibraryProps> = ({ books, onBookSelect, isLoading, error
         )}
         
         {books.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
             {books.map(book => (
               <BookCard 
                 key={book.id} 
