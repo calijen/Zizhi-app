@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { TocItem, Quote, Book, Chapter, Theme, ThemeFont, ThemeColors } from './types';
 import * as db from './db';
@@ -108,6 +109,8 @@ const BookStyles = () => {
       color: var(--color-primary-text);
       background: var(--book-texture) var(--color-background);
       user-select: text;
+      -webkit-user-select: text;
+      -webkit-touch-callout: none; /* Suppress iOS native menu/magnifier to favor custom UI */
       overflow-wrap: break-word;
       width: 100%;
       box-sizing: border-box;
@@ -1599,6 +1602,7 @@ ${textToSummarize}
             ref={viewerRef} 
             className="flex-1 overflow-y-auto relative" 
             onScroll={handleScroll}
+            onContextMenu={(e) => isMobile && e.preventDefault()}
         >
             <div className="max-w-3xl mx-auto">
                 {selectedBook.chapters.map(chapter => (
