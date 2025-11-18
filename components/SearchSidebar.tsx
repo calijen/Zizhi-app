@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { IconClose, IconSpinner } from './icons';
 
@@ -22,7 +23,7 @@ const SearchSidebar: React.FC<SearchSidebarProps> = ({ query, onClose }) => {
         const searchEngineId = process.env.GOOGLE_CSE_ID; 
 
         if (!searchEngineId) {
-            setError("Search is not configured. Missing Search Engine ID.");
+            setError("Search is not configured. Missing Search Engine ID. Please set GOOGLE_CSE_ID in your environment variables.");
             setIsLoading(false);
             return;
         }
@@ -69,6 +70,7 @@ const SearchSidebar: React.FC<SearchSidebarProps> = ({ query, onClose }) => {
     useEffect(() => {
         // This effect executes the search when the query changes or after the script loads.
         if (!query) return;
+        if (error) return; // Don't try to search if setup failed
 
         const executeSearch = () => {
             if (window.google?.search?.cse?.element) {
@@ -83,7 +85,7 @@ const SearchSidebar: React.FC<SearchSidebarProps> = ({ query, onClose }) => {
         
         executeSearch();
 
-    }, [query]);
+    }, [query, error]);
 
     // Google CSE injects its own styles. These overrides help integrate it into the app's theme.
     const customStyles = `
@@ -156,7 +158,7 @@ const SearchSidebar: React.FC<SearchSidebarProps> = ({ query, onClose }) => {
                     </button>
                 </header>
                 <div className="flex-1 overflow-y-auto relative">
-                    {isLoading && (
+                    {isLoading && !error && (
                         <div className="absolute inset-0 flex items-center justify-center bg-[var(--color-background)] z-10">
                             <div className="flex items-center space-x-2">
                                 <IconSpinner className="w-6 h-6 text-[var(--color-primary)]" />
@@ -165,8 +167,9 @@ const SearchSidebar: React.FC<SearchSidebarProps> = ({ query, onClose }) => {
                         </div>
                     )}
                     {error && (
-                        <div className="p-4 text-red-700 bg-red-50 m-4 rounded-md">
-                            <p><strong>Error:</strong> {error}</p>
+                        <div className="p-4 text-red-700 bg-red-50 m-4 rounded-md text-center">
+                            <p className="font-semibold mb-1">Search Unavailable</p>
+                            <p className="text-sm">{error}</p>
                         </div>
                     )}
                     {/* This div will be populated by the Google CSE script */}

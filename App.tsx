@@ -110,10 +110,12 @@ const BookStyles = () => {
       background: var(--book-texture) var(--color-background);
       user-select: text;
       -webkit-user-select: text;
-      -webkit-touch-callout: none; /* Suppress iOS native menu/magnifier to favor custom UI */
+      -webkit-touch-callout: none !important; /* Suppress iOS native menu/magnifier to favor custom UI */
+      -webkit-tap-highlight-color: transparent; /* Remove tap highlight on Android */
       overflow-wrap: break-word;
       width: 100%;
       box-sizing: border-box;
+      outline: none;
     }
     
     /* AGGRESSIVE RESPONSIVE OVERRIDES */
@@ -212,11 +214,13 @@ const TocItemComponent: React.FC<{ item: TocItem; onNavigate: (href: string) => 
 
 // Performance: Memoize Chapter rendering. 
 // dangerouslySetInnerHTML is expensive; this prevents react from diffing html strings when other props change.
+// Added tabIndex={-1} to discourage some browser native selection/search behaviors
 const ChapterSection: React.FC<{ chapter: Chapter; setRef: (id: string, el: HTMLElement | null) => void }> = React.memo(({ chapter, setRef }) => (
   <section
     id={chapter.id}
     ref={el => setRef(chapter.id, el)}
     className="book-content-view"
+    tabIndex={-1} 
     dangerouslySetInnerHTML={{ __html: chapter.html }}
   />
 ));
@@ -248,6 +252,7 @@ const App: React.FC = () => {
   const chapterRefs = useRef<{[key: string]: HTMLElement}>({});
   const scrollTimeout = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const selectionDebounceRef = useRef<number | null>(null);
   
   const selectedBook = library.find(b => b.id === selectedBookId) || null;
 
@@ -317,6 +322,19 @@ const App: React.FC = () => {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Add global context menu prevention for mobile to suppress native menus
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const preventContext = (e: Event) => {
+        e.preventDefault();
+    };
+
+    window.addEventListener('contextmenu', preventContext, { passive: false });
+    return () => window.removeEventListener('contextmenu', preventContext);
+  }, [isMobile]);
+
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -810,13 +828,19 @@ const App: React.FC = () => {
     if (chapterId) {
         // For mobile, we don't need precise coords, fixed positioning is used.
         if (isMobile) {
-             setSelection({
-                text,
-                top: 0, 
-                left: 0,
-                right: 0,
-                chapterId: chapterId,
-            });
+             // Clear any pending debounce
+             if (selectionDebounceRef.current) clearTimeout(selectionDebounceRef.current);
+             
+             // Debounce the mobile menu appearance to avoid jitter during drag
+             selectionDebounceRef.current = window.setTimeout(() => {
+                 setSelection({
+                    text,
+                    top: 0, 
+                    left: 0,
+                    right: 0,
+                    chapterId: chapterId!,
+                });
+             }, 100);
             return;
         }
 
@@ -862,10 +886,15 @@ const App: React.FC = () => {
         handleSelection();
       }
     };
+    
+    const handleMobileTouchEnd = () => {
+        // Trigger selection check after touch ends
+        setTimeout(handleSelection, 50);
+    };
 
     if (isMobile) {
       document.addEventListener('selectionchange', handleSelection);
-      viewer.addEventListener('touchend', handleSelection);
+      viewer.addEventListener('touchend', handleMobileTouchEnd);
     } else {
       viewer.addEventListener('mouseup', handleDesktopMouseUp);
     }
@@ -873,7 +902,7 @@ const App: React.FC = () => {
     return () => {
       if (isMobile) {
         document.removeEventListener('selectionchange', handleSelection);
-        viewer.removeEventListener('touchend', handleSelection);
+        viewer.removeEventListener('touchend', handleMobileTouchEnd);
       } else {
         viewer.removeEventListener('mouseup', handleDesktopMouseUp);
       }
@@ -1602,7 +1631,6 @@ ${textToSummarize}
             ref={viewerRef} 
             className="flex-1 overflow-y-auto relative" 
             onScroll={handleScroll}
-            onContextMenu={(e) => isMobile && e.preventDefault()}
         >
             <div className="max-w-3xl mx-auto">
                 {selectedBook.chapters.map(chapter => (
