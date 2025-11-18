@@ -7,6 +7,7 @@ import SettingsView from './components/SettingsView';
 import TextSelectionPopup from './components/TextSelectionPopup';
 import Toast from './components/Toast';
 import TrailerView from './components/TrailerView';
+import SearchSidebar from './components/SearchSidebar';
 import { 
   IconMenu, IconClose, IconChevronLeft, IconUpload, IconDownload, Logo, IconSettings
 } from './components/icons';
@@ -26,12 +27,21 @@ const FONTS: ThemeFont[] = [
     { name: 'Minimalist', sans: 'Montserrat', serif: 'Source Serif Pro' },
 ];
 
+const TEXTURES: { [key: string]: { name: string; style: string } } = {
+  none: { name: 'None', style: 'none' },
+  paper: { name: 'Paper', style: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cfilter id='n' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='5' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23n)' opacity='0.07'/%3E%3C/svg%3E")`},
+  linen: { name: 'Linen', style: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23000000' fill-opacity='0.04'%3E%3Cpath d='M0 38.59l2.83-2.83 1.41 1.41L1.41 40H0v-1.41zM0 1.4l2.83 2.83 1.41-1.41L1.41 0H0v1.41zM38.59 40l-2.83-2.83 1.41-1.41L40 38.59V40h-1.41zM40 1.41l-2.83 2.83-1.41-1.41L38.59 0H40v1.41zM20 18.6l2.83-2.83 1.41 1.41L21.41 20l2.83 2.83-1.41 1.41L20 21.41l-2.83 2.83-1.41-1.41L18.59 20l-2.83-2.83 1.41-1.41L20 18.59z'/%3E%3C/g%3E%3C/svg%3E")` },
+  parchment: { name: 'Parchment', style: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`},
+};
+
+
 const THEMES: { [key: string]: Theme } = {
   vintage: {
     name: 'Vintage',
     font: FONTS[0],
     fontSize: 1,
     lineHeight: 1.7,
+    texture: 'paper',
     colors: {
         'primary': '#5E4630',
         'secondary': '#B08D57',
@@ -46,6 +56,7 @@ const THEMES: { [key: string]: Theme } = {
     font: FONTS[0],
     fontSize: 1,
     lineHeight: 1.7,
+    texture: 'none',
     colors: {
       'primary': '#1A2B6D',
       'secondary': '#5D8BF4',
@@ -60,6 +71,7 @@ const THEMES: { [key: string]: Theme } = {
     font: FONTS[0],
     fontSize: 1,
     lineHeight: 1.7,
+    texture: 'none',
     colors: {
       'primary': '#242424',
       'secondary': '#437aff',
@@ -74,6 +86,7 @@ const THEMES: { [key: string]: Theme } = {
     font: FONTS[0],
     fontSize: 1,
     lineHeight: 1.7,
+    texture: 'none',
     colors: {
         'primary': '#0582ff',
         'secondary': '#89CFF0',
@@ -93,7 +106,7 @@ const BookStyles = () => {
       font-size: var(--font-size, 1rem);
       font-family: var(--font-serif), serif;
       color: var(--color-primary-text);
-      background-color: var(--color-background);
+      background: var(--book-texture) var(--color-background);
       user-select: text;
       overflow-wrap: break-word;
       width: 100%;
@@ -177,6 +190,35 @@ const BookStyles = () => {
   return <style>{styles}</style>;
 };
 
+// Performance: Memoize recursive TOC rendering to prevent re-renders on every scroll
+const TocItemComponent: React.FC<{ item: TocItem; onNavigate: (href: string) => void }> = React.memo(({ item, onNavigate }) => (
+  <li className="my-1">
+    <button 
+      onClick={() => onNavigate(item.href)}
+      className="w-full text-left p-2 rounded-md hover:bg-[rgba(var(--color-border-color-rgb),0.2)] transition-colors duration-200 text-sm"
+    >
+      {item.label.trim()}
+    </button>
+    {item.subitems && item.subitems.length > 0 && (
+      <ul className="pl-4 border-l border-[var(--color-border-color)] ml-2">
+        {item.subitems.map(subitem => <TocItemComponent key={subitem.id} item={subitem} onNavigate={onNavigate} />)}
+      </ul>
+    )}
+  </li>
+));
+
+// Performance: Memoize Chapter rendering. 
+// dangerouslySetInnerHTML is expensive; this prevents react from diffing html strings when other props change.
+const ChapterSection: React.FC<{ chapter: Chapter; setRef: (id: string, el: HTMLElement | null) => void }> = React.memo(({ chapter, setRef }) => (
+  <section
+    id={chapter.id}
+    ref={el => setRef(chapter.id, el)}
+    className="book-content-view"
+    dangerouslySetInnerHTML={{ __html: chapter.html }}
+  />
+));
+
+
 const App: React.FC = () => {
   const [library, setLibrary] = useState<Book[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
@@ -196,6 +238,7 @@ const App: React.FC = () => {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [theme, setTheme] = useState<Theme>(THEMES.vintage);
+  const [searchQuery, setSearchQuery] = useState<string | null>(null);
 
 
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -232,7 +275,8 @@ const App: React.FC = () => {
       
       const colorStyles = Object.entries(theme.colors).map(([key, value]) => {
         let rules = `--color-${key}: ${value};`;
-        if(!value.startsWith('rgba')) {
+        // Fix: Add type guard to ensure `value` from theme colors is a string before calling string methods on it.
+        if(typeof value === 'string' && !value.startsWith('rgba')) {
             const rgbValue = hexToRgb(value);
             if(rgbValue) rules += `--color-${key}-rgb: ${rgbValue};`;
         }
@@ -246,7 +290,11 @@ const App: React.FC = () => {
         --line-height: ${theme.lineHeight};
       `;
       
-      styleEl.innerHTML = `:root { ${colorStyles} ${fontStyles} }`;
+      const textureStyle = `
+        --book-texture: ${TEXTURES[theme.texture]?.style || 'none'};
+      `;
+      
+      styleEl.innerHTML = `:root { ${colorStyles} ${fontStyles} ${textureStyle} }`;
       
       if (!document.head.contains(styleEl)) {
         document.head.appendChild(styleEl);
@@ -259,8 +307,12 @@ const App: React.FC = () => {
   }, [theme]);
 
   useEffect(() => {
-    // Set this once on mount
-    setIsMobile('ontouchstart' in window && navigator.maxTouchPoints > 0);
+    const checkMobile = () => {
+       setIsMobile('ontouchstart' in window && navigator.maxTouchPoints > 0);
+    }
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   useEffect(() => {
@@ -666,26 +718,37 @@ const App: React.FC = () => {
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     setSelection(null); // Hide popup immediately on scroll
     if (scrollTimeout.current) window.clearTimeout(scrollTimeout.current);
+    
+    const scrollTop = e.currentTarget.scrollTop;
+    const scrollHeight = e.currentTarget.scrollHeight;
+    const clientHeight = e.currentTarget.clientHeight;
+
     scrollTimeout.current = window.setTimeout(() => {
-        if (!viewerRef.current || !selectedBookId) return;
-        const { scrollTop, scrollHeight, clientHeight } = viewerRef.current;
-        const totalScrollable = scrollHeight - clientHeight;
-        const progress = totalScrollable > 0 ? scrollTop / totalScrollable : 1;
+        if (!selectedBookId) return;
         
-        const currentBook = library.find(b => b.id === selectedBookId);
-        if (currentBook) {
+        // Use functional update to avoid 'library' dependency which causes App to re-render on every scroll debounce
+        setLibrary(prevLib => {
+            const currentBook = prevLib.find(b => b.id === selectedBookId);
+            if (!currentBook) return prevLib;
+
+            const totalScrollable = scrollHeight - clientHeight;
+            const progress = totalScrollable > 0 ? scrollTop / totalScrollable : 1;
+            
             const updatedBook = {
                 ...currentBook,
                 progress: Math.min(progress, 1),
                 lastScrollTop: scrollTop
             };
-            setLibrary(lib => lib.map(b => b.id === selectedBookId ? updatedBook : b));
+            
+            // Side effect inside setter is acceptable for this specific debounce case to avoid dependency loops
             db.saveBook(updatedBook);
-        }
-    }, 150);
-  }, [selectedBookId, library]);
 
-  const navigateTo = (href: string) => {
+            return prevLib.map(b => b.id === selectedBookId ? updatedBook : b);
+        });
+    }, 150);
+  }, [selectedBookId]);
+
+  const navigateTo = useCallback((href: string) => {
     const chapterIdWithAnchor = href.split('/').pop();
     if (!chapterIdWithAnchor) return;
     
@@ -700,7 +763,7 @@ const App: React.FC = () => {
     };
 
     // On mobile screens, if the sidebar is open, close it first and then scroll.
-    if (window.innerWidth < 1024 && isSidebarOpen) {
+    if (window.innerWidth < 1024) {
       setIsSidebarOpen(false);
       // Wait for the closing animation (300ms) to complete before scrolling.
       setTimeout(doScroll, 300); 
@@ -708,7 +771,7 @@ const App: React.FC = () => {
       // On desktop, or if sidebar is already closed, scroll immediately.
       doScroll();
     }
-  };
+  }, [isSidebarOpen]);
   
   const handleSelection = useCallback(() => {
     const viewer = viewerRef.current;
@@ -728,14 +791,6 @@ const App: React.FC = () => {
       return;
     }
     
-    const range = sel.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
-    const viewerRect = viewer.getBoundingClientRect();
-
-    if (rect.width < 1 && rect.height < 1) {
-      return;
-    }
-    
     let chapterId: string | null = null;
     let currentNode: Node | null = sel.anchorNode;
     while (currentNode && currentNode !== viewer) {
@@ -750,28 +805,48 @@ const App: React.FC = () => {
     }
 
     if (chapterId) {
-      const POPUP_WIDTH_ESTIMATE = 130;
-      const PADDING = 16;
+        // For mobile, we don't need precise coords, fixed positioning is used.
+        if (isMobile) {
+             setSelection({
+                text,
+                top: 0, 
+                left: 0,
+                right: 0,
+                chapterId: chapterId,
+            });
+            return;
+        }
 
-      let left = rect.left - viewerRect.left + rect.width / 2;
+        const range = sel.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        const viewerRect = viewer.getBoundingClientRect();
 
-      // Constrain left position to be within the viewer bounds
-      if (left - POPUP_WIDTH_ESTIMATE / 2 < PADDING) {
-        left = POPUP_WIDTH_ESTIMATE / 2 + PADDING;
-      }
-      if (left + POPUP_WIDTH_ESTIMATE / 2 > viewerRect.width - PADDING) {
-        left = viewerRect.width - POPUP_WIDTH_ESTIMATE / 2 - PADDING;
-      }
+        if (rect.width < 1 && rect.height < 1) {
+            return;
+        }
+
+        const POPUP_WIDTH_ESTIMATE = 130;
+        const PADDING = 16;
+
+        let left = rect.left - viewerRect.left + rect.width / 2;
+
+        // Constrain left position to be within the viewer bounds
+        if (left - POPUP_WIDTH_ESTIMATE / 2 < PADDING) {
+            left = POPUP_WIDTH_ESTIMATE / 2 + PADDING;
+        }
+        if (left + POPUP_WIDTH_ESTIMATE / 2 > viewerRect.width - PADDING) {
+            left = viewerRect.width - POPUP_WIDTH_ESTIMATE / 2 - PADDING;
+        }
       
-      setSelection({
-        text,
-        top: rect.top - viewerRect.top + viewer.scrollTop,
-        left: left,
-        right: rect.right - viewerRect.left, // This isn't used for positioning, but might be useful
-        chapterId: chapterId,
-      });
+        setSelection({
+            text,
+            top: rect.top - viewerRect.top + viewer.scrollTop,
+            left: left,
+            right: rect.right - viewerRect.left, // This isn't used for positioning, but might be useful
+            chapterId: chapterId,
+        });
     }
-  }, [selectedBook]);
+  }, [selectedBook, isMobile]);
   
   // This effect sets up the listeners that SHOW or UPDATE the selection popup.
   useEffect(() => {
@@ -875,6 +950,13 @@ const App: React.FC = () => {
                 setActiveTab('quotes');
             }
         });
+        setSelection(null);
+    }
+  };
+
+  const handleSearch = () => {
+    if (selection) {
+        setSearchQuery(selection.text);
         setSelection(null);
     }
   };
@@ -1363,21 +1445,10 @@ ${textToSummarize}
       setViewingTrailerForBook(null);
   };
 
-  const TocItemComponent: React.FC<{ item: TocItem; onNavigate: (href: string) => void }> = ({ item, onNavigate }) => (
-    <li className="my-1">
-      <button 
-        onClick={() => onNavigate(item.href)}
-        className="w-full text-left p-2 rounded-md hover:bg-[rgba(var(--color-border-color-rgb),0.2)] transition-colors duration-200 text-sm"
-      >
-        {item.label.trim()}
-      </button>
-      {item.subitems && item.subitems.length > 0 && (
-        <ul className="pl-4 border-l border-[var(--color-border-color)] ml-2">
-          {item.subitems.map(subitem => <TocItemComponent key={subitem.id} item={subitem} onNavigate={onNavigate} />)}
-        </ul>
-      )}
-    </li>
-  );
+  // Performance fix: Use callback to ensure stable identity for setRef to work with React.memo
+  const setChapterRef = useCallback((id: string, el: HTMLElement | null) => {
+      if (el) chapterRefs.current[id] = el;
+  }, []);
   
   if (!selectedBook) {
     const sortedLibrary = [...library].sort((a, b) => (b.lastOpened || 0) - (a.lastOpened || 0));
@@ -1446,6 +1517,7 @@ ${textToSummarize}
                         onThemeChange={setTheme}
                         themes={THEMES}
                         fonts={FONTS}
+                        textures={TEXTURES}
                     />
                 )}
             </main>
@@ -1458,87 +1530,113 @@ ${textToSummarize}
                 <>
                     <button
                         onClick={handleUploadClick}
-                        className="fixed bottom-6 right-6 flex items-center justify-center p-4 bg-[var(--color-primary)] text-white font-semibold rounded-full shadow-lg hover:opacity-90 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--color-primary)] disabled:opacity-50 disabled:cursor-not-allowed z-10"
-                        disabled={isLoading || !!generatingTrailerForBookId}
-                        title="Upload a file"
+                        className="fixed bottom-6 right-6 flex items-center justify-center p-4 bg-[var(--color-primary)] text-white font-semibold rounded-full shadow-lg hover:opacity-90 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--color-primary)]"
+                        title="Upload EPUB"
+                        aria-label="Upload EPUB file"
                     >
                         <IconUpload className="w-6 h-6" />
                     </button>
-                    <input type="file" ref={fileInputRef} className="hidden" accept=".epub" onChange={handleFileChange} disabled={isLoading} />
+                    <input
+                        type="file"
+                        accept=".epub"
+                        ref={fileInputRef}
+                        onChange={handleFileChange}
+                        className="hidden"
+                    />
                 </>
             )}
-             {toast && <Toast message={toast.message} action={toast.action} onClose={() => setToast(null)} />}
+
+            {toast && (
+                <Toast 
+                    message={toast.message} 
+                    action={toast.action}
+                    onClose={() => setToast(null)} 
+                />
+            )}
         </div>
     );
   }
-  
+
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-[var(--color-background)] text-[var(--color-primary-text)]">
-      {toast && <Toast message={toast.message} action={toast.action} onClose={() => setToast(null)} />}
-
-      <aside className={`absolute lg:relative z-20 h-full bg-[var(--color-background)] border-r border-[var(--color-border-color)] shadow-lg transition-all duration-300 ease-in-out flex flex-col overflow-hidden ${isSidebarOpen ? 'w-full sm:w-80' : 'w-0 -translate-x-full lg:w-0 lg:translate-x-0'}`}>
-        <div className="flex items-center justify-between p-4 border-b border-[var(--color-border-color)] flex-shrink-0">
-          <h2 className="text-lg font-bold truncate">Table of Contents</h2>
-          <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-1 rounded-full hover:bg-[rgba(var(--color-border-color-rgb),0.2)]">
-            <IconClose className="w-6 h-6" />
-          </button>
+    <div className="h-screen flex flex-col lg:flex-row bg-[var(--color-background)]">
+      <BookStyles />
+      <div 
+        className={`fixed inset-0 z-50 lg:z-0 lg:static lg:flex flex-col lg:w-80 xl:w-96 border-r border-[var(--color-border-color)] bg-[var(--color-background)] text-[var(--color-primary-text)] transition-transform transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 will-change-transform`}
+      >
+        <div className="flex items-center justify-between p-4 border-b border-[var(--color-border-color)]">
+            <button onClick={handleBackToLibrary} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                <IconChevronLeft className="w-5 h-5"/>
+                <span className="font-semibold text-sm">Library</span>
+            </button>
+            <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-1 rounded-full hover:bg-[rgba(var(--color-border-color-rgb),0.2)]">
+                <IconClose className="w-5 h-5"/>
+            </button>
         </div>
-        <nav className="overflow-y-auto flex-grow p-2">
-          <ul>
-            {selectedBook.toc.map(item => <TocItemComponent key={item.id} item={item} onNavigate={navigateTo} />)}
-          </ul>
-        </nav>
-      </aside>
+        <div className="flex-1 overflow-y-auto p-4">
+            <h2 className="font-bold text-lg mb-1 truncate">{selectedBook.title}</h2>
+            <p className="text-sm text-[var(--color-secondary-text)] mb-4">{selectedBook.author}</p>
+            <nav>
+              <ul>
+                {selectedBook.toc.map(item => <TocItemComponent key={item.id} item={item} onNavigate={navigateTo}/>)}
+              </ul>
+            </nav>
+        </div>
+      </div>
 
-      <main className="flex-1 flex flex-col relative min-w-0">
-        <header className="flex items-center justify-between p-2 md:p-4 bg-[var(--color-background)] border-b border-[var(--color-border-color)] z-10 w-full flex-shrink-0">
-          <button onClick={handleBackToLibrary} className="flex items-center p-2 rounded-lg hover:bg-[rgba(var(--color-border-color-rgb),0.2)] text-sm transition-colors">
-            <IconChevronLeft className="w-5 h-5 mr-1" />
-            <span className="hidden sm:inline">Back to Library</span>
-          </button>
-          <div className="text-center mx-2 flex-1 min-w-0">
-            <h1 className="font-bold text-sm md:text-lg truncate">
-                {selectedBook.title}
-            </h1>
-            <p className="text-xs md:text-sm text-[var(--color-secondary-text)] truncate">{currentLocation}</p>
-          </div>
-          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 rounded-full hover:bg-[rgba(var(--color-border-color-rgb),0.2)]">
-            {isSidebarOpen ? <IconClose className="w-6 h-6" /> : <IconMenu className="w-6 h-6" />}
-          </button>
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="flex items-center justify-between p-3 border-b border-[var(--color-border-color)] flex-shrink-0">
+            <button onClick={() => setIsSidebarOpen(true)} className="lg:hidden p-2 rounded-lg hover:bg-[rgba(var(--color-border-color-rgb),0.2)]">
+                <IconMenu className="w-6 h-6"/>
+            </button>
+            <div className="text-center text-sm text-[var(--color-secondary-text)] flex-1 min-w-0 px-2">
+                <span className="truncate">{currentLocation}</span>
+            </div>
+            {/* Placeholder for symmetry */}
+            <div className="w-10 h-10 lg:hidden"></div>
         </header>
-
-        <div 
-          className="relative flex-grow overflow-y-auto" 
-          ref={viewerRef} 
-          onScroll={handleScroll} 
-          onContextMenu={(e) => e.preventDefault()}
+        
+        <main 
+            ref={viewerRef} 
+            className="flex-1 overflow-y-auto relative" 
+            onScroll={handleScroll}
         >
-            <BookStyles />
+            <div className="max-w-3xl mx-auto">
+                {selectedBook.chapters.map(chapter => (
+                    <ChapterSection
+                        key={chapter.id}
+                        chapter={chapter}
+                        setRef={setChapterRef}
+                    />
+                ))}
+            </div>
+            
             {selection && (
                 <TextSelectionPopup 
                     top={selection.top}
                     left={selection.left}
                     onCopy={handleCopy}
                     onQuote={handleQuote}
+                    onSearch={handleSearch}
+                    isMobile={isMobile}
                 />
             )}
-            <div className="book-content-view max-w-4xl mx-auto">
-                {isLoading ? (
-                     <div className="mt-8 flex items-center justify-center space-x-2">
-                        <div className="w-8 h-8 rounded-full animate-spin border-2 border-solid border-[var(--color-primary)] border-t-transparent"></div>
-                        <span>Parsing Book...</span>
-                    </div>
-                ) : selectedBook.chapters.map(chapter => (
-                    <section
-                        key={chapter.id}
-                        id={chapter.id}
-                        ref={el => { if (el) chapterRefs.current[chapter.id] = el; }}
-                        dangerouslySetInnerHTML={{ __html: chapter.html }}
-                    />
-                ))}
-            </div>
-        </div>
-      </main>
+        </main>
+      </div>
+
+      {searchQuery && (
+        <SearchSidebar 
+            query={searchQuery}
+            onClose={() => setSearchQuery(null)}
+        />
+      )}
+      
+      {toast && (
+          <Toast 
+            message={toast.message} 
+            action={toast.action}
+            onClose={() => setToast(null)} 
+          />
+       )}
     </div>
   );
 };

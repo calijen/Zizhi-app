@@ -51,6 +51,14 @@
         from { transform: translateY(100%); }
         to { transform: translateY(0); }
       }
+      /* Special animation for centered bottom bar to maintain X centering */
+      @keyframes slideInUpCentered {
+        from { transform: translate(-50%, 100%); opacity: 0; }
+        to { transform: translate(-50%, 0); opacity: 1; }
+      }
+      .animate-slide-up-centered {
+        animation: slideInUpCentered 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
       .animate-search-panel-in {
         animation: slideInUp 0.3s ease-out forwards;
       }

@@ -1,15 +1,88 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import type { Theme, ThemeColors, ThemeFont } from '../types';
+import { GoogleGenAI, Type } from '@google/genai';
+import { IconSpinner } from './icons';
+
 
 interface SettingsViewProps {
   currentTheme: Theme;
   onThemeChange: (theme: Theme) => void;
   themes: { [key: string]: Theme };
   fonts: ThemeFont[];
+  textures: { [key: string]: { name: string; style: string } };
 }
 
-const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange, themes, fonts }) => {
+const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange, themes, fonts, textures }) => {
   const [customColors, setCustomColors] = useState<ThemeColors>(currentTheme.colors);
+  const [isSecretPanelVisible, setIsSecretPanelVisible] = useState(false);
+  const [recommendation, setRecommendation] = useState<{title: string; author: string; synopsis: string} | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+
+  useEffect(() => {
+    const konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+    let index = 0;
+
+    const handler = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() === konamiCode[index]) {
+        index++;
+        if (index === konamiCode.length) {
+          setIsSecretPanelVisible(true);
+          index = 0; // Reset
+        }
+      } else {
+        index = 0;
+      }
+    };
+
+    document.addEventListener('keydown', handler);
+    return () => {
+      document.removeEventListener('keydown', handler);
+    };
+  }, []);
+
+  const handleGenerateRecommendation = async () => {
+    setIsGenerating(true);
+    setError(null);
+    setRecommendation(null);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+      const prompt = `Generate a quirky and fictional book recommendation. The title should be bizarre. The author's name should be eccentric. The synopsis should be a single sentence that is funny and absurd. The genre should be completely made up and implied by the content.`;
+      
+      const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    title: { type: Type.STRING },
+                    author: { type: Type.STRING },
+                    synopsis: { type: Type.STRING },
+                },
+                required: ["title", "author", "synopsis"],
+            }
+          }
+      });
+      
+      const result = JSON.parse(response.text);
+      if (result.title && result.author && result.synopsis) {
+        setRecommendation(result);
+      } else {
+        throw new Error("Invalid response format from API.");
+      }
+
+    } catch (e: any) {
+      console.error("Failed to generate recommendation:", e);
+      setError("Oops! Couldn't cook up a recommendation. Please try again.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
 
   const handlePresetSelect = (theme: Theme) => {
     // When selecting a preset, also adopt its font size and line height
@@ -38,6 +111,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
     onThemeChange({ ...currentTheme, name: 'Custom', lineHeight: parseFloat(e.target.value) });
   };
 
+  const handleTextureChange = (textureKey: string) => {
+    onThemeChange({ ...currentTheme, name: 'Custom', texture: textureKey });
+  };
+
+
   const ColorInput: React.FC<{ label: string; colorKey: keyof ThemeColors; }> = ({ label, colorKey }) => (
     <div className="flex items-center justify-between">
       <label htmlFor={colorKey} className="text-sm">{label}</label>
@@ -54,6 +132,48 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
     </div>
   );
 
+  const SecretPanel = () => (
+    <div className="p-4 sm:p-6 bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-lg space-y-4 mt-6">
+      <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-secondary-text)]">🤫 TOP SECRET 🤫</h3>
+      <p className="text-sm text-[var(--color-secondary-text)]">You found the secret panel! Click the button for a completely absurd book recommendation, generated just for you.</p>
+      
+      {isGenerating ? (
+        <div className="flex items-center justify-center p-8">
+            <IconSpinner className="w-8 h-8 text-[var(--color-primary)]" />
+        </div>
+      ) : recommendation ? (
+        <div className="p-4 bg-[rgba(var(--color-border-color-rgb),0.1)] rounded-md space-y-2">
+            <h4 className="font-bold text-lg font-serif text-[var(--color-primary)]">
+                {recommendation.title}
+            </h4>
+            <p className="text-sm font-semibold text-[var(--color-primary-text)]">
+                by {recommendation.author}
+            </p>
+            <p className="italic text-[var(--color-secondary-text)] pt-2">
+                "{recommendation.synopsis}"
+            </p>
+            <button 
+                onClick={handleGenerateRecommendation}
+                className="mt-4 w-full sm:w-auto px-4 py-2 bg-[rgba(var(--color-primary-rgb),0.1)] text-[var(--color-primary)] rounded-md hover:bg-[rgba(var(--color-primary-rgb),0.2)] transition-colors text-sm font-medium"
+            >
+                Generate Another
+            </button>
+        </div>
+      ) : (
+        <div>
+          <button 
+            onClick={handleGenerateRecommendation}
+            className="w-full sm:w-auto px-4 py-2 bg-[var(--color-primary)] text-white rounded-md hover:opacity-90 transition-opacity text-sm font-semibold"
+          >
+            Generate Absurd Recommendation
+          </button>
+          {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
+        </div>
+      )}
+    </div>
+  );
+
+
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
         <h2 className="text-xl font-bold font-sans text-[var(--color-primary-text)] mb-8">Appearance</h2>
@@ -66,6 +186,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
                     style={{
                         backgroundColor: currentTheme.colors.background,
                         borderColor: currentTheme.colors['border-color'],
+                        backgroundImage: textures[currentTheme.texture]?.style || 'none',
                     }}
                 >
                     <h4 
@@ -104,7 +225,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
                 <div className="p-4 sm:p-6 bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-lg space-y-4">
                   <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-secondary-text)]">Preset Themes</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {Object.values(themes).map(theme => (
+                    {(Object.values(themes) as Theme[]).map((theme) => (
                       <button
                         key={theme.name}
                         onClick={() => handlePresetSelect(theme)}
@@ -170,6 +291,20 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
                             className="w-full h-2 bg-[rgba(var(--color-border-color-rgb),0.3)] rounded-lg appearance-none cursor-pointer accent-[var(--color-primary)]"
                         />
                     </div>
+                    <div>
+                        <label className="text-sm mb-2 block">Book Texture</label>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            {Object.entries(textures).map(([key, texture]) => (
+                                <button
+                                    key={key}
+                                    onClick={() => handleTextureChange(key)}
+                                    className={`p-2 text-sm text-center rounded-md border-2 transition-colors ${currentTheme.texture === key ? 'border-[var(--color-primary)] bg-[rgba(var(--color-primary-rgb),0.1)]' : 'border-transparent bg-[rgba(var(--color-border-color-rgb),0.1)] hover:border-[var(--color-border-color)]'}`}
+                                >
+                                    {texture.name}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                 </div>
 
                 <div className="p-4 sm:p-6 bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-lg space-y-4">
@@ -183,6 +318,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
                     <ColorInput label="Borders" colorKey="border-color" />
                   </div>
                 </div>
+                {isSecretPanelVisible && <SecretPanel />}
             </div>
         </div>
         
@@ -194,6 +330,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
                     style={{
                         backgroundColor: currentTheme.colors.background,
                         borderColor: currentTheme.colors['border-color'],
+                        backgroundImage: textures[currentTheme.texture]?.style || 'none',
                     }}
                 >
                     <h4 
@@ -233,7 +370,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
                 <div className="p-4 sm:p-6 bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-lg space-y-4">
                   <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-secondary-text)]">Preset Themes</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {Object.values(themes).map(theme => (
+                    {(Object.values(themes) as Theme[]).map((theme) => (
                       <button
                         key={theme.name}
                         onClick={() => handlePresetSelect(theme)}
@@ -299,6 +436,20 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
                             className="w-full h-2 bg-[rgba(var(--color-border-color-rgb),0.3)] rounded-lg appearance-none cursor-pointer accent-[var(--color-primary)]"
                         />
                     </div>
+                    <div>
+                        <label className="text-sm mb-2 block">Book Texture</label>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            {Object.entries(textures).map(([key, texture]) => (
+                                <button
+                                    key={key}
+                                    onClick={() => handleTextureChange(key)}
+                                    className={`p-2 text-sm text-center rounded-md border-2 transition-colors ${currentTheme.texture === key ? 'border-[var(--color-primary)] bg-[rgba(var(--color-primary-rgb),0.1)]' : 'border-transparent bg-[rgba(var(--color-border-color-rgb),0.1)] hover:border-[var(--color-border-color)]'}`}
+                                >
+                                    {texture.name}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                 </div>
 
                 <div className="p-4 sm:p-6 bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-lg space-y-4">
@@ -312,6 +463,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
                     <ColorInput label="Borders" colorKey="border-color" />
                   </div>
                 </div>
+                {isSecretPanelVisible && <SecretPanel />}
             </div>
         </div>
     </div>

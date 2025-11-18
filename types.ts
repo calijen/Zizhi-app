@@ -43,7 +43,7 @@ export interface Book {
 
 export interface ThemeColors {
   'primary': string;
-  'secondary': string;
+  'secondary':string;
   'background': string;
   'primary-text': string;
   'secondary-text': string;
@@ -62,4 +62,5 @@ export interface Theme {
   font: ThemeFont;
   fontSize: number; // in rem
   lineHeight: number; // unitless
+  texture: string; // 'none', 'paper', etc.
 }
