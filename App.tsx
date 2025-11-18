@@ -1,19 +1,18 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import type { TocItem, Quote, Book, Chapter, Theme, ThemeFont, ThemeColors } from './types';
-import * as db from './db';
+import { GoogleGenAI, Modality } from "@google/genai";
 import Library, { BookCardData } from './components/FileUpload';
 import QuotesView from './components/QuotesView';
 import SettingsView from './components/SettingsView';
-import TextSelectionPopup from './components/TextSelectionPopup';
-import Toast from './components/Toast';
 import TrailerView from './components/TrailerView';
 import SearchSidebar from './components/SearchSidebar';
+import TextSelectionPopup from './components/TextSelectionPopup';
+import Toast from './components/Toast';
 import { 
-  IconMenu, IconClose, IconChevronLeft, IconUpload, IconDownload, Logo, IconSettings
+    Logo, IconSettings, IconDownload, IconUpload, IconClose, 
+    IconSpinner, IconChevronLeft, IconMenu 
 } from './components/icons';
-import { GoogleGenAI, Modality } from "@google/genai";
-
+import * as db from './db';
+import type { Book, Quote, Theme, TocItem, Chapter, ThemeColors, ThemeFont } from './types';
 
 declare global {
   interface Window {
@@ -22,209 +21,202 @@ declare global {
 }
 
 const FONTS: ThemeFont[] = [
-    { name: 'Vintage', sans: 'Inter', serif: 'Lora' },
-    { name: 'Modern', sans: 'Roboto', serif: 'Roboto Slab' },
-    { name: 'Playful', sans: 'Nunito', serif: 'Merriweather' },
-    { name: 'Minimalist', sans: 'Montserrat', serif: 'Source Serif Pro' },
+    { name: 'Modern', sans: 'Inter', serif: 'Lora' },
+    { name: 'Classic', sans: 'Helvetica Neue', serif: 'Georgia' },
+    { name: 'Humanist', sans: 'Nunito', serif: 'Merriweather' },
+    { name: 'Geometric', sans: 'Montserrat', serif: 'Roboto Slab' },
+    { name: 'System', sans: '-apple-system, BlinkMacSystemFont, Segoe UI', serif: 'Times New Roman' }
 ];
 
 const TEXTURES: { [key: string]: { name: string; style: string } } = {
-  none: { name: 'None', style: 'none' },
-  paper: { name: 'Paper', style: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cfilter id='n' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='5' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23n)' opacity='0.07'/%3E%3C/svg%3E")`},
-  linen: { name: 'Linen', style: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23000000' fill-opacity='0.04'%3E%3Cpath d='M0 38.59l2.83-2.83 1.41 1.41L1.41 40H0v-1.41zM0 1.4l2.83 2.83 1.41-1.41L1.41 0H0v1.41zM38.59 40l-2.83-2.83 1.41-1.41L40 38.59V40h-1.41zM40 1.41l-2.83 2.83-1.41-1.41L38.59 0H40v1.41zM20 18.6l2.83-2.83 1.41 1.41L21.41 20l2.83 2.83-1.41 1.41L20 21.41l-2.83 2.83-1.41-1.41L18.59 20l-2.83-2.83 1.41-1.41L20 18.59z'/%3E%3C/g%3E%3C/svg%3E")` },
-  parchment: { name: 'Parchment', style: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`},
+    none: { name: 'None', style: 'none' },
+    paper: { name: 'Paper', style: 'url("data:image/svg+xml,%3Csvg width=\'100\' height=\'100\' viewBox=\'0 0 100 100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.8\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100\' height=\'100\' filter=\'url(%23noise)\' opacity=\'0.08\'/%3E%3C/svg%3E")' },
+    warm: { name: 'Warm', style: 'linear-gradient(to bottom right, rgba(255,250,240,0.5), rgba(255,248,220,0.5))' },
 };
-
 
 const THEMES: { [key: string]: Theme } = {
-  vintage: {
-    name: 'Vintage',
-    font: FONTS[0],
-    fontSize: 1,
-    lineHeight: 1.7,
-    texture: 'paper',
-    colors: {
-        'primary': '#5E4630',
-        'secondary': '#B08D57',
-        'background': '#FBF8EE',
-        'primary-text': '#000000',
-        'secondary-text': '#202020',
-        'border-color': '#9f9e9c',
-    }
-  },
-  modern: {
-    name: 'Modern',
-    font: FONTS[0],
-    fontSize: 1,
-    lineHeight: 1.7,
-    texture: 'none',
-    colors: {
-      'primary': '#1A2B6D',
-      'secondary': '#5D8BF4',
-      'background': '#FAFAFA',
-      'primary-text': '#333333',
-      'secondary-text': '#666666',
-      'border-color': '#E0E0E0',
+    light: {
+        name: 'Light',
+        colors: {
+            'primary': '#2563eb',
+            'secondary': '#4f46e5',
+            'background': '#ffffff',
+            'primary-text': '#1f2937',
+            'secondary-text': '#6b7280',
+            'border-color': '#e5e7eb',
+        },
+        font: FONTS[0],
+        fontSize: 1,
+        lineHeight: 1.6,
+        texture: 'none',
     },
-  },
-  black_and_white: {
-    name: 'Black & White',
-    font: FONTS[0],
-    fontSize: 1,
-    lineHeight: 1.7,
-    texture: 'none',
-    colors: {
-      'primary': '#242424',
-      'secondary': '#437aff',
-      'background': '#FFFFFF',
-      'primary-text': 'rgba(0,0,0,0.8)',
-      'secondary-text': '#6b6b6b',
-      'border-color': '#f2f2f2',
+    sepia: {
+        name: 'Sepia',
+        colors: {
+            'primary': '#8c6b48',
+            'secondary': '#a68b6c',
+            'background': '#f3e5d0',
+            'primary-text': '#433422',
+            'secondary-text': '#755f44',
+            'border-color': '#dcc6a8',
+        },
+        font: FONTS[1],
+        fontSize: 1,
+        lineHeight: 1.6,
+        texture: 'paper',
+    },
+    dark: {
+        name: 'Dark',
+        colors: {
+            'primary': '#60a5fa',
+            'secondary': '#818cf8',
+            'background': '#111827',
+            'primary-text': '#f3f4f6',
+            'secondary-text': '#9ca3af',
+            'border-color': '#374151',
+        },
+        font: FONTS[0],
+        fontSize: 1,
+        lineHeight: 1.6,
+        texture: 'none',
+    },
+    vintage: {
+         name: 'Vintage',
+         colors: {
+             'primary': '#2c3e50',
+             'secondary': '#e67e22',
+             'background': '#faf5e6', // Creamy off-white
+             'primary-text': '#2c3e50', // Dark blue-grey
+             'secondary-text': '#7f8c8d',
+             'border-color': '#dcd6c5',
+         },
+         font: FONTS[2], // Merriweather/Nunito
+         fontSize: 1.05,
+         lineHeight: 1.7,
+         texture: 'paper',
     }
-  },
-  night: {
-    name: 'Night',
-    font: FONTS[0],
-    fontSize: 1,
-    lineHeight: 1.7,
-    texture: 'none',
-    colors: {
-        'primary': '#0582ff',
-        'secondary': '#89CFF0',
-        'background': '#121212',
-        'primary-text': '#E0E0E0',
-        'secondary-text': '#A0A0A0',
-        'border-color': '#2A2A2A',
-    }
-  }
 };
 
-const BookStyles = () => {
-  const styles = `
-    .book-content-view {
-      padding: 1rem 1rem 2rem 1rem;
-      line-height: var(--line-height, 1.7);
-      font-size: var(--font-size, 1rem);
-      font-family: var(--font-serif), serif;
-      color: var(--color-primary-text);
-      background: var(--book-texture) var(--color-background);
-      user-select: text;
-      -webkit-user-select: text;
-      -webkit-touch-callout: none !important; /* Suppress iOS native menu/magnifier to favor custom UI */
-      -webkit-tap-highlight-color: transparent; /* Remove tap highlight on Android */
-      overflow-wrap: break-word;
-      width: 100%;
-      box-sizing: border-box;
-      outline: none;
+const BookStyles: React.FC = () => (
+  <style>{`
+    @keyframes fade-in-out {
+      0% { opacity: 0; transform: translate(-50%, 10px); }
+      10% { opacity: 1; transform: translate(-50%, 0); }
+      90% { opacity: 1; transform: translate(-50%, 0); }
+      100% { opacity: 0; transform: translate(-50%, 10px); }
     }
-    
-    /* AGGRESSIVE RESPONSIVE OVERRIDES */
-    .book-content-view * {
-        max-width: 100% !important;
-        min-width: 0 !important;
-        width: auto !important;
-        height: auto !important;
-        box-sizing: border-box !important;
-        word-wrap: break-word !important;
-        overflow-wrap: break-word !important;
-        /* Disable columns which can break single-column mobile layouts */
-        column-count: 1 !important;
-        column-width: auto !important;
-        column-gap: 0 !important;
+    .animate-fade-in-out {
+      animation: fade-in-out 3s ease-in-out forwards;
     }
-    .book-content-view table, .book-content-view pre {
-        white-space: pre-wrap !important;
-        width: 100% !important;
+    @keyframes slide-up-centered {
+        from { opacity: 0; transform: translate(-50%, 20px); }
+        to { opacity: 1; transform: translate(-50%, 0); }
     }
-    .book-content-view table {
-         table-layout: fixed !important;
+    .animate-slide-up-centered {
+        animation: slide-up-centered 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
-    .book-content-view img, .book-content-view video, .book-content-view svg {
-      margin: 1.5em auto !important;
-      display: block !important;
-      border-radius: 0.25rem;
+    @keyframes search-panel-in {
+        from { opacity: 0; transform: translateX(100%); }
+        to { opacity: 1; transform: translateX(0); }
     }
-    .book-content-view style, .book-content-view link[rel=stylesheet] {
-        display: none !important;
+    .animate-search-panel-in {
+        animation: search-panel-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
-    
-    /* Keep existing typography styles */
-    @media (min-width: 768px) {
-      .book-content-view {
-        padding: 2rem;
-        line-height: calc(var(--line-height, 1.7) + 0.1);
-        font-size: calc(var(--font-size, 1rem) + 0.125rem);
-      }
+    .prose {
+        max-width: 65ch;
+        margin: 0 auto;
+        font-family: var(--font-serif);
+        font-size: var(--font-size);
+        line-height: var(--line-height);
+        color: var(--color-primary-text);
     }
-    .book-content-view ::selection {
-      background-color: var(--color-secondary);
-      color: white;
+    .prose p {
+        margin-bottom: 1.5em;
+        text-align: justify;
     }
-    .book-content-view h1, .book-content-view h2, .book-content-view h3, .book-content-view h4, .book-content-view h5, .book-content-view h6 {
-      margin-top: 1.5em;
-      margin-bottom: 0.5em;
-      line-height: 1.3;
-      font-weight: 600;
-      font-family: var(--font-sans), sans-serif;
-      color: var(--color-primary);
+    .prose h1, .prose h2, .prose h3, .prose h4 {
+        font-family: var(--font-sans);
+        color: var(--color-primary-text);
+        margin-top: 2em;
+        margin-bottom: 1em;
+        font-weight: bold;
     }
-     @media (min-width: 768px) {
-        .book-content-view h1, .book-content-view h2, .book-content-view h3, .book-content-view h4, .book-content-view h5, .book-content-view h6 {
-            margin-top: 2em;
-        }
-     }
-    .book-content-view p {
-      margin-bottom: 1.2em;
+    .prose img {
+        max-width: 100%;
+        height: auto;
+        display: block;
+        margin: 2rem auto;
+        border-radius: 4px;
     }
-    .book-content-view a {
-      color: var(--color-primary);
-      text-decoration: underline;
-    }
-    .book-content-view ul, .book-content-view ol {
-      margin-bottom: 1em;
-      padding-left: 1.5em;
-    }
-    .book-content-view blockquote {
-        border-left: 3px solid var(--color-primary);
+    .prose blockquote {
+        border-left: 4px solid var(--color-primary);
         padding-left: 1em;
         margin-left: 0;
         font-style: italic;
-        color: var(--color-primary-text);
+        color: var(--color-secondary-text);
     }
-  `;
-  return <style>{styles}</style>;
-};
+    .marquee-parent {
+        position: relative;
+        width: 100%;
+        overflow: hidden;
+        height: 30px;
+    }
+    .marquee-child {
+        display: flex;
+        flex-direction: row;
+        position: absolute;
+        width: max-content;
+        white-space: nowrap;
+        animation: marquee linear infinite;
+    }
+    @keyframes marquee {
+        0% { transform: translateX(0); }
+        100% { transform: translateX(-50%); }
+    }
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+    .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+  `}</style>
+);
 
-// Performance: Memoize recursive TOC rendering to prevent re-renders on every scroll
-const TocItemComponent: React.FC<{ item: TocItem; onNavigate: (href: string) => void }> = React.memo(({ item, onNavigate }) => (
-  <li className="my-1">
+const TocItemComponent: React.FC<{ item: TocItem; onNavigate: (href: string) => void }> = ({ item, onNavigate }) => (
+  <li className="mb-2">
     <button 
-      onClick={() => onNavigate(item.href)}
-      className="w-full text-left p-2 rounded-md hover:bg-[rgba(var(--color-border-color-rgb),0.2)] transition-colors duration-200 text-sm"
+      onClick={() => onNavigate(item.href)} 
+      className="text-left w-full hover:text-[var(--color-primary)] text-[var(--color-secondary-text)] transition-colors text-sm py-1 block truncate"
+      title={item.label}
     >
-      {item.label.trim()}
+      {item.label}
     </button>
     {item.subitems && item.subitems.length > 0 && (
-      <ul className="pl-4 border-l border-[var(--color-border-color)] ml-2">
-        {item.subitems.map(subitem => <TocItemComponent key={subitem.id} item={subitem} onNavigate={onNavigate} />)}
+      <ul className="pl-4 border-l border-[var(--color-border-color)] mt-1">
+        {item.subitems.map(sub => <TocItemComponent key={sub.id} item={sub} onNavigate={onNavigate} />)}
       </ul>
     )}
   </li>
-));
+);
 
-// Performance: Memoize Chapter rendering. 
-// dangerouslySetInnerHTML is expensive; this prevents react from diffing html strings when other props change.
-// Added tabIndex={-1} to discourage some browser native selection/search behaviors
-const ChapterSection: React.FC<{ chapter: Chapter; setRef: (id: string, el: HTMLElement | null) => void }> = React.memo(({ chapter, setRef }) => (
-  <section
-    id={chapter.id}
-    ref={el => setRef(chapter.id, el)}
-    className="book-content-view"
-    tabIndex={-1} 
-    dangerouslySetInnerHTML={{ __html: chapter.html }}
-  />
-));
-
+const ChapterSection: React.FC<{
+  chapter: Chapter;
+  setRef: (id: string, el: HTMLElement | null) => void;
+}> = React.memo(({ chapter, setRef }) => {
+  return (
+    <section 
+        id={chapter.id} 
+        ref={(el) => setRef(chapter.id, el)}
+        className="py-8 px-4 sm:px-8 lg:px-12 min-h-[50vh] flex flex-col items-center"
+    >
+      <div 
+        className="prose"
+        dangerouslySetInnerHTML={{ __html: chapter.html }} 
+      />
+    </section>
+  );
+});
 
 const App: React.FC = () => {
   const [library, setLibrary] = useState<Book[]>([]);
@@ -232,8 +224,9 @@ const App: React.FC = () => {
   const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isOpeningBook, setIsOpeningBook] = useState(false);
 
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= 1024);
   const [currentLocation, setCurrentLocation] = useState('');
 
   const [selection, setSelection] = useState<{ text: string; top: number; left: number; right: number; chapterId: string; } | null>(null);
@@ -261,7 +254,6 @@ const App: React.FC = () => {
       const savedThemeRaw = localStorage.getItem('zizhi-theme');
       if (savedThemeRaw) {
         const savedTheme = JSON.parse(savedThemeRaw);
-        // Merge with a default to ensure new properties like fontSize are present
         setTheme(prev => ({ ...prev, ...savedTheme }));
       }
     } catch (e) {
@@ -272,43 +264,34 @@ const App: React.FC = () => {
   useEffect(() => {
     try {
       localStorage.setItem('zizhi-theme', JSON.stringify(theme));
-      
       const styleEl = document.getElementById('zizhi-theme-styles') || document.createElement('style');
       styleEl.id = 'zizhi-theme-styles';
-
       const hexToRgb = (hex: string): string | null => {
         const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
         return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : null;
       };
-      
       const colorStyles = Object.entries(theme.colors).map(([key, value]) => {
         let rules = `--color-${key}: ${value};`;
-        // Fix: Add type guard to ensure `value` from theme colors is a string before calling string methods on it.
         if(typeof value === 'string' && !value.startsWith('rgba')) {
             const rgbValue = hexToRgb(value);
             if(rgbValue) rules += `--color-${key}-rgb: ${rgbValue};`;
         }
         return rules;
       }).join('\n');
-      
       const fontStyles = `
         --font-sans: '${theme.font.sans}';
         --font-serif: '${theme.font.serif}';
         --font-size: ${theme.fontSize}rem;
         --line-height: ${theme.lineHeight};
       `;
-      
       const textureStyle = `
         --book-texture: ${TEXTURES[theme.texture]?.style || 'none'};
       `;
-      
       styleEl.innerHTML = `:root { ${colorStyles} ${fontStyles} ${textureStyle} }`;
-      
       if (!document.head.contains(styleEl)) {
         document.head.appendChild(styleEl);
       }
       document.body.style.fontFamily = `var(--font-sans), sans-serif`;
-
     } catch(e) {
       console.error("Failed to apply theme", e);
     }
@@ -323,18 +306,14 @@ const App: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Add global context menu prevention for mobile to suppress native menus
   useEffect(() => {
     if (!isMobile) return;
-
     const preventContext = (e: Event) => {
         e.preventDefault();
     };
-
     window.addEventListener('contextmenu', preventContext, { passive: false });
     return () => window.removeEventListener('contextmenu', preventContext);
   }, [isMobile]);
-
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -354,7 +333,7 @@ const App: React.FC = () => {
       }
     }
   };
-  
+
   const parseEpub = async (file: File): Promise<Book> => {
     if (typeof window.JSZip === 'undefined') {
       throw new Error('JSZip library not found.');
@@ -608,7 +587,6 @@ const App: React.FC = () => {
     loadLibraryFromDB();
   }, []);
 
-  // Load quotes from local storage
   useEffect(() => {
     try {
       const storedQuotes = localStorage.getItem('zizhi-quotes');
@@ -618,7 +596,6 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Save quotes to local storage
   useEffect(() => {
     try {
         localStorage.setItem('zizhi-quotes', JSON.stringify(quotes));
@@ -661,6 +638,7 @@ const App: React.FC = () => {
         setLibrary(lib => lib.map(b => b.id === bookId ? updatedBook : b));
     }
     chapterRefs.current = {};
+    setIsOpeningBook(true);
     setSelectedBookId(bookId);
   };
   
@@ -673,6 +651,7 @@ const App: React.FC = () => {
       ));
       db.saveBook(updatedBook);
     }
+    setIsOpeningBook(false);
     setSelectedBookId(null);
     setCurrentLocation('');
     chapterRefs.current = {};
@@ -689,6 +668,7 @@ const App: React.FC = () => {
     const tryToScroll = (attempt = 0) => {
       if (attempt > 20) {
         if (viewerRef.current) viewerRef.current.scrollTop = selectedBook.lastScrollTop;
+        setTimeout(() => setIsOpeningBook(false), 300);
         return;
       }
   
@@ -696,12 +676,14 @@ const App: React.FC = () => {
         const targetElement = chapterRefs.current[scrollTarget];
         if (targetElement) {
           targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          setTimeout(() => setIsOpeningBook(false), 500);
         } else {
           setTimeout(() => tryToScroll(attempt + 1), 100);
         }
       } else {
         if (viewerRef.current) {
           viewerRef.current.scrollTop = selectedBook.lastScrollTop;
+          setTimeout(() => setIsOpeningBook(false), 500);
         }
       }
     };
@@ -737,7 +719,7 @@ const App: React.FC = () => {
   }, [selectedBook, selectedBook?.id, selectedBook?.chapters]);
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    setSelection(null); // Hide popup immediately on scroll
+    setSelection(null); 
     if (scrollTimeout.current) window.clearTimeout(scrollTimeout.current);
     
     const scrollTop = e.currentTarget.scrollTop;
@@ -747,7 +729,6 @@ const App: React.FC = () => {
     scrollTimeout.current = window.setTimeout(() => {
         if (!selectedBookId) return;
         
-        // Use functional update to avoid 'library' dependency which causes App to re-render on every scroll debounce
         setLibrary(prevLib => {
             const currentBook = prevLib.find(b => b.id === selectedBookId);
             if (!currentBook) return prevLib;
@@ -761,7 +742,6 @@ const App: React.FC = () => {
                 lastScrollTop: scrollTop
             };
             
-            // Side effect inside setter is acceptable for this specific debounce case to avoid dependency loops
             db.saveBook(updatedBook);
 
             return prevLib.map(b => b.id === selectedBookId ? updatedBook : b);
@@ -779,20 +759,16 @@ const App: React.FC = () => {
       const targetElement = elementId 
         ? document.getElementById(elementId) 
         : chapterRefs.current[chapterId];
-      // Added block: 'start' for more predictable scrolling
       targetElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
-    // On mobile screens, if the sidebar is open, close it first and then scroll.
     if (window.innerWidth < 1024) {
       setIsSidebarOpen(false);
-      // Wait for the closing animation (300ms) to complete before scrolling.
       setTimeout(doScroll, 300); 
     } else {
-      // On desktop, or if sidebar is already closed, scroll immediately.
       doScroll();
     }
-  }, [isSidebarOpen]);
+  }, []);
   
   const handleSelection = useCallback(() => {
     const viewer = viewerRef.current;
@@ -807,8 +783,6 @@ const App: React.FC = () => {
     const text = sel.toString().trim();
     
     if (text.length === 0) {
-      // Don't clear the selection here on a simple click.
-      // The `handleClickOutside` handler is responsible for dismissal.
       return;
     }
     
@@ -826,12 +800,8 @@ const App: React.FC = () => {
     }
 
     if (chapterId) {
-        // For mobile, we don't need precise coords, fixed positioning is used.
         if (isMobile) {
-             // Clear any pending debounce
              if (selectionDebounceRef.current) clearTimeout(selectionDebounceRef.current);
-             
-             // Debounce the mobile menu appearance to avoid jitter during drag
              selectionDebounceRef.current = window.setTimeout(() => {
                  setSelection({
                     text,
@@ -857,7 +827,6 @@ const App: React.FC = () => {
 
         let left = rect.left - viewerRect.left + rect.width / 2;
 
-        // Constrain left position to be within the viewer bounds
         if (left - POPUP_WIDTH_ESTIMATE / 2 < PADDING) {
             left = POPUP_WIDTH_ESTIMATE / 2 + PADDING;
         }
@@ -869,13 +838,12 @@ const App: React.FC = () => {
             text,
             top: rect.top - viewerRect.top + viewer.scrollTop,
             left: left,
-            right: rect.right - viewerRect.left, // This isn't used for positioning, but might be useful
+            right: rect.right - viewerRect.left, 
             chapterId: chapterId,
         });
     }
   }, [selectedBook, isMobile]);
   
-  // This effect sets up the listeners that SHOW or UPDATE the selection popup.
   useEffect(() => {
     const viewer = viewerRef.current;
     if (!viewer) return;
@@ -888,7 +856,6 @@ const App: React.FC = () => {
     };
     
     const handleMobileTouchEnd = () => {
-        // Trigger selection check after touch ends
         setTimeout(handleSelection, 50);
     };
 
@@ -909,51 +876,34 @@ const App: React.FC = () => {
     };
   }, [isMobile, handleSelection]);
 
-  // This effect handles DISMISSING the selection popup.
   useEffect(() => {
     if (!selection) return;
-
     const handleClickOutside = (event: MouseEvent | TouchEvent) => {
         const target = event.target as HTMLElement;
-
-        // Don't dismiss if clicking on the popup itself
         if (target.closest('[data-selection-popup="true"]')) {
             return;
         }
-
-        // Don't dismiss if clicking back on the selected text.
-        // This allows the user to re-adjust the selection handles.
         const sel = window.getSelection();
         if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
             const range = sel.getRangeAt(0);
             const rect = range.getBoundingClientRect();
-            
             const e = event as MouseEvent & TouchEvent;
             const clientX = e.touches?.[0]?.clientX ?? e.clientX;
             const clientY = e.touches?.[0]?.clientY ?? e.clientY;
-
-            if (
-                clientX >= rect.left && clientX <= rect.right &&
-                clientY >= rect.top && clientY <= rect.bottom
-            ) {
+            if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
                 return;
             }
         }
-        
-        // If we reach here, it's a click outside, so dismiss.
         setSelection(null);
         window.getSelection()?.removeAllRanges();
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('touchstart', handleClickOutside);
-
     return () => {
         document.removeEventListener('mousedown', handleClickOutside);
         document.removeEventListener('touchstart', handleClickOutside);
     };
   }, [selection]);
-
 
   const handleCopy = () => {
     if(selection) {
@@ -993,7 +943,7 @@ const App: React.FC = () => {
     }
   };
 
-  const generateColorPalette = (imageUrl: string): Promise<{ background: string; gradient: string; textPrimary: string; textSecondary: string; }> => {
+   const generateColorPalette = (imageUrl: string): Promise<{ background: string; gradient: string; textPrimary: string; textSecondary: string; }> => {
     return new Promise((resolve) => {
       const defaultPalette = {
         background: '#FAFAFA',
@@ -1114,7 +1064,6 @@ const App: React.FC = () => {
         return lines;
     };
 
-    // 1. Draw Background (Frame 2)
     ctx.fillStyle = palette.background;
     ctx.fillRect(0, 0, specWidth, specHeight);
     
@@ -1124,12 +1073,11 @@ const App: React.FC = () => {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, specWidth, specHeight);
     
-    // Layout constants from spec
     const outerPadding = 24;
     const innerPadding = 12;
     const contentX = outerPadding + innerPadding;
     const contentY = outerPadding + innerPadding;
-    const contentWidth = specWidth - 2 * (outerPadding + innerPadding); // 340
+    const contentWidth = specWidth - 2 * (outerPadding + innerPadding); 
     const gap = 27;
 
     const drawRoundedRect = (x: number, y: number, w: number, h: number, r: number) => {
@@ -1146,7 +1094,6 @@ const App: React.FC = () => {
 
     let currentY = contentY;
 
-    // 2. Draw Header
     const headerHeight = 96;
     const coverWidth = 78;
     const coverHeight = 96;
@@ -1176,7 +1123,6 @@ const App: React.FC = () => {
     const titleAuthorX = contentX + coverWidth + gap;
     const titleAuthorWidth = contentWidth - coverWidth - gap;
 
-    // Title drawing with wrapping
     ctx.fillStyle = palette.textPrimary;
     ctx.font = `600 18px ${theme.font.sans}, sans-serif`;
     ctx.textAlign = 'right';
@@ -1199,36 +1145,33 @@ const App: React.FC = () => {
       authorY = lineY + titleLineHeight;
     });
 
-    // Author drawing
     ctx.fillStyle = palette.textSecondary;
     ctx.font = `600 16px ${theme.font.sans}, sans-serif`;
     ctx.fillText(quote.author, titleAuthorX + titleAuthorWidth, authorY + 4, titleAuthorWidth);
     
     currentY += headerHeight + gap;
 
-    // 3. Draw Quote Text with dynamic font size
     ctx.fillStyle = palette.textPrimary;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     const quoteHeight = 360;
 
     const findBestFitFont = () => {
-        let fontSize = 20; // Start with max font size
-        const minFontSize = 12; // Minimum font size
+        let fontSize = 20; 
+        const minFontSize = 12; 
 
         while (fontSize >= minFontSize) {
-            const lineHeight = fontSize * 1.8; // line height is 180% of font size
+            const lineHeight = fontSize * 1.8; 
             ctx.font = `600 ${fontSize}px ${theme.font.serif}, serif`;
             const lines = wrapText(quote.text, contentWidth);
             const totalHeight = lines.length * lineHeight;
 
             if (totalHeight <= quoteHeight) {
-                return { fontSize, lineHeight, lines }; // Found a good fit
+                return { fontSize, lineHeight, lines }; 
             }
-            fontSize -= 1; // Decrease font size and try again
+            fontSize -= 1; 
         }
         
-        // Fallback: If it still doesn't fit at min font size, truncate.
         const lineHeight = minFontSize * 1.8;
         ctx.font = `600 ${minFontSize}px ${theme.font.serif}, serif`;
         const lines = wrapText(quote.text, contentWidth);
@@ -1254,13 +1197,11 @@ const App: React.FC = () => {
     
     currentY += quoteHeight + gap;
 
-    // 4. Draw Logo
     const logoImage = new Image();
     try {
         const svgText = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="500" zoomAndPan="magnify" viewBox="0 0 375 374.999991" height="500" preserveAspectRatio="xMidYMid meet" version="1.0"><defs><g/></defs><path stroke-linecap="round" transform="matrix(0, 0.75, -0.75, 0, 49.498384, 101.0039)" fill="none" stroke-linejoin="miter" d="M 14.00001 13.997846 L 216.661481 13.997846 " stroke="#071108" stroke-width="28" stroke-opacity="1" stroke-miterlimit="4"/><path stroke-linecap="round" transform="matrix(0.000000001309, 0.75, -0.75, 0.000000001309, 91.115571, 163.063672)" fill="none" stroke-linejoin="miter" d="M 13.998439 13.997846 L 133.920322 13.997846 " stroke="#071108" stroke-width="28" stroke-opacity="1" stroke-miterlimit="4"/><path stroke-linecap="round" transform="matrix(0.252893, 0.706077, -0.706077, 0.252893, 121.425897, 155.549815)" fill="none" stroke-linejoin="miter" d="M 14.001778 13.999631 L 143.73484 13.999655 " stroke="#071108" stroke-width="28" stroke-opacity="1" stroke-miterlimit="4"/><g fill="#071108" fill-opacity="1"><g transform="translate(182.267174, 257.847684)"><g><path d="M 5.9375 0 C 5 0 4.238281 -0.1875 3.65625 -0.5625 C 3.082031 -0.9375 2.691406 -1.445312 2.484375 -2.09375 C 2.285156 -2.75 2.285156 -3.476562 2.484375 -4.28125 C 2.691406 -5.082031 3.113281 -5.914062 3.75 -6.78125 L 25.140625 -35.78125 L 25.140625 -33.484375 L 5.375 -33.484375 C 4.332031 -33.484375 3.539062 -33.742188 3 -34.265625 C 2.457031 -34.796875 2.1875 -35.546875 2.1875 -36.515625 C 2.1875 -37.484375 2.457031 -38.21875 3 -38.71875 C 3.539062 -39.226562 4.332031 -39.484375 5.375 -39.484375 L 28.5625 -39.484375 C 29.488281 -39.484375 30.242188 -39.296875 30.828125 -38.921875 C 31.410156 -38.546875 31.800781 -38.039062 32 -37.40625 C 32.207031 -36.769531 32.207031 -36.039062 32 -35.21875 C 31.800781 -34.394531 31.382812 -33.554688 30.75 -32.703125 L 9.359375 -3.75 L 9.359375 -5.984375 L 29.953125 -5.984375 C 31.003906 -5.984375 31.800781 -5.734375 32.34375 -5.234375 C 32.882812 -4.734375 33.15625 -4 33.15625 -3.03125 C 33.15625 -2.050781 32.882812 -1.300781 32.34375 -0.78125 C 31.800781 -0.257812 31.003906 0 29.953125 0 Z M 5.9375 0 "/></g></g></g><g fill="#071108" fill-opacity="1"><g transform="translate(218.94243, 257.847684)"><g><path d="M 7.890625 0.453125 C 6.734375 0.453125 5.847656 0.125 5.234375 -0.53125 C 4.617188 -1.1875 4.3125 -2.09375 4.3125 -3.25 L 4.3125 -36.234375 C 4.3125 -37.429688 4.617188 -38.34375 5.234375 -38.96875 C 5.847656 -39.601562 6.734375 -39.921875 7.890625 -39.921875 C 9.046875 -39.921875 9.929688 -39.601562 10.546875 -38.96875 C 11.171875 -38.34375 11.484375 -37.429688 11.484375 -36.234375 L 11.484375 -3.25 C 11.484375 -2.09375 11.179688 -1.1875 10.578125 -0.53125 C 9.984375 0.125 9.085938 0.453125 7.890625 0.453125 Z M 7.890625 0.453125 "/></g></g></g><g fill="#071108" fill-opacity="1"><g transform="translate(237.532212, 257.847684)"><g><path d="M 5.9375 0 C 5 0 4.238281 -0.1875 3.65625 -0.5625 C 3.082031 -0.9375 2.691406 -1.445312 2.484375 -2.09375 C 2.285156 -2.75 2.285156 -3.476562 2.484375 -4.28125 C 2.691406 -5.082031 3.113281 -5.914062 3.75 -6.78125 L 25.140625 -35.78125 L 25.140625 -33.484375 L 5.375 -33.484375 C 4.332031 -33.484375 3.539062 -33.742188 3 -34.265625 C 2.457031 -34.796875 2.1875 -35.546875 2.1875 -36.515625 C 2.1875 -37.484375 2.457031 -38.21875 3 -38.71875 C 3.539062 -39.226562 4.332031 -39.484375 5.375 -39.484375 L 28.5625 -39.484375 C 29.488281 -39.484375 30.242188 -39.296875 30.828125 -38.921875 C 31.410156 -38.546875 31.800781 -38.039062 32 -37.40625 C 32.207031 -36.769531 32.207031 -36.039062 32 -35.21875 C 31.800781 -34.394531 31.382812 -33.554688 30.75 -32.703125 L 9.359375 -3.75 L 9.359375 -5.984375 L 29.953125 -5.984375 C 31.003906 -5.984375 31.800781 -5.734375 32.34375 -5.234375 C 32.882812 -4.734375 33.15625 -4 33.15625 -3.03125 C 33.15625 -2.050781 32.882812 -1.300781 32.34375 -0.78125 C 31.800781 -0.257812 31.003906 0 29.953125 0 Z M 5.9375 0 "/></g></g></g><g fill="#071108" fill-opacity="1"><g transform="translate(274.207468, 257.847684)"><g><path d="M 7.890625 0.453125 C 6.734375 0.453125 5.847656 0.125 5.234375 -0.53125 C 4.617188 -1.1875 4.3125 -2.09375 4.3125 -3.25 L 4.3125 -36.234375 C 4.3125 -37.429688 4.617188 -38.34375 5.234375 -38.96875 C 5.847656 -39.601562 6.734375 -39.921875 7.890625 -39.921875 C 9.046875 -39.921875 9.929688 -39.601562 10.546875 -38.96875 C 11.171875 -38.34375 11.484375 -37.429688 11.484375 -36.234375 L 11.484375 -23.015625 L 31.8125 -23.015625 L 31.8125 -36.234375 C 31.8125 -37.429688 32.117188 -38.34375 32.734375 -38.96875 C 33.347656 -39.601562 34.234375 -39.921875 35.390625 -39.921875 C 36.546875 -39.921875 37.429688 -39.601562 38.046875 -38.96875 C 38.660156 -38.34375 38.96875 -37.429688 38.96875 -36.234375 L 38.96875 -3.25 C 38.96875 -2.09375 38.660156 -1.1875 38.046875 -0.53125 C 37.429688 0.125 36.546875 0.453125 35.390625 0.453125 C 34.234375 0.453125 33.347656 0.125 32.734375 -0.53125 C 32.117188 -1.1875 31.8125 -2.09375 31.8125 -3.25 L 31.8125 -17.03125 L 11.484375 -17.03125 L 11.484375 -3.25 C 11.484375 -2.09375 11.179688 -1.1875 10.578125 -0.53125 C 9.984375 0.125 9.085938 0.453125 7.890625 0.453125 Z M 7.890625 0.453125 "/></g></g></g><g fill="#071108" fill-opacity="1"><g transform="translate(320.289412, 257.847684)"><g><path d="M 7.890625 0.453125 C 6.734375 0.453125 5.847656 0.125 5.234375 -0.53125 C 4.617188 -1.1875 4.3125 -2.09375 4.3125 -3.25 L 4.3125 -36.234375 C 4.3125 -37.429688 4.617188 -38.34375 5.234375 -38.96875 C 5.847656 -39.601562 6.734375 -39.921875 7.890625 -39.921875 C 9.046875 -39.921875 9.929688 -39.601562 10.546875 -38.96875 C 11.171875 -38.34375 11.484375 -37.429688 11.484375 -36.234375 L 11.484375 -3.25 C 11.484375 -2.09375 11.179688 -1.1875 10.578125 -0.53125 C 9.984375 0.125 9.085938 0.453125 7.890625 0.453125 Z M 7.890625 0.453125 "/></g></g></g></svg>`;
         const logoSrc = `data:image/svg+xml;base64,${btoa(svgText)}`;
         logoImage.src = logoSrc;
-        
         await new Promise<void>((resolve) => {
             logoImage.onload = () => resolve();
             logoImage.onerror = () => {
@@ -1268,7 +1209,6 @@ const App: React.FC = () => {
                 resolve();
             };
         });
-
         if (logoImage.complete && logoImage.naturalHeight !== 0) {
             ctx.save();
             const logoSize = 57;
@@ -1364,27 +1304,24 @@ const App: React.FC = () => {
   const pcmToWav = (pcmData: Uint8Array, sampleRate: number, numChannels: number, bitsPerSample: number): Blob => {
       const header = new ArrayBuffer(44);
       const view = new DataView(header);
-      
       const writeString = (view: DataView, offset: number, string: string) => {
           for (let i = 0; i < string.length; i++) {
               view.setUint8(offset + i, string.charCodeAt(i));
           }
       };
-
       writeString(view, 0, 'RIFF');
       view.setUint32(4, 36 + pcmData.byteLength, true);
       writeString(view, 8, 'WAVE');
       writeString(view, 12, 'fmt ');
       view.setUint32(16, 16, true);
-      view.setUint16(20, 1, true); // PCM
+      view.setUint16(20, 1, true);
       view.setUint16(22, numChannels, true);
       view.setUint32(24, sampleRate, true);
-      view.setUint32(28, sampleRate * numChannels * (bitsPerSample / 8), true); // ByteRate
-      view.setUint16(32, numChannels * (bitsPerSample / 8), true); // BlockAlign
+      view.setUint32(28, sampleRate * numChannels * (bitsPerSample / 8), true);
+      view.setUint16(32, numChannels * (bitsPerSample / 8), true);
       view.setUint16(34, bitsPerSample, true);
       writeString(view, 36, 'data');
       view.setUint32(40, pcmData.byteLength, true);
-
       return new Blob([header, pcmData], { type: 'audio/wav' });
   };
 
@@ -1477,7 +1414,6 @@ ${textToSummarize}
       setViewingTrailerForBook(null);
   };
 
-  // Performance fix: Use callback to ensure stable identity for setRef to work with React.memo
   const setChapterRef = useCallback((id: string, el: HTMLElement | null) => {
       if (el) chapterRefs.current[id] = el;
   }, []);
@@ -1590,21 +1526,35 @@ ${textToSummarize}
   }
 
   return (
-    <div className="h-screen flex flex-col lg:flex-row bg-[var(--color-background)]">
+    <div className="h-[100dvh] overflow-hidden flex flex-col lg:flex-row bg-[var(--color-background)]" style={{ overscrollBehavior: 'none' }}>
       <BookStyles />
+      
+      {isOpeningBook && (
+         <div className="fixed inset-0 z-[60] bg-[var(--color-background)] flex flex-col items-center justify-center space-y-4 transition-opacity duration-500">
+            <div className="flex flex-col items-center animate-pulse">
+               <IconSpinner className="w-10 h-10 text-[var(--color-primary)] mb-4" />
+               <h2 className="text-xl font-serif font-bold text-[var(--color-primary-text)]">Opening {selectedBook.title}...</h2>
+               <p className="text-[var(--color-secondary-text)] text-sm mt-2">Resuming from where you left off</p>
+            </div>
+         </div>
+      )}
+
       <div 
-        className={`fixed inset-0 z-50 lg:z-0 lg:static lg:flex flex-col lg:w-80 xl:w-96 border-r border-[var(--color-border-color)] bg-[var(--color-background)] text-[var(--color-primary-text)] transition-transform transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 will-change-transform`}
+        className={`
+            fixed inset-0 z-50 flex flex-col border-r border-[var(--color-border-color)] bg-[var(--color-background)] text-[var(--color-primary-text)] 
+            transition-all duration-300 ease-in-out
+            ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
+            lg:translate-x-0 lg:static lg:z-auto
+            ${isSidebarOpen ? 'lg:w-80 xl:w-96 lg:opacity-100' : 'lg:w-0 lg:overflow-hidden lg:border-r-0 lg:opacity-0'}
+        `}
       >
-        <div className="flex items-center justify-between p-4 border-b border-[var(--color-border-color)]">
-            <button onClick={handleBackToLibrary} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                <IconChevronLeft className="w-5 h-5"/>
-                <span className="font-semibold text-sm">Library</span>
-            </button>
+        <div className="flex items-center justify-between p-4 border-b border-[var(--color-border-color)] h-[64px]">
+            <h2 className="font-bold text-lg truncate">Contents</h2>
             <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-1 rounded-full hover:bg-[rgba(var(--color-border-color-rgb),0.2)]">
                 <IconClose className="w-5 h-5"/>
             </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto p-4 min-w-[20rem]">
             <h2 className="font-bold text-lg mb-1 truncate">{selectedBook.title}</h2>
             <p className="text-sm text-[var(--color-secondary-text)] mb-4">{selectedBook.author}</p>
             <nav>
@@ -1615,21 +1565,36 @@ ${textToSummarize}
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="flex items-center justify-between p-3 border-b border-[var(--color-border-color)] flex-shrink-0">
-            <button onClick={() => setIsSidebarOpen(true)} className="lg:hidden p-2 rounded-lg hover:bg-[rgba(var(--color-border-color-rgb),0.2)]">
-                <IconMenu className="w-6 h-6"/>
-            </button>
-            <div className="text-center text-sm text-[var(--color-secondary-text)] flex-1 min-w-0 px-2">
+      <div className="flex-1 relative h-full flex flex-col min-w-0 bg-[var(--color-background)]">
+        <header className="absolute top-0 left-0 right-0 lg:static z-30 flex items-center justify-between p-3 border-b border-[var(--color-border-color)] bg-[var(--color-background)] h-[64px]">
+            <div className="flex-1 flex justify-start">
+                 <button 
+                    onClick={handleBackToLibrary} 
+                    className="p-2 rounded-lg hover:bg-[rgba(var(--color-border-color-rgb),0.2)] transition-colors text-[var(--color-primary-text)]"
+                    title="Back to Library"
+                    aria-label="Back to Library"
+                 >
+                    <IconChevronLeft className="w-6 h-6"/>
+                 </button>
+            </div>
+            <div className="flex-[2] text-center text-sm text-[var(--color-secondary-text)] flex-1 min-w-0 px-2 font-medium">
                 <span className="truncate">{currentLocation}</span>
             </div>
-            {/* Placeholder for symmetry */}
-            <div className="w-10 h-10 lg:hidden"></div>
+            <div className="flex-1 flex justify-end">
+                 <button 
+                    onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
+                    className={`p-2 rounded-lg hover:bg-[rgba(var(--color-border-color-rgb),0.2)] transition-colors text-[var(--color-primary-text)] ${isSidebarOpen ? 'bg-[rgba(var(--color-border-color-rgb),0.1)]' : ''}`}
+                    aria-label={isSidebarOpen ? "Close Table of Contents" : "Open Table of Contents"}
+                    title={isSidebarOpen ? "Close Table of Contents" : "Open Table of Contents"}
+                 >
+                    <IconMenu className="w-6 h-6"/>
+                 </button>
+            </div>
         </header>
         
         <main 
             ref={viewerRef} 
-            className="flex-1 overflow-y-auto relative" 
+            className="absolute top-16 bottom-0 left-0 right-0 overflow-y-auto lg:static lg:flex-1 lg:h-auto lg:pt-0" 
             onScroll={handleScroll}
         >
             <div className="max-w-3xl mx-auto">
