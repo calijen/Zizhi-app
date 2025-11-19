@@ -124,12 +124,15 @@ const BookStyles: React.FC = () => (
         animation: search-panel-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
     .prose {
+        width: 100%;
         max-width: 65ch;
         margin: 0 auto;
         font-family: var(--font-serif);
         font-size: var(--font-size);
         line-height: var(--line-height);
         color: var(--color-primary-text);
+        overflow-wrap: break-word;
+        word-break: break-word;
     }
     .prose p {
         margin-bottom: 1.5em;
@@ -155,6 +158,14 @@ const BookStyles: React.FC = () => (
         margin-left: 0;
         font-style: italic;
         color: var(--color-secondary-text);
+    }
+    .prose pre {
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        overflow-x: auto;
+        background: rgba(var(--color-border-color-rgb), 0.1);
+        padding: 1em;
+        border-radius: 4px;
     }
     .marquee-parent {
         position: relative;
@@ -209,10 +220,10 @@ const ChapterSection: React.FC<{
     <section 
         id={chapter.id} 
         ref={(el) => setRef(chapter.id, el)}
-        className="py-8 px-4 sm:px-8 lg:px-12 min-h-[50vh] flex flex-col items-center"
+        className="py-8 px-4 sm:px-8 lg:px-12 min-h-[50vh] flex flex-col items-center w-full max-w-full"
     >
       <div 
-        className="prose"
+        className="prose w-full"
         dangerouslySetInnerHTML={{ __html: chapter.html }} 
       />
     </section>
@@ -1540,32 +1551,6 @@ ${textToSummarize}
          </div>
       )}
 
-      <div 
-        className={`
-            fixed inset-0 z-50 flex flex-col border-r border-[var(--color-border-color)] bg-[var(--color-background)] text-[var(--color-primary-text)] 
-            transition-all duration-300 ease-in-out
-            ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
-            lg:translate-x-0 lg:static lg:z-auto
-            ${isSidebarOpen ? 'lg:w-80 xl:w-96 lg:opacity-100' : 'lg:w-0 lg:overflow-hidden lg:border-r-0 lg:opacity-0'}
-        `}
-      >
-        <div className="flex items-center justify-between p-4 border-b border-[var(--color-border-color)] h-[64px]">
-            <h2 className="font-bold text-lg truncate">Contents</h2>
-            <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-1 rounded-full hover:bg-[rgba(var(--color-border-color-rgb),0.2)]">
-                <IconClose className="w-5 h-5"/>
-            </button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-4 min-w-[20rem]">
-            <h2 className="font-bold text-lg mb-1 truncate">{selectedBook.title}</h2>
-            <p className="text-sm text-[var(--color-secondary-text)] mb-4">{selectedBook.author}</p>
-            <nav>
-              <ul>
-                {selectedBook.toc.map(item => <TocItemComponent key={item.id} item={item} onNavigate={navigateTo}/>)}
-              </ul>
-            </nav>
-        </div>
-      </div>
-
       <div className="flex-1 relative h-full flex flex-col min-w-0 bg-[var(--color-background)]">
         <header className="absolute top-0 left-0 right-0 lg:static z-30 flex items-center justify-between p-3 border-b border-[var(--color-border-color)] bg-[var(--color-background)] h-[64px]">
             <div className="flex-1 flex justify-start">
@@ -1588,14 +1573,14 @@ ${textToSummarize}
                     aria-label={isSidebarOpen ? "Close Table of Contents" : "Open Table of Contents"}
                     title={isSidebarOpen ? "Close Table of Contents" : "Open Table of Contents"}
                  >
-                    <IconMenu className="w-6 h-6"/>
+                    {isSidebarOpen ? <IconClose className="w-6 h-6"/> : <IconMenu className="w-6 h-6"/>}
                  </button>
             </div>
         </header>
         
         <main 
             ref={viewerRef} 
-            className="absolute top-16 bottom-0 left-0 right-0 overflow-y-auto lg:static lg:flex-1 lg:h-auto lg:pt-0" 
+            className="absolute top-16 bottom-0 left-0 right-0 overflow-y-auto overflow-x-hidden lg:relative lg:flex-1 lg:h-auto lg:pt-0" 
             onScroll={handleScroll}
         >
             <div className="max-w-3xl mx-auto">
@@ -1619,6 +1604,32 @@ ${textToSummarize}
                 />
             )}
         </main>
+      </div>
+
+      <div 
+        className={`
+            fixed inset-0 z-50 flex flex-col border-l border-[var(--color-border-color)] bg-[var(--color-background)] text-[var(--color-primary-text)] 
+            transition-all duration-300 ease-in-out
+            ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'} 
+            lg:translate-x-0 lg:static lg:z-auto
+            ${isSidebarOpen ? 'lg:w-80 xl:w-96 lg:opacity-100' : 'lg:w-0 lg:overflow-hidden lg:border-l-0 lg:opacity-0'}
+        `}
+      >
+        <div className="flex items-center justify-between p-4 border-b border-[var(--color-border-color)] h-[64px]">
+            <h2 className="font-bold text-lg truncate">Contents</h2>
+            <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-1 rounded-full hover:bg-[rgba(var(--color-border-color-rgb),0.2)]">
+                <IconClose className="w-5 h-5"/>
+            </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 min-w-[20rem]">
+            <h2 className="font-bold text-lg mb-1 truncate">{selectedBook.title}</h2>
+            <p className="text-sm text-[var(--color-secondary-text)] mb-4">{selectedBook.author}</p>
+            <nav>
+              <ul>
+                {selectedBook.toc.map(item => <TocItemComponent key={item.id} item={item} onNavigate={navigateTo}/>)}
+              </ul>
+            </nav>
+        </div>
       </div>
 
       {searchQuery && (

@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import type { Quote } from '../types';
 import { IconDownload, IconTrash } from './icons';
@@ -74,7 +75,7 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, onDelete, onShare, onGe
                     {isExpanded ? 'Show less' : 'Read more'}
                 </button>
             )}
-            <div className="flex items-center gap-6 mt-5">
+            <div className="flex items-center justify-end gap-6 mt-5">
                 <button 
                     onClick={() => onGenerateImage(quote)} 
                     title={isTooLongForImage ? "Quote is too long to download as an image (max 100 words)" : "Download as image"}
