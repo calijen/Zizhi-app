@@ -20,10 +20,11 @@ const SearchSidebar: React.FC<SearchSidebarProps> = ({ query, onClose }) => {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        const searchEngineId = process.env.GOOGLE_CSE_ID; 
+        // Check for environment variable in both standard process.env and Vite's import.meta.env using safe access
+        const searchEngineId = (import.meta as any).env?.VITE_GOOGLE_CSE_ID || (typeof process !== 'undefined' ? process.env?.GOOGLE_CSE_ID : undefined);
 
         if (!searchEngineId) {
-            setError("Search is not configured. Missing Search Engine ID. Please set GOOGLE_CSE_ID in your environment variables.");
+            setError("Search is not configured. Missing Search Engine ID. Please set GOOGLE_CSE_ID (or VITE_GOOGLE_CSE_ID) in your environment variables.");
             setIsLoading(false);
             return;
         }
@@ -39,7 +40,6 @@ const SearchSidebar: React.FC<SearchSidebarProps> = ({ query, onClose }) => {
                     ready: handleSearchComplete,
                     error: () => {
                         handleSearchComplete();
-                        // Google doesn't provide detailed error info here, so a generic message is best.
                         setError("An error occurred with Google Search.");
                     }
                 },

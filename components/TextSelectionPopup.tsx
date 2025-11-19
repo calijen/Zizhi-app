@@ -16,7 +16,6 @@ const TextSelectionPopup: React.FC<TextSelectionPopupProps> = ({ top, left, onCo
       <div
         data-selection-popup="true"
         className="fixed bottom-12 left-1/2 z-50 flex items-center bg-[var(--color-primary-text)] text-[var(--color-background)] rounded-full shadow-2xl transform -translate-x-1/2 animate-slide-up-centered select-none"
-        // Stop propagation to prevent the click from deselecting the text in the viewer
         onMouseUp={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
         onTouchEnd={(e) => e.stopPropagation()}
@@ -37,7 +36,7 @@ const TextSelectionPopup: React.FC<TextSelectionPopupProps> = ({ top, left, onCo
   return (
     <div
       data-selection-popup="true"
-      className="absolute z-30 flex items-center bg-[var(--color-primary-text)] text-[var(--color-background)] rounded-md shadow-xl select-none"
+      className="fixed z-30 flex items-center bg-[var(--color-primary-text)] text-[var(--color-background)] rounded-md shadow-xl select-none"
       style={{ top: top, left, transform: 'translate(-50%, -120%)' }}
       onMouseUp={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}

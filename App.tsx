@@ -765,9 +765,16 @@ const App: React.FC = () => {
     const chapterIdWithAnchor = href.split('/').pop();
     if (!chapterIdWithAnchor) return;
     
+    const [chapterFile, elementId] = chapterIdWithAnchor.split('#');
+    const chapterId = chapterFile.split('.')[0];
+
+    // Force update current location immediately to prevent header text "disappearing" or lagging
+    const targetChapter = selectedBook?.chapters.find(c => c.id === chapterId);
+    if (targetChapter) {
+        setCurrentLocation(targetChapter.label);
+    }
+    
     const doScroll = () => {
-      const [chapterFile, elementId] = chapterIdWithAnchor.split('#');
-      const chapterId = chapterFile.split('.')[0];
       const targetElement = elementId 
         ? document.getElementById(elementId) 
         : chapterRefs.current[chapterId];
@@ -780,7 +787,7 @@ const App: React.FC = () => {
     } else {
       doScroll();
     }
-  }, []);
+  }, [selectedBook]);
   
   const handleSelection = useCallback(() => {
     const viewer = viewerRef.current;
@@ -828,29 +835,17 @@ const App: React.FC = () => {
 
         const range = sel.getRangeAt(0);
         const rect = range.getBoundingClientRect();
-        const viewerRect = viewer.getBoundingClientRect();
-
+        
         if (rect.width < 1 && rect.height < 1) {
             return;
         }
-
-        const POPUP_WIDTH_ESTIMATE = 130;
-        const PADDING = 16;
-
-        let left = rect.left - viewerRect.left + rect.width / 2;
-
-        if (left - POPUP_WIDTH_ESTIMATE / 2 < PADDING) {
-            left = POPUP_WIDTH_ESTIMATE / 2 + PADDING;
-        }
-        if (left + POPUP_WIDTH_ESTIMATE / 2 > viewerRect.width - PADDING) {
-            left = viewerRect.width - POPUP_WIDTH_ESTIMATE / 2 - PADDING;
-        }
       
+        // Using viewport coordinates for fixed positioning
         setSelection({
             text,
-            top: rect.top - viewerRect.top + viewer.scrollTop,
-            left: left,
-            right: rect.right - viewerRect.left, 
+            top: rect.top, 
+            left: rect.left + rect.width / 2, 
+            right: rect.right, 
             chapterId: chapterId,
         });
     }
@@ -1592,19 +1587,19 @@ ${textToSummarize}
                     />
                 ))}
             </div>
-            
-            {selection && (
-                <TextSelectionPopup 
-                    top={selection.top}
-                    left={selection.left}
-                    onCopy={handleCopy}
-                    onQuote={handleQuote}
-                    onSearch={handleSearch}
-                    isMobile={isMobile}
-                />
-            )}
         </main>
       </div>
+      
+      {selection && (
+        <TextSelectionPopup 
+            top={selection.top}
+            left={selection.left}
+            onCopy={handleCopy}
+            onQuote={handleQuote}
+            onSearch={handleSearch}
+            isMobile={isMobile}
+        />
+      )}
 
       <div 
         className={`
@@ -1612,7 +1607,7 @@ ${textToSummarize}
             transition-all duration-300 ease-in-out
             ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'} 
             lg:translate-x-0 lg:static lg:z-auto
-            ${isSidebarOpen ? 'lg:w-80 xl:w-96 lg:opacity-100' : 'lg:w-0 lg:overflow-hidden lg:border-l-0 lg:opacity-0'}
+            ${isSidebarOpen ? 'lg:w-80 xl:w-96 lg:opacity-100' : 'lg:w-0 lg:overflow-hidden lg:opacity-0'}
         `}
       >
         <div className="flex items-center justify-between p-4 border-b border-[var(--color-border-color)] h-[64px]">
