@@ -111,7 +111,7 @@ const BookCard: React.FC<{
 
 const Library: React.FC<LibraryProps> = ({ books, onBookSelect, isLoading, error, onDelete, onGenerateTrailer, generatingTrailerForBookId, onViewTrailer }) => {
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8 h-full">
         {isLoading && (
           <div className="mt-4 flex items-center justify-center space-x-2 text-lg">
             <div className="w-6 h-6 rounded-full animate-spin border-2 border-solid border-[var(--color-primary)] border-t-transparent"></div>
@@ -125,16 +125,50 @@ const Library: React.FC<LibraryProps> = ({ books, onBookSelect, isLoading, error
         )}
 
         {!isLoading && books.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center py-16 px-4 space-y-4">
-            <div className="w-24 h-24 text-[var(--color-border-color)]">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full" stroke="currentColor" strokeOpacity="0.7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
-                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+          <div className="flex flex-col items-center justify-center h-full text-center pb-20 px-4">
+            <div className="w-64 h-64 text-[var(--color-border-color)] mb-8 opacity-80">
+              <svg 
+                viewBox="0 0 240 240" 
+                fill="none" 
+                xmlns="http://www.w3.org/2000/svg" 
+                className="w-full h-full" 
+                stroke="currentColor" 
+                strokeWidth="1.2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                {/* Left Page */}
+                <path d="M120 50 L60 60 C 50 62 45 70 45 80 L 45 180 C 45 190 50 198 60 196 L 120 186" />
+                {/* Right Page */}
+                <path d="M120 50 L180 60 C 190 62 195 70 195 80 L 195 180 C 195 190 190 198 180 196 L 120 186" />
+                {/* Spine */}
+                <path d="M120 50 V 186" />
+                
+                {/* Abstract Text Lines - Left */}
+                <path d="M65 80 H 105" opacity="0.4"/>
+                <path d="M65 95 H 105" opacity="0.4"/>
+                <path d="M65 110 H 105" opacity="0.4"/>
+                <path d="M65 125 H 95" opacity="0.4"/>
+                
+                {/* Abstract Text Lines - Right */}
+                <path d="M135 80 H 175" opacity="0.4"/>
+                <path d="M135 95 H 175" opacity="0.4"/>
+                <path d="M135 110 H 175" opacity="0.4"/>
+                <path d="M135 125 H 165" opacity="0.4"/>
+
+                {/* Floating Particles/Dust Motes */}
+                <circle cx="120" cy="40" r="1.5" fill="currentColor" opacity="0.6"/>
+                <circle cx="180" cy="50" r="1" fill="currentColor" opacity="0.4"/>
+                <circle cx="60" cy="50" r="1" fill="currentColor" opacity="0.4"/>
+                <circle cx="90" cy="30" r="0.8" fill="currentColor" opacity="0.3"/>
+                <circle cx="150" cy="35" r="0.8" fill="currentColor" opacity="0.3"/>
               </svg>
             </div>
-            <h3 className="text-xl font-semibold text-[var(--color-primary-text)]">Your library is empty</h3>
-            <p className="max-w-md text-[var(--color-secondary-text)]">
-              Click the upload button to add your first EPUB file. You can download e-books from public sources like Welib or OceanPDF.
+            <h3 className="text-2xl font-serif font-medium text-[var(--color-primary-text)] mb-3">Your library awaits</h3>
+            <p className="max-w-md text-[var(--color-secondary-text)] leading-relaxed text-base">
+              Upload an EPUB file to begin your reading journey.<br/>
+              <span className="text-sm opacity-70 mt-2 block">Download e-books from sources like Welib or OceanPdf.</span>
             </p>
           </div>
         )}

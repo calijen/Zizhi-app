@@ -769,7 +769,13 @@ const App: React.FC = () => {
     const chapterId = chapterFile.split('.')[0];
 
     // Force update current location immediately to prevent header text "disappearing" or lagging
-    const targetChapter = selectedBook?.chapters.find(c => c.id === chapterId);
+    // Try to find the chapter by HREF first, as ID might be random/generated
+    let targetChapter = selectedBook?.chapters.find(c => c.href.includes(chapterFile));
+    // Fallback to ID match if href match fails (though less reliable with random IDs)
+    if (!targetChapter) {
+        targetChapter = selectedBook?.chapters.find(c => c.id === chapterId);
+    }
+
     if (targetChapter) {
         setCurrentLocation(targetChapter.label);
     }
@@ -777,8 +783,11 @@ const App: React.FC = () => {
     const doScroll = () => {
       const targetElement = elementId 
         ? document.getElementById(elementId) 
-        : chapterRefs.current[chapterId];
-      targetElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        : chapterRefs.current[targetChapter?.id || chapterId];
+      
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     };
 
     if (window.innerWidth < 1024) {
@@ -950,285 +959,196 @@ const App: React.FC = () => {
     }
   };
 
-   const generateColorPalette = (imageUrl: string): Promise<{ background: string; gradient: string; textPrimary: string; textSecondary: string; }> => {
-    return new Promise((resolve) => {
-      const defaultPalette = {
-        background: '#FAFAFA',
-        gradient: 'rgba(224, 224, 224, 0.4)',
-        textPrimary: '#1D1919',
-        textSecondary: '#202020',
-      };
-
-      const img = new Image();
-      img.crossOrigin = 'Anonymous';
-      img.src = imageUrl;
-      
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          resolve(defaultPalette);
-          return;
-        }
-        canvas.width = 1;
-        canvas.height = 1;
-        ctx.drawImage(img, 0, 0, 1, 1);
-        const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-
-        const rgbToHsl = (r: number, g: number, b: number): [number, number, number] => {
-          r /= 255; g /= 255; b /= 255;
-          const max = Math.max(r, g, b), min = Math.min(r, g, b);
-          let h = 0, s: number, l = (max + min) / 2;
-          if (max === min) {
-            h = s = 0;
-          } else {
-            const d = max - min;
-            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-            switch (max) {
-              case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-              case g: h = (b - r) / d + 2; break;
-              case b: h = (r - g) / d + 4; break;
-            }
-            h /= 6;
-          }
-          return [h, s, l];
-        };
-
-        const hslToRgb = (h: number, s: number, l: number): [number, number, number] => {
-          let r, g, b;
-          if (s === 0) {
-            r = g = b = l;
-          } else {
-            const hue2rgb = (p: number, q: number, t: number) => {
-              if (t < 0) t += 1;
-              if (t > 1) t -= 1;
-              if (t < 1 / 6) return p + (q - p) * 6 * t;
-              if (t < 1 / 2) return q;
-              if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-              return p;
-            };
-            const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-            const p = 2 * l - q;
-            r = hue2rgb(p, q, h + 1 / 3);
-            g = hue2rgb(p, q, h);
-            b = hue2rgb(p, q, h - 1 / 3);
-          }
-          return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
-        };
-        
-        const [h, s] = rgbToHsl(r, g, b);
-
-        const [bgR, bgG, bgB] = hslToRgb(h, s * 0.5, 0.96);
-        const [tpR, tpG, tpB] = hslToRgb(h, s, 0.15);
-        const [tsR, tsG, tsB] = hslToRgb(h, s, 0.25);
-        
-        resolve({
-          background: `rgb(${bgR}, ${bgG}, ${bgB})`,
-          gradient: `rgba(${r}, ${g}, ${b}, 0.2)`,
-          textPrimary: `rgb(${tpR}, ${tpG}, ${tpB})`,
-          textSecondary: `rgb(${tsR}, ${tsG}, ${tsB})`
-        });
-      };
-      
-      img.onerror = () => resolve(defaultPalette);
-    });
-  };
 
   const handleGenerateImage = async (quote: Quote) => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const book = library.find(b => b.id === quote.bookId);
+    // Use a high resolution
+    const size = 1200;
+    canvas.width = size;
+    canvas.height = size;
     
-    const scale = 2; // For higher resolution
-    const specWidth = 412;
-    const specHeight = 645;
-    canvas.width = specWidth * scale;
-    canvas.height = specHeight * scale;
-    ctx.scale(scale, scale);
+    // Clear canvas
+    ctx.clearRect(0, 0, size, size);
 
-    const palette = await generateColorPalette(book?.coverImageUrl || '');
+    // --- Draw Raised Card Background ---
+    const margin = 40;
+    const cardX = margin;
+    const cardY = margin;
+    const cardW = size - (margin * 2);
+    const cardH = size - (margin * 2);
+    const cornerRadius = 24;
 
-    const wrapText = (text: string, maxWidth: number) => {
-        const paragraphs = text.split('\n');
-        const lines: string[] = [];
-        paragraphs.forEach((p) => {
-            const words = p.split(' ');
-            let currentLine = '';
-            for (let j = 0; j < words.length; j++) {
-                const testLine = currentLine + words[j] + ' ';
-                const metrics = ctx.measureText(testLine);
-                if (metrics.width > maxWidth && j > 0) {
-                    lines.push(currentLine.trim());
-                    currentLine = words[j] + ' ';
-                } else {
-                    currentLine = testLine;
-                }
+    ctx.save();
+    // Shadow for raised effect
+    ctx.shadowColor = "rgba(0, 0, 0, 0.15)";
+    ctx.shadowBlur = 40;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 10;
+
+    ctx.beginPath();
+    ctx.roundRect(cardX, cardY, cardW, cardH, cornerRadius);
+    ctx.fillStyle = theme.colors.background;
+    ctx.fill();
+    ctx.restore();
+
+    // Border (visible, theme border color)
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(cardX, cardY, cardW, cardH, cornerRadius);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = theme.colors['border-color'];
+    ctx.stroke();
+    ctx.clip(); // Clip text to card area
+    
+    // --- Typography Setup ---
+    const p = 80; // Inner padding for text
+    const textStartX = cardX + p;
+    const textWidth = cardW - (p * 2);
+    
+    const sansFont = `${theme.font.sans}, sans-serif`;
+    const serifFont = `${theme.font.serif}, serif`;
+
+    // 1. Meta Header: "Author in BookTitle" (Size 32px - approx text-sm scaled up)
+    const metaFontSize = 32; 
+    let headerY = cardY + p;
+
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'left';
+
+    // Draw Author (Semibold)
+    ctx.font = `600 ${metaFontSize}px ${sansFont}`;
+    ctx.fillStyle = theme.colors['primary-text'];
+    ctx.fillText(quote.author, textStartX, headerY);
+    const authorWidth = ctx.measureText(quote.author).width;
+
+    // Draw " in "
+    ctx.font = `${metaFontSize}px ${sansFont}`;
+    ctx.fillStyle = theme.colors['secondary-text'];
+    ctx.fillText(" in ", textStartX + authorWidth, headerY);
+    const inWidth = ctx.measureText(" in ").width;
+
+    // Draw Title (Italic)
+    ctx.font = `italic ${metaFontSize}px ${sansFont}`;
+    let titleText = quote.bookTitle;
+    const maxTitleWidth = textWidth - authorWidth - inWidth;
+    
+    // Truncate title if needed
+    if (ctx.measureText(titleText).width > maxTitleWidth) {
+        while (titleText.length > 0 && ctx.measureText(titleText + '...').width > maxTitleWidth) {
+            titleText = titleText.slice(0, -1);
+        }
+        titleText += '...';
+    }
+    ctx.fillText(titleText, textStartX + authorWidth + inWidth, headerY);
+
+    // 2. Quote Body (Size 48px - approx text-lg scaled up)
+    const quoteYStart = headerY + metaFontSize + 48; // Space between header and quote
+    const footerHeight = 100;
+    const maxQuoteHeight = cardH - (quoteYStart - cardY) - footerHeight - p;
+
+    const wrapText = (text: string, font: string) => {
+        ctx.font = font;
+        const words = text.split(' ');
+        let lines: string[] = [];
+        let currentLine = words[0];
+
+        for (let i = 1; i < words.length; i++) {
+            const word = words[i];
+            const width = ctx.measureText(currentLine + " " + word).width;
+            if (width < textWidth) {
+                currentLine += " " + word;
+            } else {
+                lines.push(currentLine);
+                currentLine = word;
             }
-            lines.push(currentLine.trim());
-        });
+        }
+        lines.push(currentLine);
         return lines;
     };
 
-    ctx.fillStyle = palette.background;
-    ctx.fillRect(0, 0, specWidth, specHeight);
-    
-    const gradient = ctx.createRadialGradient(specWidth / 2, specHeight / 2, 0, specWidth / 2, specHeight / 2, specWidth * 0.45);
-    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.2)');
-    gradient.addColorStop(1, palette.gradient);
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, specWidth, specHeight);
-    
-    const outerPadding = 24;
-    const innerPadding = 12;
-    const contentX = outerPadding + innerPadding;
-    const contentY = outerPadding + innerPadding;
-    const contentWidth = specWidth - 2 * (outerPadding + innerPadding); 
-    const gap = 27;
+    // Font Size Optimization
+    let fontSize = 48;
+    let finalLines: string[] = [];
+    let finalLineHeight = 0;
 
-    const drawRoundedRect = (x: number, y: number, w: number, h: number, r: number) => {
-        if (w < 2 * r) r = w / 2;
-        if (h < 2 * r) r = h / 2;
-        ctx.beginPath();
-        ctx.moveTo(x + r, y);
-        ctx.arcTo(x + w, y, x + w, y + h, r);
-        ctx.arcTo(x + w, y + h, x, y + h, r);
-        ctx.arcTo(x, y + h, x, y, r);
-        ctx.arcTo(x, y, x + w, y, r);
-        ctx.closePath();
-    };
-
-    let currentY = contentY;
-
-    const headerHeight = 96;
-    const coverWidth = 78;
-    const coverHeight = 96;
-    const coverRadius = 8;
-    if (book && book.coverImageUrl) {
-      try {
-        const coverImage = new Image();
-        coverImage.crossOrigin = 'anonymous';
-        coverImage.src = book.coverImageUrl;
-        await new Promise<void>((resolve, reject) => {
-          coverImage.onload = () => resolve();
-          coverImage.onerror = reject;
-        });
+    while (fontSize > 24) {
+        finalLineHeight = fontSize * 1.6;
+        const testFont = `400 ${fontSize}px ${serifFont}`;
+        const lines = wrapText(quote.text, testFont);
+        const totalHeight = lines.length * finalLineHeight;
         
-        ctx.save();
-        drawRoundedRect(contentX, currentY, coverWidth, coverHeight, coverRadius);
-        ctx.clip();
-        ctx.drawImage(coverImage, contentX, currentY, coverWidth, coverHeight);
-        ctx.restore();
-      } catch (e) {
-        ctx.fillStyle = '#E0E0E0';
-        drawRoundedRect(contentX, currentY, coverWidth, coverHeight, coverRadius);
-        ctx.fill();
-      }
+        if (totalHeight <= maxQuoteHeight) {
+            finalLines = lines;
+            break;
+        }
+        fontSize -= 2;
     }
 
-    const titleAuthorX = contentX + coverWidth + gap;
-    const titleAuthorWidth = contentWidth - coverWidth - gap;
-
-    ctx.fillStyle = palette.textPrimary;
-    ctx.font = `600 18px ${theme.font.sans}, sans-serif`;
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'top';
-
-    const originalTitleLines = wrapText(quote.bookTitle, titleAuthorWidth);
-    const titleLines = originalTitleLines.slice(0, 2);
-    if (originalTitleLines.length > 2) {
-      let lastLine = titleLines[1];
-      if (lastLine && lastLine.length > 3) {
-        titleLines[1] = lastLine.substring(0, lastLine.length - 3) + '...';
-      }
-    }
-
-    let authorY = currentY;
-    const titleLineHeight = 26;
-    titleLines.forEach((line, index) => {
-      const lineY = currentY + (index * titleLineHeight);
-      ctx.fillText(line, titleAuthorX + titleAuthorWidth, lineY, titleAuthorWidth);
-      authorY = lineY + titleLineHeight;
+    ctx.fillStyle = theme.colors['primary-text'];
+    ctx.font = `400 ${fontSize}px ${serifFont}`;
+    
+    let currentY = quoteYStart; 
+    finalLines.forEach(line => {
+        ctx.fillText(line, textStartX, currentY);
+        currentY += finalLineHeight;
     });
 
-    ctx.fillStyle = palette.textSecondary;
-    ctx.font = `600 16px ${theme.font.sans}, sans-serif`;
-    ctx.fillText(quote.author, titleAuthorX + titleAuthorWidth, authorY + 4, titleAuthorWidth);
-    
-    currentY += headerHeight + gap;
+    // 3. Footer: Logo (Bottom Left)
+    const logoFontSize = 36;
+    const logoX = textStartX;
+    const logoY = cardY + cardH - p + 15; // Adjusted baseline for visual balance
 
-    ctx.fillStyle = palette.textPrimary;
+    ctx.save();
+    ctx.translate(logoX, logoY);
     ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    const quoteHeight = 360;
-
-    const findBestFitFont = () => {
-        let fontSize = 20; 
-        const minFontSize = 12; 
-
-        while (fontSize >= minFontSize) {
-            const lineHeight = fontSize * 1.8; 
-            ctx.font = `600 ${fontSize}px ${theme.font.serif}, serif`;
-            const lines = wrapText(quote.text, contentWidth);
-            const totalHeight = lines.length * lineHeight;
-
-            if (totalHeight <= quoteHeight) {
-                return { fontSize, lineHeight, lines }; 
-            }
-            fontSize -= 1; 
-        }
-        
-        const lineHeight = minFontSize * 1.8;
-        ctx.font = `600 ${minFontSize}px ${theme.font.serif}, serif`;
-        const lines = wrapText(quote.text, contentWidth);
-        const maxLines = Math.floor(quoteHeight / lineHeight);
-        if (lines.length > maxLines) {
-            showToast("Quote is very long and has been truncated in the image.");
-        }
-        return { fontSize: minFontSize, lineHeight, lines: lines.slice(0, maxLines) };
-    };
-
-    const { lineHeight: quoteLineHeight, lines: linesToDraw } = findBestFitFont();
+    ctx.textBaseline = 'middle';
     
-    const totalTextHeight = linesToDraw.length * quoteLineHeight;
-    let quoteDisplayY = currentY;
+    // Draw "Zizhi" Text
+    ctx.font = `700 ${logoFontSize}px 'Merriweather', serif`; 
+    ctx.fillStyle = theme.colors['primary-text'];
+    const textXOffset = 50; // Gap for icon
+    ctx.fillText("Zizhi", textXOffset, 0);
 
-    if (totalTextHeight < quoteHeight) {
-        quoteDisplayY += (quoteHeight - totalTextHeight) / 2;
-    }
-
-    linesToDraw.forEach((line, index) => {
-        ctx.fillText(line, contentX, quoteDisplayY + index * quoteLineHeight);
-    });
+    // Draw Icon
+    // Icon is 24 units high in path coordinates. We want it to match text height (~36px).
+    const iconBaseHeight = 24; 
+    const targetIconHeight = 36; 
+    const iconScale = targetIconHeight / iconBaseHeight;
     
-    currentY += quoteHeight + gap;
+    ctx.save();
+    // Center icon vertically around 0 (middle baseline)
+    // Icon path is 0 to 24. Midpoint 12.
+    // We want visual center (12 * scale) to align with baseline 0
+    ctx.translate(0, -12 * iconScale); 
+    ctx.scale(iconScale, iconScale);
+    
+    ctx.beginPath();
+    ctx.lineWidth = 3.5; // Slightly thicker to match bold text
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = theme.colors['primary-text'];
 
-    const logoImage = new Image();
-    try {
-        const svgText = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="500" zoomAndPan="magnify" viewBox="0 0 375 374.999991" height="500" preserveAspectRatio="xMidYMid meet" version="1.0"><defs><g/></defs><path stroke-linecap="round" transform="matrix(0, 0.75, -0.75, 0, 49.498384, 101.0039)" fill="none" stroke-linejoin="miter" d="M 14.00001 13.997846 L 216.661481 13.997846 " stroke="#071108" stroke-width="28" stroke-opacity="1" stroke-miterlimit="4"/><path stroke-linecap="round" transform="matrix(0.000000001309, 0.75, -0.75, 0.000000001309, 91.115571, 163.063672)" fill="none" stroke-linejoin="miter" d="M 13.998439 13.997846 L 133.920322 13.997846 " stroke="#071108" stroke-width="28" stroke-opacity="1" stroke-miterlimit="4"/><path stroke-linecap="round" transform="matrix(0.252893, 0.706077, -0.706077, 0.252893, 121.425897, 155.549815)" fill="none" stroke-linejoin="miter" d="M 14.001778 13.999631 L 143.73484 13.999655 " stroke="#071108" stroke-width="28" stroke-opacity="1" stroke-miterlimit="4"/><g fill="#071108" fill-opacity="1"><g transform="translate(182.267174, 257.847684)"><g><path d="M 5.9375 0 C 5 0 4.238281 -0.1875 3.65625 -0.5625 C 3.082031 -0.9375 2.691406 -1.445312 2.484375 -2.09375 C 2.285156 -2.75 2.285156 -3.476562 2.484375 -4.28125 C 2.691406 -5.082031 3.113281 -5.914062 3.75 -6.78125 L 25.140625 -35.78125 L 25.140625 -33.484375 L 5.375 -33.484375 C 4.332031 -33.484375 3.539062 -33.742188 3 -34.265625 C 2.457031 -34.796875 2.1875 -35.546875 2.1875 -36.515625 C 2.1875 -37.484375 2.457031 -38.21875 3 -38.71875 C 3.539062 -39.226562 4.332031 -39.484375 5.375 -39.484375 L 28.5625 -39.484375 C 29.488281 -39.484375 30.242188 -39.296875 30.828125 -38.921875 C 31.410156 -38.546875 31.800781 -38.039062 32 -37.40625 C 32.207031 -36.769531 32.207031 -36.039062 32 -35.21875 C 31.800781 -34.394531 31.382812 -33.554688 30.75 -32.703125 L 9.359375 -3.75 L 9.359375 -5.984375 L 29.953125 -5.984375 C 31.003906 -5.984375 31.800781 -5.734375 32.34375 -5.234375 C 32.882812 -4.734375 33.15625 -4 33.15625 -3.03125 C 33.15625 -2.050781 32.882812 -1.300781 32.34375 -0.78125 C 31.800781 -0.257812 31.003906 0 29.953125 0 Z M 5.9375 0 "/></g></g></g><g fill="#071108" fill-opacity="1"><g transform="translate(218.94243, 257.847684)"><g><path d="M 7.890625 0.453125 C 6.734375 0.453125 5.847656 0.125 5.234375 -0.53125 C 4.617188 -1.1875 4.3125 -2.09375 4.3125 -3.25 L 4.3125 -36.234375 C 4.3125 -37.429688 4.617188 -38.34375 5.234375 -38.96875 C 5.847656 -39.601562 6.734375 -39.921875 7.890625 -39.921875 C 9.046875 -39.921875 9.929688 -39.601562 10.546875 -38.96875 C 11.171875 -38.34375 11.484375 -37.429688 11.484375 -36.234375 L 11.484375 -3.25 C 11.484375 -2.09375 11.179688 -1.1875 10.578125 -0.53125 C 9.984375 0.125 9.085938 0.453125 7.890625 0.453125 Z M 7.890625 0.453125 "/></g></g></g><g fill="#071108" fill-opacity="1"><g transform="translate(237.532212, 257.847684)"><g><path d="M 5.9375 0 C 5 0 4.238281 -0.1875 3.65625 -0.5625 C 3.082031 -0.9375 2.691406 -1.445312 2.484375 -2.09375 C 2.285156 -2.75 2.285156 -3.476562 2.484375 -4.28125 C 2.691406 -5.082031 3.113281 -5.914062 3.75 -6.78125 L 25.140625 -35.78125 L 25.140625 -33.484375 L 5.375 -33.484375 C 4.332031 -33.484375 3.539062 -33.742188 3 -34.265625 C 2.457031 -34.796875 2.1875 -35.546875 2.1875 -36.515625 C 2.1875 -37.484375 2.457031 -38.21875 3 -38.71875 C 3.539062 -39.226562 4.332031 -39.484375 5.375 -39.484375 L 28.5625 -39.484375 C 29.488281 -39.484375 30.242188 -39.296875 30.828125 -38.921875 C 31.410156 -38.546875 31.800781 -38.039062 32 -37.40625 C 32.207031 -36.769531 32.207031 -36.039062 32 -35.21875 C 31.800781 -34.394531 31.382812 -33.554688 30.75 -32.703125 L 9.359375 -3.75 L 9.359375 -5.984375 L 29.953125 -5.984375 C 31.003906 -5.984375 31.800781 -5.734375 32.34375 -5.234375 C 32.882812 -4.734375 33.15625 -4 33.15625 -3.03125 C 33.15625 -2.050781 32.882812 -1.300781 32.34375 -0.78125 C 31.800781 -0.257812 31.003906 0 29.953125 0 Z M 5.9375 0 "/></g></g></g><g fill="#071108" fill-opacity="1"><g transform="translate(274.207468, 257.847684)"><g><path d="M 7.890625 0.453125 C 6.734375 0.453125 5.847656 0.125 5.234375 -0.53125 C 4.617188 -1.1875 4.3125 -2.09375 4.3125 -3.25 L 4.3125 -36.234375 C 4.3125 -37.429688 4.617188 -38.34375 5.234375 -38.96875 C 5.847656 -39.601562 6.734375 -39.921875 7.890625 -39.921875 C 9.046875 -39.921875 9.929688 -39.601562 10.546875 -38.96875 C 11.171875 -38.34375 11.484375 -37.429688 11.484375 -36.234375 L 11.484375 -23.015625 L 31.8125 -23.015625 L 31.8125 -36.234375 C 31.8125 -37.429688 32.117188 -38.34375 32.734375 -38.96875 C 33.347656 -39.601562 34.234375 -39.921875 35.390625 -39.921875 C 36.546875 -39.921875 37.429688 -39.601562 38.046875 -38.96875 C 38.660156 -38.34375 38.96875 -37.429688 38.96875 -36.234375 L 38.96875 -3.25 C 38.96875 -2.09375 38.660156 -1.1875 38.046875 -0.53125 C 37.429688 0.125 36.546875 0.453125 35.390625 0.453125 C 34.234375 0.453125 33.347656 0.125 32.734375 -0.53125 C 32.117188 -1.1875 31.8125 -2.09375 31.8125 -3.25 L 31.8125 -17.03125 L 11.484375 -17.03125 L 11.484375 -3.25 C 11.484375 -2.09375 11.179688 -1.1875 10.578125 -0.53125 C 9.984375 0.125 9.085938 0.453125 7.890625 0.453125 Z M 7.890625 0.453125 "/></g></g></g><g fill="#071108" fill-opacity="1"><g transform="translate(320.289412, 257.847684)"><g><path d="M 7.890625 0.453125 C 6.734375 0.453125 5.847656 0.125 5.234375 -0.53125 C 4.617188 -1.1875 4.3125 -2.09375 4.3125 -3.25 L 4.3125 -36.234375 C 4.3125 -37.429688 4.617188 -38.34375 5.234375 -38.96875 C 5.847656 -39.601562 6.734375 -39.921875 7.890625 -39.921875 C 9.046875 -39.921875 9.929688 -39.601562 10.546875 -38.96875 C 11.171875 -38.34375 11.484375 -37.429688 11.484375 -36.234375 L 11.484375 -3.25 C 11.484375 -2.09375 11.179688 -1.1875 10.578125 -0.53125 C 9.984375 0.125 9.085938 0.453125 7.890625 0.453125 Z M 7.890625 0.453125 "/></g></g></g></svg>`;
-        const logoSrc = `data:image/svg+xml;base64,${btoa(svgText)}`;
-        logoImage.src = logoSrc;
-        await new Promise<void>((resolve) => {
-            logoImage.onload = () => resolve();
-            logoImage.onerror = () => {
-                console.error("Failed to load logo SVG for canvas.");
-                resolve();
-            };
-        });
-        if (logoImage.complete && logoImage.naturalHeight !== 0) {
-            ctx.save();
-            const logoSize = 57;
-            const logoRadius = logoSize / 2;
-            ctx.beginPath();
-            ctx.arc(contentX + logoRadius, currentY + logoRadius, logoRadius, 0, Math.PI * 2, true);
-            ctx.clip();
-            ctx.drawImage(logoImage, contentX, currentY, logoSize, logoSize);
-            ctx.restore();
-        }
-    } catch (e) {
-        console.warn("Could not load and draw the logo onto the quote image.", e);
-    }
+    // Book 1
+    ctx.moveTo(5, 0);
+    ctx.lineTo(5, 24);
+    
+    // Book 2
+    ctx.moveTo(11, 0);
+    ctx.lineTo(11, 24);
+    
+    // Leaning Book
+    ctx.moveTo(19, 24);
+    ctx.lineTo(13, 8);
+
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.restore();
+
+    ctx.restore(); // Restore clip
     
     const dataUrl = canvas.toDataURL('image/png');
     const link = document.createElement('a');
