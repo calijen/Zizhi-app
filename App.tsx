@@ -258,6 +258,8 @@ const App: React.FC = () => {
   const scrollTimeout = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectionDebounceRef = useRef<number | null>(null);
+  const touchStartRef = useRef<{x: number, y: number} | null>(null);
+  const touchEndRef = useRef<{x: number, y: number} | null>(null);
   
   const selectedBook = library.find(b => b.id === selectedBookId) || null;
 
@@ -1344,6 +1346,45 @@ ${textToSummarize}
   const setChapterRef = useCallback((id: string, el: HTMLElement | null) => {
       if (el) chapterRefs.current[id] = el;
   }, []);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    // Avoid interfering with sliders or other interactive elements that need horizontal dragging
+    if ((e.target as HTMLElement).tagName === 'INPUT' && (e.target as HTMLInputElement).type === 'range') {
+        return;
+    }
+    touchEndRef.current = null;
+    touchStartRef.current = { x: e.targetTouches[0].clientX, y: e.targetTouches[0].clientY };
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndRef.current = { x: e.targetTouches[0].clientX, y: e.targetTouches[0].clientY };
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStartRef.current || !touchEndRef.current) return;
+    const xDiff = touchStartRef.current.x - touchEndRef.current.x;
+    const yDiff = touchStartRef.current.y - touchEndRef.current.y;
+
+    if (Math.abs(xDiff) > Math.abs(yDiff) && Math.abs(xDiff) > 50) {
+         // Horizontal swipe
+         const tabs: ('library' | 'quotes' | 'settings')[] = ['library', 'quotes', 'settings'];
+         const currentIndex = tabs.indexOf(activeTab);
+         
+         if (xDiff > 0) {
+             // Swipe Left -> Go Next
+             if (currentIndex < tabs.length - 1) {
+                 setActiveTab(tabs[currentIndex + 1]);
+             }
+         } else {
+             // Swipe Right -> Go Prev
+             if (currentIndex > 0) {
+                 setActiveTab(tabs[currentIndex - 1]);
+             }
+         }
+    }
+    touchStartRef.current = null;
+    touchEndRef.current = null;
+  };
   
   if (!selectedBook) {
     const sortedLibrary = [...library].sort((a, b) => (b.lastOpened || 0) - (a.lastOpened || 0));
@@ -1386,7 +1427,12 @@ ${textToSummarize}
                 </nav>
             </div>
             
-            <main className="flex-1 overflow-y-auto bg-[rgba(0,0,0,0.02)]">
+            <main 
+                className="flex-1 overflow-y-auto bg-[rgba(0,0,0,0.02)]"
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+            >
                 {activeTab === 'library' ? (
                     <Library 
                         books={libraryCards} 
