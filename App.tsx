@@ -339,12 +339,14 @@ const App: React.FC = () => {
   }, []);
 
   const handleInstallClick = async () => {
-    if (installPrompt) {
-      installPrompt.prompt();
-      const { outcome } = await installPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setInstallPrompt(null);
-      }
+    if (!installPrompt) {
+      showToast("Install not available. Check if already installed or use browser menu.");
+      return;
+    }
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setInstallPrompt(null);
     }
   };
 
@@ -1477,16 +1479,14 @@ ${textToSummarize}
                 </>
             )}
 
-            {installPrompt && (
-                <button
-                    onClick={handleInstallClick}
-                    className="fixed bottom-6 left-6 z-50 flex items-center justify-center gap-3 px-6 py-4 bg-[var(--color-secondary)] text-white font-bold rounded-full shadow-2xl hover:scale-105 transition-transform duration-300 border-2 border-white/20"
-                    title="Install Zizhi App"
-                >
-                    <IconDownload className="w-6 h-6" />
-                    <span>Install App</span>
-                </button>
-            )}
+            <button
+                onClick={handleInstallClick}
+                className="fixed bottom-6 left-6 z-50 flex items-center justify-center gap-3 px-6 py-4 bg-[var(--color-secondary)] text-white font-bold rounded-full shadow-2xl hover:scale-105 transition-transform duration-300 border-2 border-white/20"
+                title="Install Zizhi App"
+            >
+                <IconDownload className="w-6 h-6" />
+                <span>Install App</span>
+            </button>
 
             {toast && (
                 <Toast 
