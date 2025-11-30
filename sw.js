@@ -1,3 +1,4 @@
+
 const CACHE_NAME = 'zizhi-cache-v1';
 const urlsToCache = [
   '/',
@@ -23,6 +24,7 @@ const urlsToCache = [
   'https://aistudiocdn.com/react-dom@^19.2.0/',
   'https://aistudiocdn.com/@google/genai@^1.29.0',
   'https://aistudiocdn.com/react@^19.2.0',
+  'https://aistudiocdn.com/react-dom@^19.2.0',
 ];
 
 self.addEventListener('install', event => {

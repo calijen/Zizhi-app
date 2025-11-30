@@ -1398,16 +1398,6 @@ ${textToSummarize}
             <header className="flex-shrink-0 p-4 sm:p-6 lg:p-8 flex justify-between items-center gap-4">
                 <Logo className="h-10 sm:h-12 w-auto" />
                 <div className="flex items-center gap-2">
-                    {installPrompt && (
-                      <button
-                        onClick={handleInstallClick}
-                        title="Install Zizhi App"
-                        className="flex items-center gap-2 bg-[var(--color-secondary)] text-white font-semibold py-2 px-4 rounded-lg shadow-md hover:bg-opacity-90 transition-opacity"
-                      >
-                        <IconDownload className="w-5 h-5" />
-                        <span className="text-sm hidden sm:inline">Install App</span>
-                      </button>
-                    )}
                     <button 
                         onClick={() => setActiveTab('settings')}
                         title="Settings"
@@ -1485,6 +1475,17 @@ ${textToSummarize}
                         className="hidden"
                     />
                 </>
+            )}
+
+            {installPrompt && (
+                <button
+                    onClick={handleInstallClick}
+                    className="fixed bottom-6 left-6 z-50 flex items-center justify-center gap-3 px-6 py-4 bg-[var(--color-secondary)] text-white font-bold rounded-full shadow-2xl hover:scale-105 transition-transform duration-300 border-2 border-white/20"
+                    title="Install Zizhi App"
+                >
+                    <IconDownload className="w-6 h-6" />
+                    <span>Install App</span>
+                </button>
             )}
 
             {toast && (
