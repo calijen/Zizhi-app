@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import type { Theme, ThemeColors, ThemeFont } from '../types';
 import { GoogleGenAI, Type } from '@google/genai';
@@ -224,8 +225,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
                 <div className="p-4 sm:p-6 bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-lg space-y-4">
                   <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-secondary-text)]">Preset Themes</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {Object.keys(themes).map((key) => {
-                      const theme = themes[key];
+                    {Object.keys(themes).map((themeKey) => {
+                      const theme = themes[themeKey];
                       return (
                       <button
                         key={theme.name}
@@ -371,8 +372,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
                 <div className="p-4 sm:p-6 bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-lg space-y-4">
                   <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-secondary-text)]">Preset Themes</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {Object.keys(themes).map((key) => {
-                      const theme = themes[key];
+                    {Object.keys(themes).map((themeKey) => {
+                      const theme = themes[themeKey];
                       return (
                       <button
                         key={theme.name}

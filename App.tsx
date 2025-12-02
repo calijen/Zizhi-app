@@ -251,6 +251,7 @@ const App: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [theme, setTheme] = useState<Theme>(THEMES.dark);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
+  const [isIOS, setIsIOS] = useState(false);
 
 
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -313,7 +314,12 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const checkMobile = () => {
-       setIsMobile('ontouchstart' in window && navigator.maxTouchPoints > 0);
+       const userAgent = window.navigator.userAgent;
+       const mobile = 'ontouchstart' in window && navigator.maxTouchPoints > 0;
+       const ios = /iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream;
+       
+       setIsMobile(mobile);
+       setIsIOS(ios);
     }
     checkMobile();
     window.addEventListener('resize', checkMobile);
@@ -339,12 +345,19 @@ const App: React.FC = () => {
   }, []);
 
   const handleInstallClick = async () => {
+    if (isIOS) {
+        showToast("To install on iOS: Tap 'Share' then 'Add to Home Screen'.");
+        return;
+    }
     if (installPrompt) {
       installPrompt.prompt();
       const { outcome } = await installPrompt.userChoice;
       if (outcome === 'accepted') {
         setInstallPrompt(null);
       }
+    } else {
+        // Fallback for when the prompt isn't ready or already installed
+        showToast("To install, use your browser's menu (⋮) > 'Add to Home Screen' or 'Install App'.");
     }
   };
 
@@ -787,8 +800,14 @@ const App: React.FC = () => {
         ? document.getElementById(elementId) 
         : chapterRefs.current[targetChapter?.id || chapterId];
       
-      if (targetElement) {
-        targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (targetElement && viewerRef.current) {
+        // Calculate offset relative to the scroll container to avoid scrolling parent containers
+        // This fixes the issue where the header (navbar) disappears on desktop
+        const viewerRect = viewerRef.current.getBoundingClientRect();
+        const targetRect = targetElement.getBoundingClientRect();
+        const offset = targetRect.top - viewerRect.top + viewerRef.current.scrollTop;
+        
+        viewerRef.current.scrollTo({ top: offset, behavior: 'smooth' });
       }
     };
 
@@ -1477,16 +1496,14 @@ ${textToSummarize}
                 </>
             )}
 
-            {installPrompt && (
-                <button
-                    onClick={handleInstallClick}
-                    className="fixed bottom-6 left-6 z-50 flex items-center justify-center gap-3 px-6 py-4 bg-[var(--color-secondary)] text-white font-bold rounded-full shadow-2xl hover:scale-105 transition-transform duration-300 border-2 border-white/20"
-                    title="Install Zizhi App"
-                >
-                    <IconDownload className="w-6 h-6" />
-                    <span>Install App</span>
-                </button>
-            )}
+            <button
+                onClick={handleInstallClick}
+                className="fixed bottom-6 left-6 z-50 flex items-center justify-center gap-3 px-6 py-4 bg-[var(--color-secondary)] text-white font-bold rounded-full shadow-2xl hover:scale-105 transition-transform duration-300 border-2 border-white/20"
+                title={isIOS ? "Install on iOS" : "Install App"}
+            >
+                <IconDownload className="w-6 h-6" />
+                <span>{isIOS ? "Add to Home Screen" : "Install App"}</span>
+            </button>
 
             {toast && (
                 <Toast 
@@ -1513,7 +1530,7 @@ ${textToSummarize}
          </div>
       )}
 
-      <div className="flex-1 relative h-full flex flex-col min-w-0 bg-[var(--color-background)]">
+      <div className="flex-1 relative h-full flex flex-col min-w-0 bg-[var(--color-background)] overflow-hidden">
         <header className="absolute top-0 left-0 right-0 lg:static z-30 flex items-center justify-between p-3 border-b border-[var(--color-border-color)] bg-[var(--color-background)] h-[64px]">
             <div className="flex-1 flex justify-start">
                  <button 

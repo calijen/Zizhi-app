@@ -2,15 +2,23 @@
   "name": "Zizhi EPUB Reader",
   "short_name": "Zizhi",
   "description": "An elegant, offline-first EPUB reader. With a clean design inspired by Medium, Zizhi offers a focused and beautiful reading experience.",
+  "id": "/",
   "start_url": "/",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#FFFFFF",
-  "theme_color": "#242424",
+  "theme_color": "#FFFFFF",
   "icons": [
     {
-      "src": "logo.svg",
-      "sizes": "any",
+      "src": "/logo.svg",
       "type": "image/svg+xml",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
       "purpose": "any maskable"
     }
   ]

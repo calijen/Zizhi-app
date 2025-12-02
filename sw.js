@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'zizhi-cache-v1';
+const CACHE_NAME = 'zizhi-cache-v2';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -28,11 +28,11 @@ const urlsToCache = [
 ];
 
 self.addEventListener('install', event => {
+  self.skipWaiting(); // Force activation
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('Opened cache');
-        // Use addAll with a catch to prevent install failure if one resource fails
         return cache.addAll(urlsToCache).catch(error => {
           console.error('Failed to cache one or more resources:', error);
         });
@@ -55,8 +55,10 @@ self.addEventListener('fetch', event => {
 
         // If the network request is successful, cache it and return it.
         if (networkResponse.ok) {
-          // We don't cache POST requests or Gemini API calls
-          if (event.request.method === 'GET' && !event.request.url.includes('generativelanguage')) {
+          // We don't cache POST requests, Gemini API calls, or chrome-extension requests
+          if (event.request.method === 'GET' && 
+              !event.request.url.includes('generativelanguage') &&
+              !event.request.url.startsWith('chrome-extension')) {
             await cache.put(event.request, networkResponse.clone());
           }
         }
@@ -87,6 +89,6 @@ self.addEventListener('activate', event => {
           }
         })
       );
-    })
+    }).then(() => self.clients.claim()) // Take control of all clients immediately
   );
 });
