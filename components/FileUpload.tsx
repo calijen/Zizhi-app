@@ -65,7 +65,14 @@ const BookCard: React.FC<{
                     </div>
                     <p className="text-xs sm:text-sm text-[var(--color-secondary-text)] truncate" title={book.author}>{book.author || 'Unknown Author'}</p>
                     <div className="pt-2 mt-auto">
-                        <div className="w-full bg-[rgba(var(--color-border-color-rgb),0.3)] rounded-full h-1">
+                        <div 
+                            className="w-full bg-[rgba(var(--color-border-color-rgb),0.3)] rounded-full h-1"
+                            role="progressbar"
+                            aria-valuenow={Math.round(book.progress * 100)}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-label={`Reading progress: ${Math.round(book.progress * 100)}%`}
+                        >
                             <div className="bg-[var(--color-primary)] h-1 rounded-full" style={{ width: `${book.progress * 100}%` }}></div>
                         </div>
                         <p className="text-[10px] text-right mt-1 text-[var(--color-secondary-text)]">{Math.round(book.progress * 100)}%</p>
@@ -113,13 +120,13 @@ const Library: React.FC<LibraryProps> = ({ books, onBookSelect, isLoading, error
   return (
     <div className="p-4 sm:p-6 lg:p-8 h-full">
         {isLoading && (
-          <div className="mt-4 flex items-center justify-center space-x-2 text-lg">
+          <div className="mt-4 flex items-center justify-center space-x-2 text-lg" role="status" aria-live="polite">
             <div className="w-6 h-6 rounded-full animate-spin border-2 border-solid border-[var(--color-primary)] border-t-transparent"></div>
             <span>Processing book...</span>
           </div>
         )}
         {error && (
-          <div className="my-4 text-red-900 bg-red-100 border border-red-300 rounded-md p-3 text-center">
+          <div className="my-4 text-red-900 bg-red-100 border border-red-300 rounded-md p-3 text-center" role="alert">
             <strong>Error:</strong> {error}
           </div>
         )}

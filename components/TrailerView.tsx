@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import type { Book } from '../types';
 import { IconPlay, IconPause, IconClose, IconRewind, IconForward } from './icons';
@@ -168,7 +169,7 @@ const TrailerView: React.FC<TrailerViewProps> = ({ book, onClose }) => {
   }, [timedScript, currentTime]);
   
   const CaptionDisplay = () => (
-    <div className="flex items-center justify-center text-center h-full w-full p-4">
+    <div className="flex items-center justify-center text-center h-full w-full p-4" aria-live="polite">
         {currentSentence ? (
             <p className="text-[var(--color-primary-text)] font-serif text-2xl lg:text-4xl leading-relaxed">
                 {currentSentence.words.map((word, index) => {
@@ -199,7 +200,7 @@ const TrailerView: React.FC<TrailerViewProps> = ({ book, onClose }) => {
   }
   
   return (
-    <div className="fixed inset-0 z-50 bg-[var(--color-background)] flex flex-col animate-search-panel-in" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-50 bg-[var(--color-background)] flex flex-col animate-search-panel-in" role="dialog" aria-modal="true" aria-label="Book Trailer">
         <audio ref={audioRef} src={book.audioTrailerUrl} />
         <button onClick={onClose} className="absolute top-4 right-4 z-10 p-2 rounded-full hover:bg-[rgba(var(--color-border-color-rgb),0.2)] transition-colors" aria-label="Close trailer">
             <IconClose className="w-6 h-6 text-[var(--color-primary-text)]" />
@@ -225,17 +226,18 @@ const TrailerView: React.FC<TrailerViewProps> = ({ book, onClose }) => {
                         value={currentTime}
                         onChange={handleSeek}
                         className="w-full h-1.5 bg-[rgba(var(--color-border-color-rgb),0.3)] rounded-lg appearance-none cursor-pointer range-sm accent-[var(--color-primary)]"
+                        aria-label="Seek trailer position"
                     />
-                     <div className="flex items-center justify-between text-xs text-[var(--color-secondary-text)] mt-1">
+                     <div className="flex items-center justify-between text-xs text-[var(--color-secondary-text)] mt-1" aria-hidden="true">
                         <span>{formatTime(currentTime)}</span>
                         <span>{formatTime(duration)}</span>
                     </div>
                     <div className="flex items-center justify-center gap-8 mt-4">
-                        <button onClick={handleRewind} className="text-[rgba(var(--color-primary-text-rgb),0.7)] hover:text-[var(--color-primary-text)]"><IconRewind className="w-8 h-8" /></button>
-                        <button onClick={handlePlayPause} className="bg-[var(--color-primary)] text-white w-16 h-16 rounded-full flex items-center justify-center shadow-lg">
+                        <button onClick={handleRewind} className="text-[rgba(var(--color-primary-text-rgb),0.7)] hover:text-[var(--color-primary-text)]" aria-label="Rewind 15 seconds"><IconRewind className="w-8 h-8" /></button>
+                        <button onClick={handlePlayPause} className="bg-[var(--color-primary)] text-white w-16 h-16 rounded-full flex items-center justify-center shadow-lg" aria-label={isPlaying ? "Pause" : "Play"}>
                             {isPlaying ? <IconPause className="w-8 h-8" /> : <IconPlay className="w-8 h-8" />}
                         </button>
-                        <button onClick={handleForward} className="text-[rgba(var(--color-primary-text-rgb),0.7)] hover:text-[var(--color-primary-text)]"><IconForward className="w-8 h-8" /></button>
+                        <button onClick={handleForward} className="text-[rgba(var(--color-primary-text-rgb),0.7)] hover:text-[var(--color-primary-text)]" aria-label="Forward 15 seconds"><IconForward className="w-8 h-8" /></button>
                     </div>
                 </div>
             </div>
@@ -288,17 +290,18 @@ const TrailerView: React.FC<TrailerViewProps> = ({ book, onClose }) => {
                     value={currentTime}
                     onChange={handleSeek}
                     className="w-full h-1.5 bg-[rgba(var(--color-border-color-rgb),0.3)] rounded-lg appearance-none cursor-pointer accent-[var(--color-primary)]"
+                    aria-label="Seek trailer position"
                 />
-                <div className="flex items-center justify-between text-xs text-[var(--color-secondary-text)] mt-1">
+                <div className="flex items-center justify-between text-xs text-[var(--color-secondary-text)] mt-1" aria-hidden="true">
                     <span>{formatTime(currentTime)}</span>
                     <span>{formatTime(duration)}</span>
                 </div>
                 <div className="flex items-center justify-center gap-8 mt-4">
-                    <button onClick={handleRewind} className="text-[rgba(var(--color-primary-text-rgb),0.7)] hover:text-[var(--color-primary-text)]"><IconRewind className="w-7 h-7" /></button>
-                    <button onClick={handlePlayPause} className="bg-[var(--color-primary)] text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg">
+                    <button onClick={handleRewind} className="text-[rgba(var(--color-primary-text-rgb),0.7)] hover:text-[var(--color-primary-text)]" aria-label="Rewind 15 seconds"><IconRewind className="w-7 h-7" /></button>
+                    <button onClick={handlePlayPause} className="bg-[var(--color-primary)] text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg" aria-label={isPlaying ? "Pause" : "Play"}>
                         {isPlaying ? <IconPause className="w-7 h-7" /> : <IconPlay className="w-7 h-7" />}
                     </button>
-                    <button onClick={handleForward} className="text-[rgba(var(--color-primary-text-rgb),0.7)] hover:text-[var(--color-primary-text)]"><IconForward className="w-7 h-7" /></button>
+                    <button onClick={handleForward} className="text-[rgba(var(--color-primary-text-rgb),0.7)] hover:text-[var(--color-primary-text)]" aria-label="Forward 15 seconds"><IconForward className="w-7 h-7" /></button>
                 </div>
             </div>
         </div>

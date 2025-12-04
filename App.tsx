@@ -252,6 +252,7 @@ const App: React.FC = () => {
   const [theme, setTheme] = useState<Theme>(THEMES.dark);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
   const [isIOS, setIsIOS] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
 
 
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -313,17 +314,28 @@ const App: React.FC = () => {
   }, [theme]);
 
   useEffect(() => {
-    const checkMobile = () => {
+    const checkEnvironment = () => {
        const userAgent = window.navigator.userAgent;
        const mobile = 'ontouchstart' in window && navigator.maxTouchPoints > 0;
        const ios = /iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream;
+       // Check if app is running in standalone mode (PWA installed)
+       const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
        
        setIsMobile(mobile);
        setIsIOS(ios);
+       setIsStandalone(isStandaloneMode);
     }
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    checkEnvironment();
+    window.addEventListener('resize', checkEnvironment);
+    
+    const mediaQuery = window.matchMedia('(display-mode: standalone)');
+    const handleModeChange = (e: MediaQueryListEvent) => setIsStandalone(e.matches);
+    mediaQuery.addEventListener('change', handleModeChange);
+
+    return () => {
+        window.removeEventListener('resize', checkEnvironment);
+        mediaQuery.removeEventListener('change', handleModeChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -355,9 +367,6 @@ const App: React.FC = () => {
       if (outcome === 'accepted') {
         setInstallPrompt(null);
       }
-    } else {
-        // Fallback for when the prompt isn't ready or already installed
-        showToast("To install, use your browser's menu (⋮) > 'Add to Home Screen' or 'Install App'.");
     }
   };
 
@@ -702,7 +711,7 @@ const App: React.FC = () => {
       if (scrollTarget) {
         const targetElement = chapterRefs.current[scrollTarget];
         if (targetElement) {
-          targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          viewerRef.current.scrollTo({ top: targetElement.offsetTop, behavior: 'smooth' });
           setTimeout(() => setIsOpeningBook(false), 500);
         } else {
           setTimeout(() => tryToScroll(attempt + 1), 100);
@@ -1417,6 +1426,17 @@ ${textToSummarize}
             <header className="flex-shrink-0 p-4 sm:p-6 lg:p-8 flex justify-between items-center gap-4">
                 <Logo className="h-10 sm:h-12 w-auto" />
                 <div className="flex items-center gap-2">
+                    {/* Conditional Install Button */}
+                    {(!isStandalone && (installPrompt || isIOS)) && (
+                        <button
+                            onClick={handleInstallClick}
+                            title={isIOS ? "Install on iOS" : "Install App"}
+                            className="p-2 rounded-lg hover:bg-[rgba(var(--color-border-color-rgb),0.5)] transition-colors text-[var(--color-primary)]"
+                            aria-label={isIOS ? "Install on iOS" : "Install App"}
+                        >
+                            <IconDownload className="w-6 h-6" />
+                        </button>
+                    )}
                     <button 
                         onClick={() => setActiveTab('settings')}
                         title="Settings"
@@ -1429,10 +1449,37 @@ ${textToSummarize}
             </header>
 
             <div className="px-4 sm:px-6 lg:p-8 border-b border-[var(--color-border-color)]">
-                <nav className="flex space-x-4">
-                    <button onClick={() => setActiveTab('library')} className={`py-3 px-1 text-sm font-medium transition-colors focus:outline-none ${activeTab === 'library' ? 'text-[var(--color-primary-text)] border-b-2 border-[var(--color-primary)]' : 'text-[var(--color-secondary-text)] hover:text-[var(--color-primary-text)]'}`}>Library</button>
-                    <button onClick={() => setActiveTab('quotes')} className={`py-3 px-1 text-sm font-medium transition-colors focus:outline-none ${activeTab === 'quotes' ? 'text-[var(--color-primary-text)] border-b-2 border-[var(--color-primary)]' : 'text-[var(--color-secondary-text)] hover:text-[var(--color-primary-text)]'}`}>Quotes</button>
-                    <button onClick={() => setActiveTab('settings')} className={`py-3 px-1 text-sm font-medium transition-colors focus:outline-none ${activeTab === 'settings' ? 'text-[var(--color-primary-text)] border-b-2 border-[var(--color-primary)]' : 'text-[var(--color-secondary-text)] hover:text-[var(--color-primary-text)]'}`}>Settings</button>
+                <nav className="flex space-x-4" role="tablist" aria-label="Main Navigation">
+                    <button 
+                        onClick={() => setActiveTab('library')} 
+                        role="tab"
+                        aria-selected={activeTab === 'library'}
+                        aria-controls="library-panel"
+                        id="tab-library"
+                        className={`py-3 px-1 text-sm font-medium transition-colors focus:outline-none ${activeTab === 'library' ? 'text-[var(--color-primary-text)] border-b-2 border-[var(--color-primary)]' : 'text-[var(--color-secondary-text)] hover:text-[var(--color-primary-text)]'}`}
+                    >
+                        Library
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('quotes')} 
+                        role="tab"
+                        aria-selected={activeTab === 'quotes'}
+                        aria-controls="quotes-panel"
+                        id="tab-quotes"
+                        className={`py-3 px-1 text-sm font-medium transition-colors focus:outline-none ${activeTab === 'quotes' ? 'text-[var(--color-primary-text)] border-b-2 border-[var(--color-primary)]' : 'text-[var(--color-secondary-text)] hover:text-[var(--color-primary-text)]'}`}
+                    >
+                        Quotes
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('settings')} 
+                        role="tab"
+                        aria-selected={activeTab === 'settings'}
+                        aria-controls="settings-panel"
+                        id="tab-settings"
+                        className={`py-3 px-1 text-sm font-medium transition-colors focus:outline-none ${activeTab === 'settings' ? 'text-[var(--color-primary-text)] border-b-2 border-[var(--color-primary)]' : 'text-[var(--color-secondary-text)] hover:text-[var(--color-primary-text)]'}`}
+                    >
+                        Settings
+                    </button>
                 </nav>
             </div>
             
@@ -1441,6 +1488,9 @@ ${textToSummarize}
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
+                id={`${activeTab}-panel`}
+                role="tabpanel"
+                aria-labelledby={`tab-${activeTab}`}
             >
                 {activeTab === 'library' ? (
                     <Library 
@@ -1496,15 +1546,6 @@ ${textToSummarize}
                 </>
             )}
 
-            <button
-                onClick={handleInstallClick}
-                className="fixed bottom-6 left-6 z-50 flex items-center justify-center gap-3 px-6 py-4 bg-[var(--color-secondary)] text-white font-bold rounded-full shadow-2xl hover:scale-105 transition-transform duration-300 border-2 border-white/20"
-                title={isIOS ? "Install on iOS" : "Install App"}
-            >
-                <IconDownload className="w-6 h-6" />
-                <span>{isIOS ? "Add to Home Screen" : "Install App"}</span>
-            </button>
-
             {toast && (
                 <Toast 
                     message={toast.message} 
@@ -1521,7 +1562,7 @@ ${textToSummarize}
       <BookStyles />
       
       {isOpeningBook && (
-         <div className="fixed inset-0 z-[60] bg-[var(--color-background)] flex flex-col items-center justify-center space-y-4 transition-opacity duration-500">
+         <div className="fixed inset-0 z-[60] bg-[var(--color-background)] flex flex-col items-center justify-center space-y-4 transition-opacity duration-500" role="alert" aria-busy="true">
             <div className="flex flex-col items-center animate-pulse">
                <IconSpinner className="w-10 h-10 text-[var(--color-primary)] mb-4" />
                <h2 className="text-xl font-serif font-bold text-[var(--color-primary-text)]">Opening {selectedBook.title}...</h2>
@@ -1551,6 +1592,7 @@ ${textToSummarize}
                     className={`p-2 rounded-lg hover:bg-[rgba(var(--color-border-color-rgb),0.2)] transition-colors text-[var(--color-primary-text)] ${isSidebarOpen ? 'bg-[rgba(var(--color-border-color-rgb),0.1)]' : ''}`}
                     aria-label={isSidebarOpen ? "Close Table of Contents" : "Open Table of Contents"}
                     title={isSidebarOpen ? "Close Table of Contents" : "Open Table of Contents"}
+                    aria-expanded={isSidebarOpen}
                  >
                     {isSidebarOpen ? <IconClose className="w-6 h-6"/> : <IconMenu className="w-6 h-6"/>}
                  </button>
@@ -1593,17 +1635,24 @@ ${textToSummarize}
             lg:translate-x-0 lg:static lg:z-auto
             ${isSidebarOpen ? 'lg:w-80 xl:w-96 lg:opacity-100' : 'lg:w-0 lg:overflow-hidden lg:opacity-0'}
         `}
+        role="dialog"
+        aria-modal={isSidebarOpen && window.innerWidth < 1024}
+        aria-label="Table of Contents"
       >
         <div className="flex items-center justify-between p-4 border-b border-[var(--color-border-color)] h-[64px]">
             <h2 className="font-bold text-lg truncate">Contents</h2>
-            <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-1 rounded-full hover:bg-[rgba(var(--color-border-color-rgb),0.2)]">
+            <button 
+                onClick={() => setIsSidebarOpen(false)} 
+                className="lg:hidden p-1 rounded-full hover:bg-[rgba(var(--color-border-color-rgb),0.2)]"
+                aria-label="Close Table of Contents"
+            >
                 <IconClose className="w-5 h-5"/>
             </button>
         </div>
         <div className="flex-1 overflow-y-auto p-4 min-w-[20rem]">
             <h2 className="font-bold text-lg mb-1 truncate">{selectedBook.title}</h2>
             <p className="text-sm text-[var(--color-secondary-text)] mb-4">{selectedBook.author}</p>
-            <nav>
+            <nav aria-label="Book chapters">
               <ul>
                 {selectedBook.toc.map(item => <TocItemComponent key={item.id} item={item} onNavigate={navigateTo}/>)}
               </ul>

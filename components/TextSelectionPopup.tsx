@@ -19,6 +19,8 @@ const TextSelectionPopup: React.FC<TextSelectionPopupProps> = ({ top, left, onCo
         onMouseUp={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
         onTouchEnd={(e) => e.stopPropagation()}
+        role="toolbar"
+        aria-label="Text selection actions"
       >
         <button onClick={onCopy} className="px-6 py-3 active:bg-white/20 transition-colors text-base font-medium rounded-l-full border-r border-white/20 whitespace-nowrap select-none">
           Copy
@@ -40,15 +42,17 @@ const TextSelectionPopup: React.FC<TextSelectionPopupProps> = ({ top, left, onCo
       style={{ top: top, left, transform: 'translate(-50%, -120%)' }}
       onMouseUp={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
+      role="toolbar"
+      aria-label="Text selection actions"
     >
       <button onClick={onCopy} title="Copy" className="px-4 py-2 hover:bg-white/20 transition-colors text-sm font-medium rounded-l-md select-none">
         Copy
       </button>
-      <div className="w-px h-5 bg-white/20" />
+      <div className="w-px h-5 bg-white/20" role="separator" aria-orientation="vertical" />
       <button onClick={onQuote} title="Save as Quote" className="px-4 py-2 hover:bg-white/20 transition-colors text-sm font-medium select-none">
         Quote
       </button>
-      <div className="w-px h-5 bg-white/20" />
+      <div className="w-px h-5 bg-white/20" role="separator" aria-orientation="vertical" />
       <button onClick={onSearch} title="Search Online" className="px-4 py-2 hover:bg-white/20 transition-colors text-sm font-medium rounded-r-md select-none">
         Search
       </button>

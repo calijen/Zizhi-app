@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import type { Theme, ThemeColors, ThemeFont } from '../types';
 import { GoogleGenAI, Type } from '@google/genai';
@@ -127,6 +126,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
             onChange={(e) => handleColorChange(colorKey, e.target.value)}
             className="absolute -top-2 -left-2 w-32 h-12 cursor-pointer border-0"
             title={`Select ${label} color`}
+            aria-label={`Select ${label} color`}
         />
       </div>
     </div>
@@ -138,7 +138,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
       <p className="text-sm text-[var(--color-secondary-text)]">You found the secret panel! Click the button for a completely absurd book recommendation, generated just for you.</p>
       
       {isGenerating ? (
-        <div className="flex items-center justify-center p-8">
+        <div className="flex items-center justify-center p-8" role="status">
             <IconSpinner className="w-8 h-8 text-[var(--color-primary)]" />
         </div>
       ) : recommendation ? (
@@ -167,7 +167,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
           >
             Generate Absurd Recommendation
           </button>
-          {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
+          {error && <p className="text-red-600 text-sm mt-2" role="alert">{error}</p>}
         </div>
       )}
     </div>
@@ -188,6 +188,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
                         borderColor: currentTheme.colors['border-color'],
                         backgroundImage: textures[currentTheme.texture]?.style || 'none',
                     }}
+                    aria-label="Theme preview"
                 >
                     <h4 
                         className="text-lg font-bold mb-2 transition-colors duration-300"
@@ -225,17 +226,18 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
                 <div className="p-4 sm:p-6 bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-lg space-y-4">
                   <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-secondary-text)]">Preset Themes</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {Object.keys(themes).map((themeKey) => {
-                      const theme = themes[themeKey];
+                    {(Object.values(themes) as Theme[]).map((theme) => {
                       return (
                       <button
                         key={theme.name}
                         onClick={() => handlePresetSelect(theme)}
                         className={`p-4 rounded-md border-2 transition-colors ${currentTheme.name === theme.name ? 'border-[var(--color-primary)]' : 'border-transparent hover:border-[var(--color-border-color)]'}`}
                         style={{ backgroundColor: theme.colors.background }}
+                        aria-pressed={currentTheme.name === theme.name}
+                        aria-label={`Select ${theme.name} theme`}
                       >
                         <div className="flex flex-col items-start gap-2">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5" aria-hidden="true">
                             <div className="w-4 h-4 rounded-full" style={{ backgroundColor: theme.colors.primary }}></div>
                             <div className="w-4 h-4 rounded-full" style={{ backgroundColor: theme.colors.secondary }}></div>
                           </div>
@@ -264,7 +266,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
                      <div>
                         <div className="flex justify-between items-center mb-2">
                             <label htmlFor="font-size-slider-mobile" className="text-sm">Font Size</label>
-                            <span className="text-sm font-mono text-[var(--color-secondary-text)]">{currentTheme.fontSize.toFixed(2)}rem</span>
+                            <span className="text-sm font-mono text-[var(--color-secondary-text)]" aria-hidden="true">{currentTheme.fontSize.toFixed(2)}rem</span>
                         </div>
                         <input
                             id="font-size-slider-mobile"
@@ -275,12 +277,13 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
                             value={currentTheme.fontSize}
                             onChange={handleFontSizeChange}
                             className="w-full h-2 bg-[rgba(var(--color-border-color-rgb),0.3)] rounded-lg appearance-none cursor-pointer accent-[var(--color-primary)]"
+                            aria-label="Adjust font size"
                         />
                     </div>
                     <div>
                         <div className="flex justify-between items-center mb-2">
                             <label htmlFor="line-height-slider-mobile" className="text-sm">Line Height</label>
-                            <span className="text-sm font-mono text-[var(--color-secondary-text)]">{currentTheme.lineHeight.toFixed(1)}</span>
+                            <span className="text-sm font-mono text-[var(--color-secondary-text)]" aria-hidden="true">{currentTheme.lineHeight.toFixed(1)}</span>
                         </div>
                         <input
                             id="line-height-slider-mobile"
@@ -291,6 +294,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
                             value={currentTheme.lineHeight}
                             onChange={handleLineHeightChange}
                             className="w-full h-2 bg-[rgba(var(--color-border-color-rgb),0.3)] rounded-lg appearance-none cursor-pointer accent-[var(--color-primary)]"
+                            aria-label="Adjust line height"
                         />
                     </div>
                     <div>
@@ -301,6 +305,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
                                     key={key}
                                     onClick={() => handleTextureChange(key)}
                                     className={`p-2 text-sm text-center rounded-md border-2 transition-colors ${currentTheme.texture === key ? 'border-[var(--color-primary)] bg-[rgba(var(--color-primary-rgb),0.1)]' : 'border-transparent bg-[rgba(var(--color-border-color-rgb),0.1)] hover:border-[var(--color-border-color)]'}`}
+                                    aria-pressed={currentTheme.texture === key}
+                                    aria-label={`Select ${texture.name} texture`}
                                 >
                                     {texture.name}
                                 </button>
@@ -334,6 +340,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
                         borderColor: currentTheme.colors['border-color'],
                         backgroundImage: textures[currentTheme.texture]?.style || 'none',
                     }}
+                    aria-label="Theme preview"
                 >
                     <h4 
                         className="text-lg font-bold mb-2 transition-colors duration-300"
@@ -372,17 +379,18 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
                 <div className="p-4 sm:p-6 bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-lg space-y-4">
                   <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-secondary-text)]">Preset Themes</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {Object.keys(themes).map((themeKey) => {
-                      const theme = themes[themeKey];
+                    {(Object.values(themes) as Theme[]).map((theme) => {
                       return (
                       <button
                         key={theme.name}
                         onClick={() => handlePresetSelect(theme)}
                         className={`p-4 rounded-md border-2 transition-colors ${currentTheme.name === theme.name ? 'border-[var(--color-primary)]' : 'border-transparent hover:border-[var(--color-border-color)]'}`}
                         style={{ backgroundColor: theme.colors.background }}
+                        aria-pressed={currentTheme.name === theme.name}
+                        aria-label={`Select ${theme.name} theme`}
                       >
                         <div className="flex flex-col items-start gap-2">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5" aria-hidden="true">
                             <div className="w-4 h-4 rounded-full" style={{ backgroundColor: theme.colors.primary }}></div>
                             <div className="w-4 h-4 rounded-full" style={{ backgroundColor: theme.colors.secondary }}></div>
                           </div>
@@ -411,7 +419,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
                      <div>
                         <div className="flex justify-between items-center mb-2">
                             <label htmlFor="font-size-slider" className="text-sm">Font Size</label>
-                            <span className="text-sm font-mono text-[var(--color-secondary-text)]">{currentTheme.fontSize.toFixed(2)}rem</span>
+                            <span className="text-sm font-mono text-[var(--color-secondary-text)]" aria-hidden="true">{currentTheme.fontSize.toFixed(2)}rem</span>
                         </div>
                         <input
                             id="font-size-slider"
@@ -422,12 +430,13 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
                             value={currentTheme.fontSize}
                             onChange={handleFontSizeChange}
                             className="w-full h-2 bg-[rgba(var(--color-border-color-rgb),0.3)] rounded-lg appearance-none cursor-pointer accent-[var(--color-primary)]"
+                            aria-label="Adjust font size"
                         />
                     </div>
                     <div>
                         <div className="flex justify-between items-center mb-2">
                             <label htmlFor="line-height-slider" className="text-sm">Line Height</label>
-                            <span className="text-sm font-mono text-[var(--color-secondary-text)]">{currentTheme.lineHeight.toFixed(1)}</span>
+                            <span className="text-sm font-mono text-[var(--color-secondary-text)]" aria-hidden="true">{currentTheme.lineHeight.toFixed(1)}</span>
                         </div>
                         <input
                             id="line-height-slider"
@@ -438,6 +447,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
                             value={currentTheme.lineHeight}
                             onChange={handleLineHeightChange}
                             className="w-full h-2 bg-[rgba(var(--color-border-color-rgb),0.3)] rounded-lg appearance-none cursor-pointer accent-[var(--color-primary)]"
+                            aria-label="Adjust line height"
                         />
                     </div>
                     <div>
@@ -448,6 +458,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
                                     key={key}
                                     onClick={() => handleTextureChange(key)}
                                     className={`p-2 text-sm text-center rounded-md border-2 transition-colors ${currentTheme.texture === key ? 'border-[var(--color-primary)] bg-[rgba(var(--color-primary-rgb),0.1)]' : 'border-transparent bg-[rgba(var(--color-border-color-rgb),0.1)] hover:border-[var(--color-border-color)]'}`}
+                                    aria-pressed={currentTheme.texture === key}
+                                    aria-label={`Select ${texture.name} texture`}
                                 >
                                     {texture.name}
                                 </button>

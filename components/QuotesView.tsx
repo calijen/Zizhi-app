@@ -64,8 +64,16 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, onDelete, onShare, onGe
                 <span className="font-semibold text-[var(--color-primary-text)]">{quote.author}</span> in <span className="italic">{quote.bookTitle}</span>
             </div>
             <p 
-              className={`text-lg text-[var(--color-primary-text)] font-serif leading-relaxed whitespace-pre-wrap ${quote.location ? 'cursor-pointer' : ''}`}
+              className={`text-lg text-[var(--color-primary-text)] font-serif leading-relaxed whitespace-pre-wrap ${quote.location ? 'cursor-pointer hover:opacity-80' : ''}`}
               onClick={() => quote.location && onGoToQuote(quote)}
+              onKeyDown={(e) => {
+                if (quote.location && (e.key === 'Enter' || e.key === ' ')) {
+                  e.preventDefault();
+                  onGoToQuote(quote);
+                }
+              }}
+              role={quote.location ? "button" : undefined}
+              tabIndex={quote.location ? 0 : undefined}
               title={quote.location ? "View in book" : "Location not available for this quote"}
             >
                 {displayText}
@@ -81,11 +89,16 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, onDelete, onShare, onGe
                     title={isTooLongForImage ? "Quote is too long to download as an image (max 100 words)" : "Download as image"}
                     disabled={isTooLongForImage}
                     className={`flex items-center gap-1.5 text-[var(--color-secondary-text)] hover:text-[var(--color-primary)] transition-colors text-sm font-medium ${isTooLongForImage ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    aria-label={isTooLongForImage ? "Quote too long to download" : "Download quote as image"}
                 >
                     <IconDownload className="w-4 h-4" />
                     <span>Download</span>
                 </button>
-                <button onClick={() => onDelete(quote.id)} className="flex items-center gap-1.5 text-[var(--color-secondary-text)] hover:text-red-600 transition-colors text-sm font-medium">
+                <button 
+                    onClick={() => onDelete(quote.id)} 
+                    className="flex items-center gap-1.5 text-[var(--color-secondary-text)] hover:text-red-600 transition-colors text-sm font-medium"
+                    aria-label="Delete quote"
+                >
                     <IconTrash className="w-4 h-4" />
                     <span>Delete</span>
                 </button>
@@ -98,7 +111,7 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, onDelete, onShare, onGe
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-8 space-y-4">
         <div className="w-24 h-24 text-[var(--color-border-color)]">
-          <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+          <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full" aria-hidden="true">
             <path d="M12 11C12 9.34315 13.3431 8 15 8H33C34.6569 8 36 9.34315 36 11V37C36 38.6569 34.6569 40 33 40H15C13.3431 40 12 38.6569 12 37V11Z" stroke="currentColor" strokeOpacity="0.5" strokeWidth="2" strokeLinejoin="round"/>
             <path d="M20 18H28" stroke="currentColor" strokeOpacity="0.7" strokeWidth="2" strokeLinecap="round"/>
             <path d="M20 26H28" stroke="currentColor" strokeOpacity="0.7" strokeWidth="2" strokeLinecap="round"/>
@@ -116,17 +129,19 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, onDelete, onShare, onGe
   return (
     <div className="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8">
       <div className="flex items-center justify-end mb-4">
-        <span className="text-sm text-[var(--color-secondary-text)] mr-2">Sort by:</span>
-        <div className="flex items-center border border-[var(--color-border-color)] rounded-md bg-[var(--color-background)]">
+        <span className="text-sm text-[var(--color-secondary-text)] mr-2" id="sort-label">Sort by:</span>
+        <div className="flex items-center border border-[var(--color-border-color)] rounded-md bg-[var(--color-background)]" role="group" aria-labelledby="sort-label">
           <button 
             onClick={() => setSortBy('date')} 
             className={`px-3 py-1 text-sm rounded-l-md transition-colors ${sortBy === 'date' ? 'bg-[rgba(var(--color-border-color-rgb),0.2)] text-[var(--color-primary-text)] font-semibold' : 'text-[var(--color-secondary-text)] hover:bg-[rgba(var(--color-border-color-rgb),0.1)]'}`}
+            aria-pressed={sortBy === 'date'}
           >
             Date
           </button>
           <button 
             onClick={() => setSortBy('book')} 
             className={`px-3 py-1 text-sm rounded-r-md transition-colors border-l border-[var(--color-border-color)] ${sortBy === 'book' ? 'bg-[rgba(var(--color-border-color-rgb),0.2)] text-[var(--color-primary-text)] font-semibold' : 'text-[var(--color-secondary-text)] hover:bg-[rgba(var(--color-border-color-rgb),0.1)]'}`}
+            aria-pressed={sortBy === 'book'}
           >
             Book
           </button>
