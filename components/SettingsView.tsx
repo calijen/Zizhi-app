@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import type { Theme, ThemeColors, ThemeFont } from '../types';
 import { GoogleGenAI, Type } from '@google/genai';
@@ -47,7 +48,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
     setError(null);
     setRecommendation(null);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+      const apiKey = (import.meta as any).env?.VITE_API_KEY || (typeof process !== 'undefined' ? process.env?.API_KEY : undefined);
+      if (!apiKey) throw new Error("API Key not found. Please set VITE_API_KEY or API_KEY.");
+      const ai = new GoogleGenAI({ apiKey });
       const prompt = `Generate a quirky and fictional book recommendation. The title should be bizarre. The author's name should be eccentric. The synopsis should be a single sentence that is funny and absurd. The genre should be completely made up and implied by the content.`;
       
       const response = await ai.models.generateContent({
@@ -173,6 +176,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
     </div>
   );
 
+  const PreviewCard = () => (
+      <div className="bg-[var(--color-background)] p-6 rounded-lg border border-[var(--color-border-color)] shadow-sm prose mb-8">
+        <h3 className="mt-0 font-serif text-[var(--color-primary-text)]">Preview</h3>
+        <p className="font-serif text-[var(--color-primary-text)] leading-relaxed">
+          The quick brown fox jumps over the lazy dog. Zizhi offers a clean, distraction-free environment for your reading pleasure.
+          This is how your books will look with the current settings.
+        </p>
+      </div>
+  );
 
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
@@ -180,306 +192,131 @@ const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange
         
         {/* Mobile Layout: Sticky Preview, Content Below */}
         <div className="md:hidden">
-            <div className="sticky top-4 z-10">
-                 <div 
-                    className="p-6 rounded-lg border transition-colors duration-300 shadow-lg"
-                    style={{
-                        backgroundColor: currentTheme.colors.background,
-                        borderColor: currentTheme.colors['border-color'],
-                        backgroundImage: textures[currentTheme.texture]?.style || 'none',
-                    }}
-                    aria-label="Theme preview"
-                >
-                    <h4 
-                        className="text-lg font-bold mb-2 transition-colors duration-300"
-                        style={{
-                        fontFamily: `'${currentTheme.font.sans}', sans-serif`,
-                        color: currentTheme.colors.primary,
-                        }}
-                    >
-                        A Preview of Your Theme
-                    </h4>
-                    <p 
-                        className="mb-4 transition-all duration-100"
-                        style={{
-                        fontFamily: `'${currentTheme.font.serif}', serif`,
-                        color: currentTheme.colors['primary-text'],
-                        fontSize: `${currentTheme.fontSize}rem`,
-                        lineHeight: currentTheme.lineHeight,
-                        }}
-                    >
-                        This is how your text will appear in the reader. You can adjust the font style, size, and line height below to create the most comfortable reading experience for you. The colors can also be customized.
-                    </p>
-                    <button
-                        className="px-4 py-2 rounded-md font-semibold text-sm transition-colors duration-300"
-                        style={{
-                        backgroundColor: currentTheme.colors.primary,
-                        color: currentTheme.colors.background,
-                        fontFamily: `'${currentTheme.font.sans}', sans-serif`,
-                        }}
-                    >
-                        Example Button
-                    </button>
-                </div>
-            </div>
-            <div className="space-y-6 mt-8">
-                <div className="p-4 sm:p-6 bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-lg space-y-4">
-                  <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-secondary-text)]">Preset Themes</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {(Object.values(themes) as Theme[]).map((theme) => {
-                      return (
-                      <button
-                        key={theme.name}
-                        onClick={() => handlePresetSelect(theme)}
-                        className={`p-4 rounded-md border-2 transition-colors ${currentTheme.name === theme.name ? 'border-[var(--color-primary)]' : 'border-transparent hover:border-[var(--color-border-color)]'}`}
-                        style={{ backgroundColor: theme.colors.background }}
-                        aria-pressed={currentTheme.name === theme.name}
-                        aria-label={`Select ${theme.name} theme`}
-                      >
-                        <div className="flex flex-col items-start gap-2">
-                          <div className="flex items-center gap-1.5" aria-hidden="true">
-                            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: theme.colors.primary }}></div>
-                            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: theme.colors.secondary }}></div>
-                          </div>
-                          <span className="font-semibold text-sm" style={{ color: theme.colors['primary-text'] }}>{theme.name}</span>
-                        </div>
-                      </button>
-                    )})}
-                  </div>
-                </div>
-
-                <div className="p-4 sm:p-6 bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-lg space-y-6">
-                    <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-secondary-text)]">Reading Experience</h3>
-                    <div>
-                      <label htmlFor="font-select-mobile" className="text-sm mb-2 block">Font Style</label>
-                      <select
-                        id="font-select-mobile"
-                        value={currentTheme.font.name}
-                        onChange={handleFontChange}
-                        className="w-full p-2 rounded-md border border-[var(--color-border-color)] bg-[var(--color-background)]"
-                      >
-                        {fonts.map(font => (
-                          <option key={font.name} value={font.name}>{font.name} ({font.serif} & {font.sans})</option>
-                        ))}
-                      </select>
-                    </div>
-                     <div>
-                        <div className="flex justify-between items-center mb-2">
-                            <label htmlFor="font-size-slider-mobile" className="text-sm">Font Size</label>
-                            <span className="text-sm font-mono text-[var(--color-secondary-text)]" aria-hidden="true">{currentTheme.fontSize.toFixed(2)}rem</span>
-                        </div>
-                        <input
-                            id="font-size-slider-mobile"
-                            type="range"
-                            min="0.8"
-                            max="1.5"
-                            step="0.05"
-                            value={currentTheme.fontSize}
-                            onChange={handleFontSizeChange}
-                            className="w-full h-2 bg-[rgba(var(--color-border-color-rgb),0.3)] rounded-lg appearance-none cursor-pointer accent-[var(--color-primary)]"
-                            aria-label="Adjust font size"
-                        />
-                    </div>
-                    <div>
-                        <div className="flex justify-between items-center mb-2">
-                            <label htmlFor="line-height-slider-mobile" className="text-sm">Line Height</label>
-                            <span className="text-sm font-mono text-[var(--color-secondary-text)]" aria-hidden="true">{currentTheme.lineHeight.toFixed(1)}</span>
-                        </div>
-                        <input
-                            id="line-height-slider-mobile"
-                            type="range"
-                            min="1.4"
-                            max="2.2"
-                            step="0.1"
-                            value={currentTheme.lineHeight}
-                            onChange={handleLineHeightChange}
-                            className="w-full h-2 bg-[rgba(var(--color-border-color-rgb),0.3)] rounded-lg appearance-none cursor-pointer accent-[var(--color-primary)]"
-                            aria-label="Adjust line height"
-                        />
-                    </div>
-                    <div>
-                        <label className="text-sm mb-2 block">Book Texture</label>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                            {Object.entries(textures).map(([key, texture]) => (
-                                <button
-                                    key={key}
-                                    onClick={() => handleTextureChange(key)}
-                                    className={`p-2 text-sm text-center rounded-md border-2 transition-colors ${currentTheme.texture === key ? 'border-[var(--color-primary)] bg-[rgba(var(--color-primary-rgb),0.1)]' : 'border-transparent bg-[rgba(var(--color-border-color-rgb),0.1)] hover:border-[var(--color-border-color)]'}`}
-                                    aria-pressed={currentTheme.texture === key}
-                                    aria-label={`Select ${texture.name} texture`}
-                                >
-                                    {texture.name}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="p-4 sm:p-6 bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-lg space-y-4">
-                  <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-secondary-text)]">Custom Colors</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <ColorInput label="Primary Accent" colorKey="primary" />
-                    <ColorInput label="Secondary Accent" colorKey="secondary" />
-                    <ColorInput label="Background" colorKey="background" />
-                    <ColorInput label="Primary Text" colorKey="primary-text" />
-                    <ColorInput label="Secondary Text" colorKey="secondary-text" />
-                    <ColorInput label="Borders" colorKey="border-color" />
-                  </div>
-                </div>
-                {isSecretPanelVisible && <SecretPanel />}
+            <div className="sticky top-0 z-20 bg-[var(--color-background)] pb-4 pt-2 border-b border-[var(--color-border-color)] mb-6">
+                <PreviewCard />
             </div>
         </div>
-        
-        {/* Desktop Layout: 2-column grid */}
-        <div className="hidden md:grid grid-cols-2 gap-8 lg:gap-12 items-start">
-            <div className="sticky top-4 sm:top-6 lg:top-8">
-                <div 
-                    className="p-6 rounded-lg border transition-colors duration-300"
-                    style={{
-                        backgroundColor: currentTheme.colors.background,
-                        borderColor: currentTheme.colors['border-color'],
-                        backgroundImage: textures[currentTheme.texture]?.style || 'none',
-                    }}
-                    aria-label="Theme preview"
-                >
-                    <h4 
-                        className="text-lg font-bold mb-2 transition-colors duration-300"
-                        style={{
-                        fontFamily: `'${currentTheme.font.sans}', sans-serif`,
-                        color: currentTheme.colors.primary,
-                        }}
-                    >
-                        A Preview of Your Theme
-                    </h4>
-                    <p 
-                        className="mb-4 transition-all duration-100"
-                        style={{
-                        fontFamily: `'${currentTheme.font.serif}', serif`,
-                        color: currentTheme.colors['primary-text'],
-                        fontSize: `${currentTheme.fontSize}rem`,
-                        lineHeight: currentTheme.lineHeight,
-                        }}
-                    >
-                        This is how your text will appear in the reader. You can adjust the font style, size, and line height below to create the most comfortable reading experience for you. The colors can also be customized.
-                    </p>
-                    <button
-                        className="px-4 py-2 rounded-md font-semibold text-sm transition-colors duration-300"
-                        style={{
-                        backgroundColor: currentTheme.colors.primary,
-                        color: currentTheme.colors.background,
-                        fontFamily: `'${currentTheme.font.sans}', sans-serif`,
-                        }}
-                    >
-                        Example Button
-                    </button>
-                </div>
-            </div>
-            
-            <div className="space-y-6">
-                <div className="p-4 sm:p-6 bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-lg space-y-4">
-                  <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-secondary-text)]">Preset Themes</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {(Object.values(themes) as Theme[]).map((theme) => {
-                      return (
-                      <button
-                        key={theme.name}
-                        onClick={() => handlePresetSelect(theme)}
-                        className={`p-4 rounded-md border-2 transition-colors ${currentTheme.name === theme.name ? 'border-[var(--color-primary)]' : 'border-transparent hover:border-[var(--color-border-color)]'}`}
-                        style={{ backgroundColor: theme.colors.background }}
-                        aria-pressed={currentTheme.name === theme.name}
-                        aria-label={`Select ${theme.name} theme`}
-                      >
-                        <div className="flex flex-col items-start gap-2">
-                          <div className="flex items-center gap-1.5" aria-hidden="true">
-                            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: theme.colors.primary }}></div>
-                            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: theme.colors.secondary }}></div>
-                          </div>
-                          <span className="font-semibold text-sm" style={{ color: theme.colors['primary-text'] }}>{theme.name}</span>
-                        </div>
-                      </button>
-                    )})}
-                  </div>
-                </div>
 
-                <div className="p-4 sm:p-6 bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-lg space-y-6">
-                    <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-secondary-text)]">Reading Experience</h3>
-                    <div>
-                      <label htmlFor="font-select" className="text-sm mb-2 block">Font Style</label>
-                      <select
-                        id="font-select"
-                        value={currentTheme.font.name}
-                        onChange={handleFontChange}
-                        className="w-full p-2 rounded-md border border-[var(--color-border-color)] bg-[var(--color-background)]"
-                      >
-                        {fonts.map(font => (
-                          <option key={font.name} value={font.name}>{font.name} ({font.serif} & {font.sans})</option>
-                        ))}
-                      </select>
+        {/* Desktop Layout: Side-by-side */}
+        <div className="flex flex-col md:flex-row gap-8">
+            {/* Settings Column */}
+            <div className="flex-1 space-y-10">
+                
+                {/* Themes */}
+                <section>
+                    <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-secondary-text)] mb-4">Theme</h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        {(Object.keys(themes) as string[]).map((key) => {
+                            const theme = themes[key] as Theme;
+                            return (
+                                <button
+                                    key={theme.name}
+                                    onClick={() => handlePresetSelect(theme)}
+                                    className={`p-4 rounded-lg border text-center transition-all ${currentTheme.name === theme.name ? 'border-[var(--color-primary)] ring-2 ring-[var(--color-primary)] ring-opacity-50' : 'border-[var(--color-border-color)] hover:border-[var(--color-secondary-text)]'}`}
+                                    style={{ backgroundColor: theme.colors.background, color: theme.colors['primary-text'] }}
+                                    aria-pressed={currentTheme.name === theme.name}
+                                >
+                                    <span className="text-sm font-medium">{theme.name}</span>
+                                </button>
+                            );
+                        })}
                     </div>
-                     <div>
-                        <div className="flex justify-between items-center mb-2">
-                            <label htmlFor="font-size-slider" className="text-sm">Font Size</label>
-                            <span className="text-sm font-mono text-[var(--color-secondary-text)]" aria-hidden="true">{currentTheme.fontSize.toFixed(2)}rem</span>
+                </section>
+
+                {/* Typography */}
+                <section className="space-y-6">
+                    <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-secondary-text)] mb-4">Typography</h3>
+                    
+                    <div className="space-y-2">
+                         <label htmlFor="font-family" className="text-sm font-medium block">Typeface</label>
+                         <div className="relative">
+                             <select
+                                id="font-family"
+                                value={currentTheme.font.name}
+                                onChange={handleFontChange}
+                                className="w-full appearance-none bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-md py-2 pl-3 pr-10 text-[var(--color-primary-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                             >
+                                {fonts.map(font => (
+                                    <option key={font.name} value={font.name}>{font.name}</option>
+                                ))}
+                             </select>
+                             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[var(--color-secondary-text)]">
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                             </div>
+                         </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <div className="flex justify-between">
+                            <label htmlFor="font-size" className="text-sm font-medium">Size</label>
+                            <span className="text-xs text-[var(--color-secondary-text)]">{currentTheme.fontSize}rem</span>
                         </div>
                         <input
-                            id="font-size-slider"
                             type="range"
+                            id="font-size"
                             min="0.8"
                             max="1.5"
                             step="0.05"
                             value={currentTheme.fontSize}
                             onChange={handleFontSizeChange}
-                            className="w-full h-2 bg-[rgba(var(--color-border-color-rgb),0.3)] rounded-lg appearance-none cursor-pointer accent-[var(--color-primary)]"
-                            aria-label="Adjust font size"
+                            className="w-full h-1.5 bg-[rgba(var(--color-border-color-rgb),0.5)] rounded-lg appearance-none cursor-pointer accent-[var(--color-primary)]"
                         />
                     </div>
-                    <div>
-                        <div className="flex justify-between items-center mb-2">
-                            <label htmlFor="line-height-slider" className="text-sm">Line Height</label>
-                            <span className="text-sm font-mono text-[var(--color-secondary-text)]" aria-hidden="true">{currentTheme.lineHeight.toFixed(1)}</span>
+
+                    <div className="space-y-2">
+                        <div className="flex justify-between">
+                            <label htmlFor="line-height" className="text-sm font-medium">Line Height</label>
+                            <span className="text-xs text-[var(--color-secondary-text)]">{currentTheme.lineHeight}</span>
                         </div>
-                        <input
-                            id="line-height-slider"
+                         <input
                             type="range"
-                            min="1.4"
+                            id="line-height"
+                            min="1.2"
                             max="2.2"
                             step="0.1"
                             value={currentTheme.lineHeight}
                             onChange={handleLineHeightChange}
-                            className="w-full h-2 bg-[rgba(var(--color-border-color-rgb),0.3)] rounded-lg appearance-none cursor-pointer accent-[var(--color-primary)]"
-                            aria-label="Adjust line height"
+                            className="w-full h-1.5 bg-[rgba(var(--color-border-color-rgb),0.5)] rounded-lg appearance-none cursor-pointer accent-[var(--color-primary)]"
                         />
                     </div>
-                    <div>
-                        <label className="text-sm mb-2 block">Book Texture</label>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                            {Object.entries(textures).map(([key, texture]) => (
-                                <button
-                                    key={key}
-                                    onClick={() => handleTextureChange(key)}
-                                    className={`p-2 text-sm text-center rounded-md border-2 transition-colors ${currentTheme.texture === key ? 'border-[var(--color-primary)] bg-[rgba(var(--color-primary-rgb),0.1)]' : 'border-transparent bg-[rgba(var(--color-border-color-rgb),0.1)] hover:border-[var(--color-border-color)]'}`}
-                                    aria-pressed={currentTheme.texture === key}
-                                    aria-label={`Select ${texture.name} texture`}
-                                >
-                                    {texture.name}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
+                </section>
 
-                <div className="p-4 sm:p-6 bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-lg space-y-4">
-                  <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-secondary-text)]">Custom Colors</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <ColorInput label="Primary Accent" colorKey="primary" />
-                    <ColorInput label="Secondary Accent" colorKey="secondary" />
-                    <ColorInput label="Background" colorKey="background" />
-                    <ColorInput label="Primary Text" colorKey="primary-text" />
-                    <ColorInput label="Secondary Text" colorKey="secondary-text" />
-                    <ColorInput label="Borders" colorKey="border-color" />
-                  </div>
-                </div>
+                {/* Texture */}
+                <section>
+                    <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-secondary-text)] mb-4">Texture</h3>
+                    <div className="flex flex-wrap gap-3">
+                        {Object.entries(textures).map(([key, texture]) => (
+                            <button
+                                key={key}
+                                onClick={() => handleTextureChange(key)}
+                                className={`px-4 py-2 rounded-full border text-sm transition-all ${currentTheme.texture === key ? 'bg-[var(--color-primary)] text-white border-transparent' : 'border-[var(--color-border-color)] hover:border-[var(--color-secondary-text)]'}`}
+                                aria-pressed={currentTheme.texture === key}
+                            >
+                                {texture.name}
+                            </button>
+                        ))}
+                    </div>
+                </section>
+                
+                {/* Advanced Colors */}
+                <section>
+                     <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-secondary-text)] mb-4">Color Palette</h3>
+                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-[rgba(var(--color-border-color-rgb),0.1)] p-4 rounded-lg">
+                        <ColorInput label="Background" colorKey="background" />
+                        <ColorInput label="Primary Text" colorKey="primary-text" />
+                        <ColorInput label="Secondary Text" colorKey="secondary-text" />
+                        <ColorInput label="Accent" colorKey="primary" />
+                     </div>
+                </section>
+
                 {isSecretPanelVisible && <SecretPanel />}
+            </div>
+
+            {/* Desktop Preview Column */}
+            <div className="hidden md:block w-1/3 min-w-[300px]">
+                <div className="sticky top-6">
+                    <PreviewCard />
+                </div>
             </div>
         </div>
     </div>

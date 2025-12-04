@@ -1294,6 +1294,9 @@ const App: React.FC = () => {
       showToast("Creating cinematic trailer...");
 
       try {
+          const apiKey = (import.meta as any).env?.VITE_API_KEY || (typeof process !== 'undefined' ? process.env?.API_KEY : undefined);
+          if (!apiKey) throw new Error("API Key not found. Please set VITE_API_KEY or API_KEY.");
+
           let accumulatedText = '';
           for (const chapter of book.chapters) {
               const parser = new DOMParser();
@@ -1308,7 +1311,7 @@ const App: React.FC = () => {
               throw new Error("Book content is too short to generate a trailer.");
           }
 
-          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+          const ai = new GoogleGenAI({ apiKey });
           
           const summaryPrompt = `You are a world-class movie trailer scriptwriter. Your task is to write the narration for a short, dramatic, and captivating movie-style trailer based on the following text from a book.
 
