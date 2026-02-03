@@ -24,17 +24,16 @@ const urlsToCache = [
   'https://aistudiocdn.com/react-dom@^19.2.0/',
   'https://aistudiocdn.com/@google/genai@^1.29.0',
   'https://aistudiocdn.com/react@^19.2.0',
-  'https://aistudiocdn.com/react-dom@^19.2.0',
+  'https://aistudiocdn.com/react-dom@^19.2.0'
 ];
 
 self.addEventListener('install', event => {
-  self.skipWaiting(); // Force activation
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('Opened cache');
         return cache.addAll(urlsToCache).catch(error => {
-          console.error('Failed to cache one or more resources:', error);
+          console.error('Failed to cache resources:', error);
         });
       })
   );
@@ -43,19 +42,12 @@ self.addEventListener('install', event => {
 self.addEventListener('fetch', event => {
   event.respondWith(
     caches.open(CACHE_NAME).then(async (cache) => {
-      // Try the cache first.
       const cachedResponse = await cache.match(event.request);
-      if (cachedResponse) {
-        return cachedResponse;
-      }
+      if (cachedResponse) return cachedResponse;
 
-      // If it's not in the cache, try the network.
       try {
         const networkResponse = await fetch(event.request);
-
-        // If the network request is successful, cache it and return it.
         if (networkResponse.ok) {
-          // We don't cache POST requests, Gemini API calls, or chrome-extension requests
           if (event.request.method === 'GET' && 
               !event.request.url.includes('generativelanguage') &&
               !event.request.url.startsWith('chrome-extension')) {
@@ -64,19 +56,15 @@ self.addEventListener('fetch', event => {
         }
         return networkResponse;
       } catch (error) {
-        // The network failed.
-        // For navigation requests, serve the main app shell from the cache.
         if (event.request.mode === 'navigate') {
           const indexResponse = await cache.match('/index.html');
           if (indexResponse) return indexResponse;
         }
-        // For other requests, we can't do anything, so let the error propagate.
         throw error;
       }
     })
   );
 });
-
 
 self.addEventListener('activate', event => {
   const cacheWhitelist = [CACHE_NAME];
@@ -89,6 +77,6 @@ self.addEventListener('activate', event => {
           }
         })
       );
-    }).then(() => self.clients.claim()) // Take control of all clients immediately
+    }).then(() => self.clients.claim())
   );
 });

@@ -1,17 +1,17 @@
-import type { Book } from './types';
+
+import type { Book, Quote } from './types';
 
 const DB_NAME = 'ZizhiDB';
-const DB_VERSION = 1;
-const STORE_NAME = 'books';
+const DB_VERSION = 3; // Bump version for quotes store
+const BOOK_STORE = 'books';
+const QUOTE_STORE = 'quotes';
 
 let db: IDBDatabase;
 
 export const initDB = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
     if (db) return resolve(db);
-
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-
     request.onerror = () => reject('Error opening database');
     request.onsuccess = () => {
       db = request.result;
@@ -19,8 +19,11 @@ export const initDB = (): Promise<IDBDatabase> => {
     };
     request.onupgradeneeded = (event) => {
       const dbInstance = (event.target as IDBOpenDBRequest).result;
-      if (!dbInstance.objectStoreNames.contains(STORE_NAME)) {
-        dbInstance.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      if (!dbInstance.objectStoreNames.contains(BOOK_STORE)) {
+        dbInstance.createObjectStore(BOOK_STORE, { keyPath: 'id' });
+      }
+      if (!dbInstance.objectStoreNames.contains(QUOTE_STORE)) {
+        dbInstance.createObjectStore(QUOTE_STORE, { keyPath: 'id' });
       }
     };
   });
@@ -29,36 +32,44 @@ export const initDB = (): Promise<IDBDatabase> => {
 export const saveBook = async (book: Book): Promise<void> => {
   const db = await initDB();
   return new Promise((resolve, reject) => {
-    // We remove fields that can't be cloned for storage
-    const { coverImageUrl, chapters, toc, audioTrailerUrl, ...storableBook } = book;
-    
-    const transaction = db.transaction(STORE_NAME, 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.put(storableBook);
-    
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject('Error saving book: ' + request.error);
+    const transaction = db.transaction(BOOK_STORE, 'readwrite');
+    const store = transaction.objectStore(BOOK_STORE);
+    store.put(book).onsuccess = () => resolve();
   });
 };
 
 export const getBooks = async (): Promise<Book[]> => {
     const db = await initDB();
     return new Promise((resolve, reject) => {
-        const transaction = db.transaction(STORE_NAME, 'readonly');
-        const store = transaction.objectStore(STORE_NAME);
-        const request = store.getAll();
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject('Error getting books');
+        const transaction = db.transaction(BOOK_STORE, 'readonly');
+        db.transaction(BOOK_STORE, 'readonly').objectStore(BOOK_STORE).getAll().onsuccess = (e) => resolve((e.target as any).result);
     });
 };
 
 export const deleteBook = async (id: string): Promise<void> => {
     const db = await initDB();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(STORE_NAME, 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
-        const request = store.delete(id);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject('Error deleting book');
+    const transaction = db.transaction(BOOK_STORE, 'readwrite');
+    transaction.objectStore(BOOK_STORE).delete(id);
+};
+
+export const saveQuote = async (quote: Quote): Promise<void> => {
+    const db = await initDB();
+    return new Promise((resolve) => {
+        const transaction = db.transaction(QUOTE_STORE, 'readwrite');
+        transaction.objectStore(QUOTE_STORE).put(quote).onsuccess = () => resolve();
     });
+};
+
+export const getQuotes = async (): Promise<Quote[]> => {
+    const db = await initDB();
+    return new Promise((resolve) => {
+        const transaction = db.transaction(QUOTE_STORE, 'readonly');
+        transaction.objectStore(QUOTE_STORE).getAll().onsuccess = (e) => resolve((e.target as any).result);
+    });
+};
+
+export const deleteQuote = async (id: string): Promise<void> => {
+    const db = await initDB();
+    const transaction = db.transaction(QUOTE_STORE, 'readwrite');
+    transaction.objectStore(QUOTE_STORE).delete(id);
 };

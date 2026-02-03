@@ -1,6 +1,8 @@
 
+
 import React from 'react';
 import { IconClose, IconMicrophone, IconSpinner, IconPlay } from './icons';
+import type { GenerationStatus } from '../App';
 
 export interface BookCardData {
   id: string;
@@ -8,7 +10,7 @@ export interface BookCardData {
   author: string;
   coverImageUrl: string | null;
   progress: number;
-  audioTrailerUrl?: string;
+  audioSummaryUrl?: string;
 }
 
 interface LibraryProps {
@@ -17,19 +19,20 @@ interface LibraryProps {
   isLoading: boolean;
   error: string | null;
   onDelete: (bookId: string) => void;
-  onGenerateTrailer: (bookId: string) => void;
-  generatingTrailerForBookId: string | null;
-  onViewTrailer: (bookId: string) => void;
+  onGenerateSummary: (bookId: string) => void;
+  generatingSummaryForBookId: string | null; // Kept for compat, unused
+  generationStatuses: Record<string, GenerationStatus>;
+  onViewSummary: (bookId: string) => void;
 }
 
 const BookCard: React.FC<{ 
     book: BookCardData; 
     onSelect: (id: string) => void; 
     onDelete: (id: string) => void;
-    onGenerateTrailer: (id: string) => void;
-    onViewTrailer: (id: string) => void;
+    onGenerateSummary: (id: string) => void;
+    onViewSummary: (id: string) => void;
     isGenerating: boolean;
-}> = ({ book, onSelect, onDelete, onGenerateTrailer, onViewTrailer, isGenerating }) => {
+}> = ({ book, onSelect, onDelete, onGenerateSummary, onViewSummary, isGenerating }) => {
 
     const handleDelete = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -87,25 +90,29 @@ const BookCard: React.FC<{
                     </button>
                     <div className="relative">
                         {isGenerating ? (
-                            <button className="w-full py-2 px-2 bg-[rgba(var(--color-secondary-text-rgb),0.1)] text-[var(--color-secondary-text)] rounded-md transition-colors flex items-center justify-center gap-1 truncate" disabled>
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); onViewSummary(book.id); }}
+                                className="w-full py-2 px-2 bg-[rgba(var(--color-secondary-text-rgb),0.1)] text-[var(--color-secondary-text)] rounded-md hover:bg-[rgba(var(--color-secondary-text-rgb),0.2)] transition-colors flex items-center justify-center gap-1 truncate"
+                                title="Click to view progress"
+                            >
                                 <IconSpinner className="w-3 h-3 sm:w-4 sm:h-4" />
-                                <span>Creating...</span>
+                                <span>Generating...</span>
                             </button>
-                        ) : book.audioTrailerUrl ? (
+                        ) : book.audioSummaryUrl ? (
                              <button 
-                                onClick={() => onViewTrailer(book.id)}
+                                onClick={(e) => { e.stopPropagation(); onViewSummary(book.id); }}
                                 className="w-full py-2 px-2 bg-[rgba(var(--color-secondary-text-rgb),0.1)] text-[var(--color-secondary-text)] rounded-md hover:bg-[rgba(var(--color-secondary-text-rgb),0.2)] transition-colors flex items-center justify-center gap-1 truncate"
                              >
                                 <IconPlay className="w-3 h-3 sm:w-4 sm:h-4" />
-                                <span>Play</span>
+                                <span>Summary</span>
                              </button>
                         ) : (
                             <button 
-                                onClick={() => onGenerateTrailer(book.id)}
+                                onClick={(e) => { e.stopPropagation(); onGenerateSummary(book.id); }}
                                 className="w-full py-2 px-2 bg-[rgba(var(--color-secondary-text-rgb),0.1)] text-[var(--color-secondary-text)] rounded-md hover:bg-[rgba(var(--color-secondary-text-rgb),0.2)] transition-colors flex items-center justify-center gap-1 truncate"
                             >
                                 <IconMicrophone className="w-3 h-3 sm:w-4 sm:h-4" />
-                                <span>Trailer</span>
+                                <span>Summary</span>
                             </button>
                         )}
                     </div>
@@ -116,7 +123,7 @@ const BookCard: React.FC<{
 };
 
 
-const Library: React.FC<LibraryProps> = ({ books, onBookSelect, isLoading, error, onDelete, onGenerateTrailer, generatingTrailerForBookId, onViewTrailer }) => {
+const Library: React.FC<LibraryProps> = ({ books, onBookSelect, isLoading, error, onDelete, onGenerateSummary, generationStatuses, onViewSummary }) => {
   return (
     <div className="p-4 sm:p-6 lg:p-8 h-full">
         {isLoading && (
@@ -188,9 +195,9 @@ const Library: React.FC<LibraryProps> = ({ books, onBookSelect, isLoading, error
                 book={book} 
                 onSelect={onBookSelect} 
                 onDelete={onDelete} 
-                onGenerateTrailer={onGenerateTrailer}
-                onViewTrailer={onViewTrailer}
-                isGenerating={generatingTrailerForBookId === book.id}
+                onGenerateSummary={onGenerateSummary}
+                onViewSummary={onViewSummary}
+                isGenerating={!!generationStatuses[book.id]}
               />
             ))}
           </div>

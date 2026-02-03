@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -20,76 +21,28 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-      /* Custom scrollbar for a better look */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent;
-      }
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
       ::-webkit-scrollbar-thumb {
         background-color: #BDBDBD;
         border-radius: 20px;
         border: 2px solid var(--color-background, #FAFAFA);
         background-clip: content-box;
       }
-      ::-webkit-scrollbar-thumb:hover {
-        background-color: #9E9E9E;
-      }
+      ::-webkit-scrollbar-thumb:hover { background-color: #9E9E9E; }
 
-      /* Animations */
-      @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      @keyframes fadeOut {
-        from { opacity: 1; transform: translateY(0); }
-        to { opacity: 0; transform: translateY(10px); }
-      }
-      .animate-fade-in-out {
-        animation: fadeIn 0.15s ease-out forwards, fadeOut 0.3s ease-in 2.55s forwards;
-      }
-      @keyframes slideInRight {
-        from { transform: translateX(100%); }
-        to { transform: translateX(0); }
-      }
-      @keyframes slideInUp {
-        from { transform: translateY(100%); }
-        to { transform: translateY(0); }
-      }
-      /* Special animation for centered bottom bar to maintain X centering */
-      @keyframes slideInUpCentered {
-        from { transform: translate(-50%, 100%); opacity: 0; }
-        to { transform: translate(-50%, 0); opacity: 1; }
-      }
-      .animate-slide-up-centered {
-        animation: slideInUpCentered 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-      }
-      .animate-search-panel-in {
-        animation: slideInUp 0.3s ease-out forwards;
-      }
-      @media (min-width: 768px) {
-        .animate-search-panel-in {
-          animation-name: slideInRight;
-        }
-      }
-
-      @keyframes marquee {
-        from { transform: translateX(0); }
-        to { transform: translateX(-50%); }
-      }
-      .marquee-parent {
-        position: relative;
-        overflow: hidden;
-      }
-      .marquee-child {
-        display: flex;
-        position: absolute;
-        animation-name: marquee;
-        animation-timing-function: linear;
-        animation-iteration-count: infinite;
-      }
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes fadeOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(10px); } }
+      .animate-fade-in-out { animation: fadeIn 0.15s ease-out forwards, fadeOut 0.3s ease-in 2.55s forwards; }
+      @keyframes slideInUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+      @keyframes slideInUpCentered { from { transform: translate(-50%, 100%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+      .animate-slide-up-centered { animation: slideInUpCentered 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      
+      @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+      .marquee-parent { position: relative; overflow: hidden; }
+      .marquee-child { display: flex; position: absolute; animation-name: marquee; animation-timing-function: linear; animation-iteration-count: infinite; }
+      
+      .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
     </style>
   <script type="importmap">
 {
@@ -97,7 +50,9 @@
     "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "react": "https://aistudiocdn.com/react@^19.2.0",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.0"
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.0",
+    "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.1/+esm",
+    "jszip": "https://esm.sh/jszip@^3.10.1"
   }
 }
 </script>
@@ -105,18 +60,5 @@
   <body class="bg-[var(--color-background)] font-sans text-[var(--color-primary-text)] selection:bg-[var(--color-primary)] selection:text-white">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').then(registration => {
-            console.log('ServiceWorker registration successful with scope: ', registration.scope);
-            // Check for updates
-            registration.update();
-          }, err => {
-            console.log('ServiceWorker registration failed: ', err);
-          });
-        });
-      }
-    </script>
   </body>
 </html>

@@ -1,4 +1,5 @@
 
+
 export interface TocItem {
   id: string;
   href: string;
@@ -33,12 +34,15 @@ export interface Book {
     progress: number; // 0-1 (e.g. 0.5 for 50%)
     lastScrollTop: number;
     lastOpened?: number; // Timestamp
-    audioTrailerUrl?: string;
-    trailerScript?: string;
+    
+    // Summary fields
+    audioSummaryUrl?: string;
+    summaryScript?: string;
+    audioDuration?: number; // Duration in seconds
 
     // For persistence
     epubFile?: File | Blob;
-    audioTrailerBlob?: Blob;
+    audioSummaryBlob?: Blob;
 }
 
 export interface ThemeColors {

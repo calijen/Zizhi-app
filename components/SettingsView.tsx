@@ -1,9 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { Theme, ThemeColors, ThemeFont } from '../types';
-import { GoogleGenAI, Type } from '@google/genai';
 import { IconSpinner } from './icons';
-
 
 interface SettingsViewProps {
   currentTheme: Theme;
@@ -13,309 +11,144 @@ interface SettingsViewProps {
   textures: { [key: string]: { name: string; style: string } };
 }
 
-const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange, themes, fonts, textures }) => {
-  const [customColors, setCustomColors] = useState<ThemeColors>(currentTheme.colors);
-  const [isSecretPanelVisible, setIsSecretPanelVisible] = useState(false);
-  const [recommendation, setRecommendation] = useState<{title: string; author: string; synopsis: string} | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+const SettingsView: React.FC<SettingsViewProps> = ({ currentTheme, onThemeChange, themes, fonts }) => {
+  const [draftTheme, setDraftTheme] = useState<Theme>(currentTheme);
 
-
-  useEffect(() => {
-    const konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
-    let index = 0;
-
-    const handler = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() === konamiCode[index]) {
-        index++;
-        if (index === konamiCode.length) {
-          setIsSecretPanelVisible(true);
-          index = 0; // Reset
-        }
-      } else {
-        index = 0;
-      }
-    };
-
-    document.addEventListener('keydown', handler);
-    return () => {
-      document.removeEventListener('keydown', handler);
-    };
-  }, []);
-
-  const handleGenerateRecommendation = async () => {
-    setIsGenerating(true);
-    setError(null);
-    setRecommendation(null);
-    try {
-      const apiKey = (import.meta as any).env?.VITE_API_KEY || (typeof process !== 'undefined' ? process.env?.API_KEY : undefined);
-      if (!apiKey) throw new Error("API Key not found. Please set VITE_API_KEY or API_KEY.");
-      const ai = new GoogleGenAI({ apiKey });
-      const prompt = `Generate a quirky and fictional book recommendation. The title should be bizarre. The author's name should be eccentric. The synopsis should be a single sentence that is funny and absurd. The genre should be completely made up and implied by the content.`;
-      
-      const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: prompt,
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                    title: { type: Type.STRING },
-                    author: { type: Type.STRING },
-                    synopsis: { type: Type.STRING },
-                },
-                required: ["title", "author", "synopsis"],
-            }
-          }
-      });
-      
-      const result = JSON.parse(response.text);
-      if (result.title && result.author && result.synopsis) {
-        setRecommendation(result);
-      } else {
-        throw new Error("Invalid response format from API.");
-      }
-
-    } catch (e: any) {
-      console.error("Failed to generate recommendation:", e);
-      setError("Oops! Couldn't cook up a recommendation. Please try again.");
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-
-  const handlePresetSelect = (theme: Theme) => {
-    // When selecting a preset, also adopt its font size and line height
-    onThemeChange(theme);
-    setCustomColors(theme.colors);
-  };
+  // Use JSON stringify for deep equality check to enable/disable Save button
+  const hasChanges = useMemo(() => {
+      return JSON.stringify(draftTheme) !== JSON.stringify(currentTheme);
+  }, [draftTheme, currentTheme]);
 
   const handleFontChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedFont = fonts.find(f => f.name === e.target.value);
     if (selectedFont) {
-      onThemeChange({ ...currentTheme, name: 'Custom', font: selectedFont });
+      setDraftTheme(prev => ({ ...prev, font: selectedFont }));
     }
   };
 
-  const handleColorChange = (colorName: keyof ThemeColors, value: string) => {
-    const newColors = { ...customColors, [colorName]: value };
-    setCustomColors(newColors);
-    onThemeChange({ ...currentTheme, name: 'Custom', colors: newColors });
+  const handleColorChange = (key: keyof ThemeColors, value: string) => {
+    setDraftTheme(prev => ({
+      ...prev,
+      colors: { ...prev.colors, [key]: value }
+    }));
   };
-  
+
   const handleFontSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onThemeChange({ ...currentTheme, name: 'Custom', fontSize: parseFloat(e.target.value) });
+    setDraftTheme(prev => ({ ...prev, fontSize: parseFloat(e.target.value) }));
   };
 
-  const handleLineHeightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onThemeChange({ ...currentTheme, name: 'Custom', lineHeight: parseFloat(e.target.value) });
-  };
-
-  const handleTextureChange = (textureKey: string) => {
-    onThemeChange({ ...currentTheme, name: 'Custom', texture: textureKey });
-  };
-
-
-  const ColorInput: React.FC<{ label: string; colorKey: keyof ThemeColors; }> = ({ label, colorKey }) => (
-    <div className="flex items-center justify-between">
-      <label htmlFor={colorKey} className="text-sm">{label}</label>
-      <div className="relative w-24 h-8 rounded-md border border-[var(--color-border-color)] overflow-hidden">
-        <input
-            type="color"
-            id={colorKey}
-            value={customColors[colorKey]}
-            onChange={(e) => handleColorChange(colorKey, e.target.value)}
-            className="absolute -top-2 -left-2 w-32 h-12 cursor-pointer border-0"
-            title={`Select ${label} color`}
-            aria-label={`Select ${label} color`}
-        />
+  const ColorPicker: React.FC<{ label: string; colorKey: keyof ThemeColors }> = ({ label, colorKey }) => (
+    <div className="flex items-center justify-between group">
+      <label className="text-sm font-medium text-[var(--color-primary-text)] group-hover:text-[var(--color-primary)] transition-colors">{label}</label>
+      <div className="relative w-12 h-12 rounded-full border border-[var(--color-border-color)] overflow-hidden cursor-pointer shadow-sm hover:ring-2 hover:ring-[var(--color-primary)] transition-all">
+          <input 
+            type="color" 
+            value={draftTheme.colors[colorKey]} 
+            onChange={(e) => handleColorChange(colorKey, e.target.value)} 
+            className="absolute inset-0 w-[200%] h-[200%] -top-1/2 -left-1/2 cursor-pointer border-none p-0"
+          />
       </div>
     </div>
-  );
-
-  const SecretPanel = () => (
-    <div className="p-4 sm:p-6 bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-lg space-y-4 mt-6">
-      <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-secondary-text)]">🤫 TOP SECRET 🤫</h3>
-      <p className="text-sm text-[var(--color-secondary-text)]">You found the secret panel! Click the button for a completely absurd book recommendation, generated just for you.</p>
-      
-      {isGenerating ? (
-        <div className="flex items-center justify-center p-8" role="status">
-            <IconSpinner className="w-8 h-8 text-[var(--color-primary)]" />
-        </div>
-      ) : recommendation ? (
-        <div className="p-4 bg-[rgba(var(--color-border-color-rgb),0.1)] rounded-md space-y-2">
-            <h4 className="font-bold text-lg font-serif text-[var(--color-primary)]">
-                {recommendation.title}
-            </h4>
-            <p className="text-sm font-semibold text-[var(--color-primary-text)]">
-                by {recommendation.author}
-            </p>
-            <p className="italic text-[var(--color-secondary-text)] pt-2">
-                "{recommendation.synopsis}"
-            </p>
-            <button 
-                onClick={handleGenerateRecommendation}
-                className="mt-4 w-full sm:w-auto px-4 py-2 bg-[rgba(var(--color-primary-rgb),0.1)] text-[var(--color-primary)] rounded-md hover:bg-[rgba(var(--color-primary-rgb),0.2)] transition-colors text-sm font-medium"
-            >
-                Generate Another
-            </button>
-        </div>
-      ) : (
-        <div>
-          <button 
-            onClick={handleGenerateRecommendation}
-            className="w-full sm:w-auto px-4 py-2 bg-[var(--color-primary)] text-white rounded-md hover:opacity-90 transition-opacity text-sm font-semibold"
-          >
-            Generate Absurd Recommendation
-          </button>
-          {error && <p className="text-red-600 text-sm mt-2" role="alert">{error}</p>}
-        </div>
-      )}
-    </div>
-  );
-
-  const PreviewCard = () => (
-      <div className="bg-[var(--color-background)] p-6 rounded-lg border border-[var(--color-border-color)] shadow-sm prose mb-8">
-        <h3 className="mt-0 font-serif text-[var(--color-primary-text)]">Preview</h3>
-        <p className="font-serif text-[var(--color-primary-text)] leading-relaxed">
-          The quick brown fox jumps over the lazy dog. Zizhi offers a clean, distraction-free environment for your reading pleasure.
-          This is how your books will look with the current settings.
-        </p>
-      </div>
   );
 
   return (
-    <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
-        <h2 className="text-xl font-bold font-sans text-[var(--color-primary-text)] mb-8">Appearance</h2>
-        
-        {/* Mobile Layout: Sticky Preview, Content Below */}
-        <div className="md:hidden">
-            <div className="sticky top-0 z-20 bg-[var(--color-background)] pb-4 pt-2 border-b border-[var(--color-border-color)] mb-6">
-                <PreviewCard />
-            </div>
+    <div className="p-6 sm:p-10 max-w-6xl mx-auto flex flex-col lg:flex-row gap-12 pb-32">
+        {/* Configuration Column */}
+        <div className="flex-1 space-y-12">
+            <section>
+                <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--color-secondary-text)] mb-6">Appearance Presets</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    {/* Fix: Added explicit type annotation (t: Theme) to avoid TypeScript unknown errors */}
+                    {Object.values(themes).map((t: Theme) => (
+                        <button
+                            key={t.name}
+                            onClick={() => setDraftTheme(t)}
+                            className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-3 ${draftTheme.name === t.name ? 'border-[var(--color-primary)] bg-[rgba(var(--color-primary-rgb),0.05)] shadow-md' : 'border-[var(--color-border-color)] bg-[var(--color-background)] hover:border-[var(--color-primary)]'}`}
+                        >
+                            <div className="w-10 h-10 rounded-full border border-[var(--color-border-color)]" style={{ backgroundColor: t.colors.background }}></div>
+                            <span className="text-xs font-bold uppercase tracking-tighter">{t.name}</span>
+                        </button>
+                    ))}
+                </div>
+            </section>
+
+            <section className="space-y-6">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--color-secondary-text)] mb-6 border-b border-[var(--color-border-color)] pb-2">Custom Palette</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-6">
+                    <ColorPicker label="Background Canvas" colorKey="background" />
+                    <ColorPicker label="Primary Text Color" colorKey="primary-text" />
+                    <ColorPicker label="Secondary Text Details" colorKey="secondary-text" />
+                    <ColorPicker label="Accent Action Color" colorKey="primary" />
+                </div>
+            </section>
+
+            <section className="space-y-8">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--color-secondary-text)] mb-6 border-b border-[var(--color-border-color)] pb-2">Typography</h3>
+                <div className="space-y-6">
+                    <div className="space-y-2">
+                        <label className="text-sm font-bold text-[var(--color-secondary-text)]">Font Family</label>
+                        <select 
+                            value={draftTheme.font.name} 
+                            onChange={handleFontChange} 
+                            className="w-full bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-xl py-3 px-4 text-sm font-medium focus:ring-2 focus:ring-[var(--color-primary)] outline-none"
+                        >
+                            {fonts.map(f => <option key={f.name} value={f.name}>{f.name}</option>)}
+                        </select>
+                    </div>
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                            <label className="text-sm font-bold text-[var(--color-secondary-text)]">Font Size</label>
+                            <span className="text-xs font-bold px-2 py-1 bg-[var(--color-primary)] text-white rounded-md">{draftTheme.fontSize}x</span>
+                        </div>
+                        <input 
+                            type="range" 
+                            min="0.8" 
+                            max="1.5" 
+                            step="0.05" 
+                            value={draftTheme.fontSize} 
+                            onChange={handleFontSizeChange} 
+                            className="w-full h-2 bg-[var(--color-border-color)] rounded-lg appearance-none cursor-pointer accent-[var(--color-primary)]"
+                        />
+                    </div>
+                </div>
+            </section>
         </div>
 
-        {/* Desktop Layout: Side-by-side */}
-        <div className="flex flex-col md:flex-row gap-8">
-            {/* Settings Column */}
-            <div className="flex-1 space-y-10">
+        {/* Sticky Preview Column */}
+        <div className="w-full lg:w-80 xl:w-96 flex-shrink-0">
+            <div className="lg:sticky lg:top-24 space-y-4">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--color-secondary-text)] mb-4">Live Preview</h3>
+                <div 
+                    className="p-8 rounded-2xl border-4 shadow-2xl transition-all duration-300"
+                    style={{ 
+                        backgroundColor: draftTheme.colors.background,
+                        borderColor: draftTheme.colors['border-color'],
+                        color: draftTheme.colors['primary-text'],
+                        fontFamily: draftTheme.font.serif
+                    }}
+                >
+                    <h4 className="text-lg font-bold mb-4" style={{ fontFamily: draftTheme.font.sans }}>The Reader's Journey</h4>
+                    <p style={{ fontSize: `${draftTheme.fontSize}rem`, lineHeight: draftTheme.lineHeight }}>
+                        “A reader lives a thousand lives before he dies,” said Jojen. “The man who never reads lives only one.”
+                    </p>
+                    <div className="mt-8 pt-6 border-t border-dashed opacity-50" style={{ borderColor: draftTheme.colors['secondary-text'] }}>
+                        <p className="text-xs italic" style={{ color: draftTheme.colors['secondary-text'] }}>Sample metadata and details</p>
+                    </div>
+                </div>
                 
-                {/* Themes */}
-                <section>
-                    <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-secondary-text)] mb-4">Theme</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                        {(Object.keys(themes) as string[]).map((key) => {
-                            const theme = themes[key] as Theme;
-                            return (
-                                <button
-                                    key={theme.name}
-                                    onClick={() => handlePresetSelect(theme)}
-                                    className={`p-4 rounded-lg border text-center transition-all ${currentTheme.name === theme.name ? 'border-[var(--color-primary)] ring-2 ring-[var(--color-primary)] ring-opacity-50' : 'border-[var(--color-border-color)] hover:border-[var(--color-secondary-text)]'}`}
-                                    style={{ backgroundColor: theme.colors.background, color: theme.colors['primary-text'] }}
-                                    aria-pressed={currentTheme.name === theme.name}
-                                >
-                                    <span className="text-sm font-medium">{theme.name}</span>
-                                </button>
-                            );
-                        })}
-                    </div>
-                </section>
+                <p className="text-center text-[10px] text-[var(--color-secondary-text)] italic px-4">
+                    Preview changes in real-time. Hit "Save Preferences" to apply globally.
+                </p>
 
-                {/* Typography */}
-                <section className="space-y-6">
-                    <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-secondary-text)] mb-4">Typography</h3>
-                    
-                    <div className="space-y-2">
-                         <label htmlFor="font-family" className="text-sm font-medium block">Typeface</label>
-                         <div className="relative">
-                             <select
-                                id="font-family"
-                                value={currentTheme.font.name}
-                                onChange={handleFontChange}
-                                className="w-full appearance-none bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-md py-2 pl-3 pr-10 text-[var(--color-primary-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                             >
-                                {fonts.map(font => (
-                                    <option key={font.name} value={font.name}>{font.name}</option>
-                                ))}
-                             </select>
-                             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[var(--color-secondary-text)]">
-                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-                             </div>
-                         </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <div className="flex justify-between">
-                            <label htmlFor="font-size" className="text-sm font-medium">Size</label>
-                            <span className="text-xs text-[var(--color-secondary-text)]">{currentTheme.fontSize}rem</span>
-                        </div>
-                        <input
-                            type="range"
-                            id="font-size"
-                            min="0.8"
-                            max="1.5"
-                            step="0.05"
-                            value={currentTheme.fontSize}
-                            onChange={handleFontSizeChange}
-                            className="w-full h-1.5 bg-[rgba(var(--color-border-color-rgb),0.5)] rounded-lg appearance-none cursor-pointer accent-[var(--color-primary)]"
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <div className="flex justify-between">
-                            <label htmlFor="line-height" className="text-sm font-medium">Line Height</label>
-                            <span className="text-xs text-[var(--color-secondary-text)]">{currentTheme.lineHeight}</span>
-                        </div>
-                         <input
-                            type="range"
-                            id="line-height"
-                            min="1.2"
-                            max="2.2"
-                            step="0.1"
-                            value={currentTheme.lineHeight}
-                            onChange={handleLineHeightChange}
-                            className="w-full h-1.5 bg-[rgba(var(--color-border-color-rgb),0.5)] rounded-lg appearance-none cursor-pointer accent-[var(--color-primary)]"
-                        />
-                    </div>
-                </section>
-
-                {/* Texture */}
-                <section>
-                    <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-secondary-text)] mb-4">Texture</h3>
-                    <div className="flex flex-wrap gap-3">
-                        {Object.entries(textures).map(([key, texture]) => (
-                            <button
-                                key={key}
-                                onClick={() => handleTextureChange(key)}
-                                className={`px-4 py-2 rounded-full border text-sm transition-all ${currentTheme.texture === key ? 'bg-[var(--color-primary)] text-white border-transparent' : 'border-[var(--color-border-color)] hover:border-[var(--color-secondary-text)]'}`}
-                                aria-pressed={currentTheme.texture === key}
-                            >
-                                {texture.name}
-                            </button>
-                        ))}
-                    </div>
-                </section>
-                
-                {/* Advanced Colors */}
-                <section>
-                     <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-secondary-text)] mb-4">Color Palette</h3>
-                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-[rgba(var(--color-border-color-rgb),0.1)] p-4 rounded-lg">
-                        <ColorInput label="Background" colorKey="background" />
-                        <ColorInput label="Primary Text" colorKey="primary-text" />
-                        <ColorInput label="Secondary Text" colorKey="secondary-text" />
-                        <ColorInput label="Accent" colorKey="primary" />
-                     </div>
-                </section>
-
-                {isSecretPanelVisible && <SecretPanel />}
-            </div>
-
-            {/* Desktop Preview Column */}
-            <div className="hidden md:block w-1/3 min-w-[300px]">
-                <div className="sticky top-6">
-                    <PreviewCard />
+                {/* Mobile/Accessible Floating Save Button */}
+                <div className="pt-6">
+                    <button
+                        onClick={() => onThemeChange(draftTheme)}
+                        disabled={!hasChanges}
+                        className={`w-full py-4 rounded-2xl font-bold shadow-xl transition-all flex items-center justify-center gap-2 ${hasChanges ? 'bg-[var(--color-primary)] text-white scale-100' : 'bg-[var(--color-border-color)] text-[var(--color-secondary-text)] scale-95 opacity-50 cursor-not-allowed'}`}
+                    >
+                        Save Preferences
+                    </button>
                 </div>
             </div>
         </div>
