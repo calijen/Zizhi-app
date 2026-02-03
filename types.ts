@@ -18,7 +18,7 @@ export interface Quote {
   bookTitle: string;
   author: string;
   bookId: string;
-  location?: string; // e.g. chapter ID
+  location?: string;
 }
 
 export interface Chapter {
@@ -33,21 +33,21 @@ export interface Book {
     id: string;
     title: string;
     author: string;
-    coverImageUrl: string | null;
+    coverImageUrl: string | null; // This will now store Base64 strings for persistence
     chapters: Chapter[];
     toc: TocItem[];
-    progress: number; // 0-1 (e.g. 0.5 for 50%)
+    progress: number;
     lastScrollTop: number;
-    lastOpened?: number; // Timestamp
+    lastOpened?: number;
+    readingTime: number; // Cumulative seconds spent reading this book
     
     // Summary fields
     audioSummaryUrl?: string;
     summaryScript?: string;
-    audioDuration?: number; // Duration in seconds
+    audioDuration?: number;
 
-    // For persistence
+    // For persistence (optional local file reference)
     epubFile?: File | Blob;
-    audioSummaryBlob?: Blob;
 }
 
 export interface ThemeColors {
@@ -69,7 +69,7 @@ export interface Theme {
   name: string;
   colors: ThemeColors;
   font: ThemeFont;
-  fontSize: number; // in rem
-  lineHeight: number; // unitless
-  texture: string; // 'none', 'paper', etc.
+  fontSize: number;
+  lineHeight: number;
+  texture: string;
 }

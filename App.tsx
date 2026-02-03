@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Library from './components/FileUpload';
 import QuotesView from './components/QuotesView';
 import SettingsView from './components/SettingsView';
@@ -8,7 +8,7 @@ import ReaderView from './components/ReaderView';
 import SearchSidebar from './components/SearchSidebar';
 import Toast from './components/Toast';
 import { 
-    Logo, IconSettings, IconUser, IconLibrary, IconQuote, IconCloud, IconUpload, IconSpinner, IconClose
+    Logo, IconSettings, IconUser, IconLibrary, IconQuote, IconUpload, IconSpinner, IconLibrary as IconBookOpen
 } from './components/icons';
 import * as db from './db';
 import { supabase, isSupabaseConfigured } from './supabase';
@@ -106,9 +106,32 @@ const App: React.FC = () => {
       const updatedLibrary = [...localBooks];
       for (const cb of cloudBooks) {
         const localIdx = updatedLibrary.findIndex(b => b.id === cb.id);
-        if (localIdx > -1 && cb.progress > updatedLibrary[localIdx].progress) {
-            updatedLibrary[localIdx].progress = cb.progress;
-            await db.saveBook(updatedLibrary[localIdx]);
+        if (localIdx > -1) {
+            let changed = false;
+            if (cb.progress > updatedLibrary[localIdx].progress) {
+                updatedLibrary[localIdx].progress = cb.progress;
+                changed = true;
+            }
+            if (cb.reading_time > (updatedLibrary[localIdx].readingTime || 0)) {
+                updatedLibrary[localIdx].readingTime = cb.reading_time;
+                changed = true;
+            }
+            if (changed) await db.saveBook(updatedLibrary[localIdx]);
+        } else {
+            const newBook: Book = {
+                id: cb.id,
+                title: cb.title,
+                author: cb.author,
+                progress: cb.progress,
+                readingTime: cb.reading_time || 0,
+                coverImageUrl: cb.cover_image_base64 || null,
+                chapters: cb.chapters || [],
+                toc: [],
+                lastScrollTop: 0,
+                lastOpened: Date.now()
+            };
+            updatedLibrary.push(newBook);
+            await db.saveBook(newBook);
         }
       }
       setLibrary(updatedLibrary);
@@ -158,7 +181,14 @@ const App: React.FC = () => {
           setLibrary(prev => [newBook, ...prev]);
           if (user && isSupabaseConfigured()) {
             await supabase.from('books_metadata').upsert({
-              id: newBook.id, user_id: user.id, title: newBook.title, author: newBook.author, progress: 0
+              id: newBook.id, 
+              user_id: user.id, 
+              title: newBook.title, 
+              author: newBook.author, 
+              progress: 0,
+              chapters: newBook.chapters,
+              cover_image_base64: newBook.coverImageUrl,
+              reading_time: 0
             }).catch(() => {});
           }
           setToast({ message: `"${newBook.title}" uploaded.` });
@@ -171,16 +201,26 @@ const App: React.FC = () => {
       }
   };
 
-  const handleUpdateProgress = useCallback(async (bookId: string, chapterIndex: number, scrollTop: number) => {
+  const handleUpdateProgress = useCallback(async (bookId: string, chapterIndex: number, scrollTop: number, timeSpent: number) => {
     setLibrary(prev => {
         const idx = prev.findIndex(b => b.id === bookId);
         if (idx === -1) return prev;
         const book = prev[idx];
         const progress = (chapterIndex + 1) / (book.chapters.length || 1);
-        const updatedBook = { ...book, progress: Math.max(book.progress, progress), lastScrollTop: scrollTop };
+        const updatedBook = { 
+            ...book, 
+            progress: Math.max(book.progress, progress), 
+            lastScrollTop: scrollTop,
+            readingTime: (book.readingTime || 0) + timeSpent
+        };
         db.saveBook(updatedBook);
         if (user && isSupabaseConfigured()) {
-            supabase.from('books_metadata').upsert({ id: bookId, user_id: user.id, progress: updatedBook.progress }).catch(() => {});
+            supabase.from('books_metadata').upsert({ 
+                id: bookId, 
+                user_id: user.id, 
+                progress: updatedBook.progress,
+                reading_time: updatedBook.readingTime
+            }).catch(() => {});
         }
         const next = [...prev];
         next[idx] = updatedBook;
@@ -198,6 +238,14 @@ const App: React.FC = () => {
         supabase.from('quotes').insert({ id: newQuote.id, user_id: user.id, text, book_title: newQuote.bookTitle, author: newQuote.author, book_id: newQuote.bookId, location: chapterId }).catch(() => {});
     }
   }, [selectedBook, user]);
+
+  const stats = useMemo(() => {
+    const totalSeconds = library.reduce((acc, book) => acc + (book.readingTime || 0), 0);
+    const totalHours = (totalSeconds / 3600).toFixed(1);
+    const booksUploaded = library.length;
+    const booksFinished = library.filter(b => b.progress >= 0.99).length;
+    return { totalHours, booksUploaded, booksFinished };
+  }, [library]);
 
   const appStyles = {
       '--color-primary': theme.colors.primary,
@@ -233,9 +281,15 @@ const App: React.FC = () => {
                 <QuotesView quotes={quotes} onDelete={async (id) => { await db.deleteQuote(id); setQuotes(prev => prev.filter(q => q.id !== id)); }} onShare={() => {}} onGenerateImage={() => {}} onGoToQuote={() => {}} />
             )}
             {activeTab === 'profile' && (
-                <div className="p-8 max-w-md mx-auto flex flex-col items-center text-center animate-fade-in">
-                    <div className="w-24 h-24 rounded-full bg-black/5 flex items-center justify-center mb-6 relative">
-                        <IconUser className="w-12 h-12 text-[var(--color-primary-text)] opacity-40" />
+                <div className="p-8 max-w-4xl mx-auto flex flex-col items-center animate-fade-in">
+                    <div className="w-24 h-24 rounded-full bg-black/5 flex items-center justify-center mb-6 relative group">
+                        {user ? (
+                           <div className="w-full h-full rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center text-white text-3xl font-bold shadow-lg">
+                               {(user.user_metadata?.full_name || user.email || '?')[0].toUpperCase()}
+                           </div>
+                        ) : (
+                           <IconUser className="w-12 h-12 text-[var(--color-primary-text)] opacity-40" />
+                        )}
                         {user && (
                             <div className="absolute bottom-0 right-0 bg-green-500 w-6 h-6 rounded-full border-4 border-[var(--color-background)] shadow-sm" />
                         )}
@@ -246,41 +300,112 @@ const App: React.FC = () => {
                     </h2>
                     
                     <div className="mb-10 w-full">
-                        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest mb-6 bg-black/5 border border-[var(--color-border-color)]">
-                             <span className={`w-2 h-2 rounded-full ${user ? 'bg-green-500' : 'bg-gray-300'}`} />
-                             {user ? 'Reading Remotely' : 'Local Library Only'}
+                        <div className="flex justify-center mb-8">
+                            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest bg-black/5 border border-[var(--color-border-color)]">
+                                <span className={`w-2 h-2 rounded-full ${user ? 'bg-green-500' : 'bg-gray-300'}`} />
+                                {user ? 'Cloud Sync Active' : 'Local Only'}
+                            </div>
                         </div>
 
-                        <div className="p-8 bg-black/5 rounded-3xl border border-[var(--color-border-color)] text-center">
-                            <h3 className="text-sm font-bold text-[var(--color-primary-text)] mb-2">
-                                {user ? 'Sync Active' : 'Remote Reading'}
-                            </h3>
-                            <p className="text-sm leading-relaxed text-[var(--color-secondary-text)]">
-                                {user 
-                                  ? 'Your reading progress and quotes are being synced across your devices.' 
-                                  : 'Join Zizhi to sync your library across devices and back up your data safely.'}
-                            </p>
-                        </div>
+                        {user ? (
+                            /* Stats Dashboard - Only Visible when Logged In */
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
+                                {/* Time Card */}
+                                <div className="bg-orange-50 border border-orange-100 rounded-[2.5rem] p-8 flex flex-col items-center text-center shadow-sm hover:shadow-md transition-shadow">
+                                    <div className="w-16 h-16 bg-orange-200/50 rounded-2xl flex items-center justify-center mb-4">
+                                        <svg viewBox="0 0 24 24" className="w-10 h-10 text-orange-600" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <circle cx="12" cy="12" r="10" />
+                                            <path d="M12 6v6l4 2" />
+                                        </svg>
+                                    </div>
+                                    <span className="text-4xl font-bold text-orange-700 mb-1">{stats.totalHours}</span>
+                                    <span className="text-[11px] font-black uppercase tracking-widest text-orange-600/60">Hours Engaged</span>
+                                </div>
+                                
+                                {/* Library Card */}
+                                <div className="bg-blue-50 border border-blue-100 rounded-[2.5rem] p-8 flex flex-col items-center text-center shadow-sm hover:shadow-md transition-shadow">
+                                    <div className="w-16 h-16 bg-blue-200/50 rounded-2xl flex items-center justify-center mb-4">
+                                        <svg viewBox="0 0 24 24" className="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
+                                            <path d="M6 2v18" />
+                                        </svg>
+                                    </div>
+                                    <span className="text-4xl font-bold text-blue-700 mb-1">{stats.booksUploaded}</span>
+                                    <span className="text-[11px] font-black uppercase tracking-widest text-blue-600/60">Books Collected</span>
+                                </div>
+
+                                {/* Finished Card */}
+                                <div className="bg-emerald-50 border border-emerald-100 rounded-[2.5rem] p-8 flex flex-col items-center text-center shadow-sm hover:shadow-md transition-shadow">
+                                    <div className="w-16 h-16 bg-emerald-200/50 rounded-2xl flex items-center justify-center mb-4">
+                                        <svg viewBox="0 0 24 24" className="w-10 h-10 text-emerald-600" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M12 15l-3-3 1.5-1.5L12 12l4.5-4.5L18 9l-6 6Z" />
+                                            <circle cx="12" cy="12" r="10" />
+                                        </svg>
+                                    </div>
+                                    <span className="text-4xl font-bold text-emerald-700 mb-1">{stats.booksFinished}</span>
+                                    <span className="text-[11px] font-black uppercase tracking-widest text-emerald-600/60">Mastered Titles</span>
+                                </div>
+                            </div>
+                        ) : (
+                            /* Guest CTA Card */
+                            <div className="p-10 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 rounded-[3rem] border-2 border-dashed border-[var(--color-border-color)] text-center mb-10 group hover:border-[var(--color-primary)] transition-colors">
+                                <div className="w-20 h-20 bg-[var(--color-background)] rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-[var(--color-border-color)]">
+                                    <svg viewBox="0 0 24 24" className="w-10 h-10 text-[var(--color-primary)]" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" />
+                                        <path d="M12 8v4l3 3" />
+                                    </svg>
+                                </div>
+                                <h3 className="text-xl font-bold text-[var(--color-primary-text)] mb-3">
+                                    Unlock Your Reading Insights
+                                </h3>
+                                <p className="text-sm leading-relaxed text-[var(--color-secondary-text)] max-w-sm mx-auto mb-8">
+                                    Sign in to track your reading time, see detailed statistics, and keep your library perfectly synced across all your devices.
+                                </p>
+                                <div className="flex flex-wrap justify-center gap-3">
+                                    <div className="px-4 py-2 bg-white rounded-full text-[10px] font-bold text-indigo-600 border border-indigo-100 shadow-sm">Cloud Backup</div>
+                                    <div className="px-4 py-2 bg-white rounded-full text-[10px] font-bold text-purple-600 border border-purple-100 shadow-sm">Reading Stats</div>
+                                    <div className="px-4 py-2 bg-white rounded-full text-[10px] font-bold text-blue-600 border border-blue-100 shadow-sm">Cross-Device Sync</div>
+                                </div>
+                            </div>
+                        )}
+
+                        {user && (
+                            <div className="p-8 bg-black/5 rounded-3xl border border-[var(--color-border-color)] text-center mb-10">
+                                <h3 className="text-sm font-bold text-[var(--color-primary-text)] mb-2">
+                                    Your Library is Safe
+                                </h3>
+                                <p className="text-sm leading-relaxed text-[var(--color-secondary-text)]">
+                                    All your books, progress, and quotes are synchronized across your devices.
+                                </p>
+                            </div>
+                        )}
                     </div>
 
                     {!user ? (
                         <button 
                             onClick={() => setShowAuth(true)} 
-                            className="w-full py-4 bg-[var(--color-primary)] text-white font-bold rounded-2xl shadow-xl hover:opacity-90 active:scale-95 transition-all"
+                            className="w-full max-w-sm py-4 bg-[var(--color-primary)] text-white font-bold rounded-2xl shadow-xl hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-3"
                         >
-                            Sign In / Join Zizhi
+                            <IconUser className="w-5 h-5" />
+                            <span>Sign In / Join Zizhi</span>
                         </button>
                     ) : (
-                        <div className="w-full space-y-4">
+                        <div className="w-full max-w-sm space-y-4">
                             <button 
                                 onClick={() => fetchCloudData(user.id)} 
-                                className="w-full py-3 border border-[var(--color-border-color)] text-[var(--color-primary-text)] font-bold rounded-xl active:scale-95 transition-all"
+                                className="w-full py-3 border border-[var(--color-border-color)] text-[var(--color-primary-text)] font-bold rounded-xl active:scale-95 transition-all flex items-center justify-center gap-2 hover:bg-black/5"
                             >
-                                Sync Now
+                                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                    <path d="M21 2v6h-6" />
+                                    <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+                                    <path d="M3 22v-6h6" />
+                                    <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+                                </svg>
+                                <span>Sync Library</span>
                             </button>
                             <button 
                                 onClick={() => { supabase.auth.signOut(); setUser(null); }} 
-                                className="w-full py-3 text-red-500 font-bold hover:bg-red-50 rounded-xl transition-colors"
+                                className="w-full py-3 text-red-500 font-bold hover:bg-red-50 rounded-xl transition-colors active:scale-95"
                             >
                                 Sign Out
                             </button>

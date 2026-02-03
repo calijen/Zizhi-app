@@ -8,7 +8,7 @@ interface ReaderViewProps {
     book: Book;
     theme: Theme;
     onClose: () => void;
-    onUpdateProgress: (bookId: string, chapterIndex: number, scrollTop: number) => void;
+    onUpdateProgress: (bookId: string, chapterIndex: number, scrollTop: number, timeSpent: number) => void;
     onSaveQuote: (text: string, chapterId: string) => void;
     onSearch: (query: string) => void;
 }
@@ -19,6 +19,8 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
     const [selection, setSelection] = useState<{ top: number; left: number; text: string } | null>(null);
     const contentRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const lastTickRef = useRef<number>(Date.now());
+    const accumulatedTimeRef = useRef<number>(0);
 
     const chapter = book.chapters[currentChapterIndex];
 
@@ -28,11 +30,39 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
         }
     }, [currentChapterIndex]);
 
+    // Reading time tracker
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const now = Date.now();
+            const delta = (now - lastTickRef.current) / 1000; // in seconds
+            accumulatedTimeRef.current += delta;
+            lastTickRef.current = now;
+
+            // Update stats every 10 seconds or when closing
+            if (accumulatedTimeRef.current >= 10) {
+                flushStats();
+            }
+        }, 1000);
+
+        return () => {
+            clearInterval(interval);
+            flushStats();
+        };
+    }, [currentChapterIndex]);
+
+    const flushStats = () => {
+        if (accumulatedTimeRef.current > 0) {
+            const timeToSync = Math.floor(accumulatedTimeRef.current);
+            const scrollTop = containerRef.current?.scrollTop || 0;
+            onUpdateProgress(book.id, currentChapterIndex, scrollTop, timeToSync);
+            accumulatedTimeRef.current -= timeToSync;
+        }
+    };
+
     const handleScroll = () => {
         if (containerRef.current) {
-            const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-            const progress = (currentChapterIndex + (scrollTop / (scrollHeight - clientHeight || 1))) / book.chapters.length;
-            onUpdateProgress(book.id, currentChapterIndex, scrollTop);
+            const { scrollTop } = containerRef.current;
+            onUpdateProgress(book.id, currentChapterIndex, scrollTop, 0);
         }
     };
 
@@ -97,7 +127,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
                 <div className="max-w-2xl mx-auto p-12 flex justify-between items-center border-t border-[var(--color-border-color)]">
                     <button 
                         disabled={currentChapterIndex === 0}
-                        onClick={() => setCurrentChapterIndex(i => Math.max(0, i - 1))}
+                        onClick={() => { flushStats(); setCurrentChapterIndex(i => Math.max(0, i - 1)); }}
                         className="px-4 py-2 rounded-md bg-[var(--color-primary)] text-white disabled:opacity-30"
                     >
                         Previous
@@ -107,7 +137,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
                     </span>
                     <button 
                         disabled={currentChapterIndex === book.chapters.length - 1}
-                        onClick={() => setCurrentChapterIndex(i => Math.min(book.chapters.length - 1, i + 1))}
+                        onClick={() => { flushStats(); setCurrentChapterIndex(i => Math.min(book.chapters.length - 1, i + 1)); }}
                         className="px-4 py-2 rounded-md bg-[var(--color-primary)] text-white disabled:opacity-30"
                     >
                         Next
@@ -128,7 +158,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
                             {book.chapters.map((ch, idx) => (
                                 <button
                                     key={ch.id}
-                                    onClick={() => { setCurrentChapterIndex(idx); setShowToc(false); }}
+                                    onClick={() => { flushStats(); setCurrentChapterIndex(idx); setShowToc(false); }}
                                     className={`w-full text-left p-3 rounded-lg text-sm transition-colors ${idx === currentChapterIndex ? 'bg-[var(--color-primary)] text-white font-bold' : 'hover:bg-black/5'}`}
                                 >
                                     {ch.label}

@@ -1,8 +1,16 @@
 
 import type { Book, Chapter, TocItem } from './types';
 
-// Use the JSZip version loaded via script tag in index.html to be more robust
 declare const JSZip: any;
+
+const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+};
 
 export const parseEpub = async (file: File): Promise<Book> => {
     if (typeof JSZip === 'undefined') {
@@ -10,8 +18,6 @@ export const parseEpub = async (file: File): Promise<Book> => {
     }
     
     const zip = await new JSZip().loadAsync(file);
-    
-    // 1. Find the container.xml to locate the .opf file
     const containerXmlFile = zip.file('META-INF/container.xml');
     if (!containerXmlFile) throw new Error('Invalid EPUB: Missing container.xml');
     const containerXml = await containerXmlFile.async('string');
@@ -28,11 +34,9 @@ export const parseEpub = async (file: File): Promise<Book> => {
     
     const opfDoc = parser.parseFromString(opfXml, 'application/xml');
 
-    // 2. Extract Metadata
     const title = opfDoc.querySelector('dc\\:title, title')?.textContent || 'Unknown Title';
     const author = opfDoc.querySelector('dc\\:creator, creator')?.textContent || 'Unknown Author';
     
-    // 3. Extract Manifest & Spine
     const manifestItems: Record<string, { href: string; mediaType: string }> = {};
     opfDoc.querySelectorAll('manifest > item').forEach((item: any) => {
         const id = item.getAttribute('id');
@@ -48,7 +52,6 @@ export const parseEpub = async (file: File): Promise<Book> => {
         return idref ? manifestItems[idref] : null;
     }).filter(Boolean);
 
-    // 4. Extract Chapters
     const chapters: Chapter[] = [];
     for (const item of spine) {
         if (!item) continue;
@@ -70,7 +73,6 @@ export const parseEpub = async (file: File): Promise<Book> => {
         }
     }
 
-    // 5. Try to find cover
     let coverImageUrl: string | null = null;
     const coverItem = opfDoc.querySelector('item[properties~="cover-image"]') || 
                       opfDoc.querySelector('item#cover-image') || 
@@ -81,7 +83,7 @@ export const parseEpub = async (file: File): Promise<Book> => {
             const coverFile = zip.file(opfDir + href);
             if (coverFile) {
                 const coverData = await coverFile.async('blob');
-                coverImageUrl = URL.createObjectURL(coverData);
+                coverImageUrl = await blobToBase64(coverData);
             }
         }
     }
@@ -95,6 +97,7 @@ export const parseEpub = async (file: File): Promise<Book> => {
         toc: [], 
         progress: 0,
         lastScrollTop: 0,
+        readingTime: 0,
         epubFile: file,
         lastOpened: Date.now()
     };
