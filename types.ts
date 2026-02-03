@@ -1,4 +1,9 @@
 
+export interface GenerationStatus {
+  stage: string;
+  progress: number;
+  currentAction: string;
+}
 
 export interface TocItem {
   id: string;

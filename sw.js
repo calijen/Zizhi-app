@@ -40,6 +40,12 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('fetch', event => {
+  // CRITICAL: Ignore all Supabase requests. 
+  // Letting the browser handle these directly prevents "Failed to fetch" errors caused by SW interception.
+  if (event.request.url.includes('supabase.co')) {
+    return;
+  }
+
   event.respondWith(
     caches.open(CACHE_NAME).then(async (cache) => {
       const cachedResponse = await cache.match(event.request);

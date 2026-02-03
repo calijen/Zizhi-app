@@ -1,8 +1,7 @@
 
-
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import type { Book } from '../types';
-import type { GenerationStatus } from '../App';
+// Fixed: Combined and updated imports to use types.ts for all shared interfaces
+import type { Book, GenerationStatus } from '../types';
 import { IconPlay, IconPause, IconClose, IconRewind, IconForward, IconSpinner } from './icons';
 
 interface SummaryViewProps {

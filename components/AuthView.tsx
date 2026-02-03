@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { IconClose, IconSpinner, Logo, IconCloud } from './icons';
+import { IconClose, IconSpinner, Logo, IconGoogle } from './icons';
 import { supabase, isSupabaseConfigured } from '../supabase';
 
 interface AuthViewProps {
@@ -9,196 +9,162 @@ interface AuthViewProps {
 }
 
 const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
-    const [view, setView] = useState<'login' | 'signup'>('login');
+    const [view, setView] = useState<'login' | 'signup'>('signup');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<{message: string; isWarning?: boolean} | null>(null);
 
-    const getFriendlyErrorMessage = (err: any) => {
-        const msg = err.message?.toLowerCase() || '';
-        
-        // Network errors are the most common cause of "Failed to fetch"
-        if (msg.includes('failed to fetch') || msg.includes('network error')) {
-            return {
-                message: "We're having trouble reaching the cloud. This might be a temporary connection issue. Please try again in a moment.",
-                isWarning: false
-            };
+    const handleGoogleLogin = async () => {
+        if (!isSupabaseConfigured()) {
+            setError({ message: "Supabase API key is missing. Please check supabase.ts", isWarning: false });
+            return;
         }
-
-        // Supabase returns generic "Invalid login credentials" for both wrong password AND missing account
-        if (msg.includes('invalid login credentials')) {
-            if (view === 'login') {
-                return { 
-                    message: "We couldn't find an account with that email and password. If you haven't created an account yet, please sign up below.", 
-                    isWarning: false 
-                };
-            }
-            return { message: "The login details provided are incorrect. Please try again.", isWarning: false };
+        setIsLoading(true);
+        setError(null);
+        try {
+            const { error: authError } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: window.location.origin,
+                }
+            });
+            if (authError) throw authError;
+        } catch (err: any) {
+            setError({ message: err.message || "Google Login failed.", isWarning: false });
+            setIsLoading(false);
         }
-
-        if (msg.includes('user already registered')) {
-            return { message: "An account with this email already exists! Try signing in instead.", isWarning: true };
-        }
-
-        if (msg.includes('email not confirmed')) {
-            return { message: "Your account is ready, but needs to be activated. Please check your email for the confirmation link.", isWarning: true };
-        }
-
-        if (msg.includes('password should be at least 6 characters')) {
-            return { message: "Please choose a password with at least 6 characters.", isWarning: false };
-        }
-
-        // Project specific issues
-        if (msg.includes('api key') || msg.includes('not found')) {
-            return { message: "Cloud sync is currently undergoing maintenance. Please try again later.", isWarning: false };
-        }
-
-        return { message: "Something went wrong. Please try again or continue reading offline.", isWarning: false };
     };
 
-    const handleAuth = async (e: React.FormEvent) => {
+    const handleEmailAuth = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!isSupabaseConfigured()) return;
-        
         setError(null);
         setIsLoading(true);
 
         try {
+            if (!isSupabaseConfigured()) {
+                throw new Error("Supabase API key is not configured correctly in supabase.ts");
+            }
+
             if (view === 'login') {
-                const { data, error: authError } = await supabase!.auth.signInWithPassword({ email, password });
+                const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
                 if (authError) throw authError;
                 onLogin(data.user);
                 onClose();
             } else {
-                const { data, error: authError } = await supabase!.auth.signUp({ 
-                    email, 
-                    password,
-                    options: {
-                        emailRedirectTo: window.location.origin
+                const { data, error: authError } = await supabase.auth.signUp({ email, password });
+                if (authError) {
+                    if (authError.message.includes('apiKey')) {
+                        throw new Error("Invalid API Key. Please ensure the key in supabase.ts is correct.");
                     }
-                });
-                if (authError) throw authError;
+                    throw authError;
+                }
                 
                 if (data.user && data.session) {
                     onLogin(data.user);
                     onClose();
-                } else if (data.user) {
-                    setError({ 
-                        message: "Almost there! We've sent a confirmation link to " + email + ". Please click it to activate your account.", 
-                        isWarning: true 
-                    });
-                    setEmail('');
-                    setPassword('');
+                } else {
+                    setError({ message: "Welcome! Please check your email to confirm your account.", isWarning: true });
                 }
             }
         } catch (err: any) {
-            setError(getFriendlyErrorMessage(err));
+            setError({ message: err.message || "Authentication error occurred.", isWarning: false });
         } finally {
             setIsLoading(false);
         }
     };
 
-    if (!isSupabaseConfigured()) {
-        return (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                <div className="relative w-full max-w-md bg-[var(--color-background)] rounded-2xl shadow-2xl p-10 text-center animate-fade-in">
-                    <button onClick={onClose} className="absolute top-6 right-6 p-2 text-[var(--color-secondary-text)]"><IconClose className="w-6 h-6" /></button>
-                    <div className="mb-6 w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mx-auto">
-                        <IconCloud className="w-8 h-8" />
-                    </div>
-                    <h2 className="text-2xl font-bold font-serif mb-4">Cloud Sync Offline</h2>
-                    <p className="text-[var(--color-secondary-text)] text-sm mb-6 leading-relaxed">
-                        Cloud features are currently unavailable. You can still read books and save quotes locally on this device.
-                    </p>
-                    <button onClick={onClose} className="w-full py-4 bg-[var(--color-primary)] text-white font-bold rounded-xl shadow-lg active:scale-95 transition-all">Continue Reading</button>
-                </div>
-            </div>
-        );
-    }
-
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-[var(--color-background)] md:bg-black/60 md:backdrop-blur-sm">
-            <div className="hidden md:block absolute inset-0" onClick={onClose} />
+        <div className="fixed inset-0 z-[100] bg-[var(--color-background)] flex flex-col items-center justify-center p-6 animate-fade-in overflow-y-auto">
+            {/* Close Button */}
+            <button 
+                onClick={onClose} 
+                className="absolute top-6 right-6 p-2 text-[var(--color-secondary-text)] hover:bg-black/5 rounded-full transition-all"
+                aria-label="Close"
+            >
+                <IconClose className="w-6 h-6" />
+            </button>
             
-            <div className="relative w-full h-full md:h-auto md:max-w-md bg-[var(--color-background)] md:rounded-2xl md:shadow-2xl flex flex-col items-center justify-center p-6 sm:p-10 animate-fade-in">
-                <button 
-                    onClick={onClose} 
-                    className="absolute top-6 right-6 p-2 text-[var(--color-secondary-text)] hover:text-[var(--color-primary-text)] transition-colors rounded-full"
-                >
-                    <IconClose className="w-6 h-6" />
-                </button>
+            <div className="w-full max-w-sm flex flex-col items-center">
+                <header className="text-center mb-10">
+                    <div className="mb-6 flex justify-center scale-110">
+                        <Logo className="h-10 w-auto text-[var(--color-primary-text)]" />
+                    </div>
+                    <h1 className="text-2xl font-bold font-serif mb-2 text-[var(--color-primary-text)]">
+                        {view === 'login' ? 'Welcome Back' : 'Join Zizhi'}
+                    </h1>
+                    <p className="text-sm text-[var(--color-secondary-text)] opacity-80">
+                        Synchronize your library across devices.
+                    </p>
+                </header>
 
-                <div className="w-full max-w-sm space-y-8 py-10">
-                    <div className="text-center">
-                        <Logo className="h-10 w-auto text-[var(--color-primary-text)] mx-auto mb-6" />
-                        <h2 className="text-3xl font-bold font-serif text-[var(--color-primary-text)] mb-3">
-                            {view === 'login' ? 'Welcome Back' : 'Create Account'}
-                        </h2>
-                        <p className="text-[var(--color-secondary-text)] text-sm leading-relaxed">
-                            {view === 'login' 
-                                ? 'Sign in to sync your library across devices.' 
-                                : 'Sign up to keep your reading progress safe in the cloud.'}
-                        </p>
+                {error && (
+                    <div className={`w-full p-4 mb-6 text-sm rounded-xl border leading-relaxed text-center animate-fade-in ${error.isWarning ? 'bg-blue-50 border-blue-100 text-blue-700' : 'bg-red-50 border-red-100 text-red-600 font-bold'}`}>
+                        {error.message}
+                    </div>
+                )}
+
+                <div className="w-full space-y-6">
+                    {/* Standalone Google Button */}
+                    <button 
+                        onClick={handleGoogleLogin} 
+                        disabled={isLoading}
+                        className="w-full flex items-center justify-center gap-3 py-3.5 bg-white border border-gray-200 text-gray-700 rounded-xl font-semibold shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-all disabled:opacity-50"
+                    >
+                        <IconGoogle className="w-5 h-5" />
+                        <span>Continue with Google</span>
+                    </button>
+
+                    <div className="relative flex items-center gap-4">
+                        <div className="flex-1 h-px bg-[var(--color-border-color)] opacity-60" />
+                        <span className="text-[10px] font-bold text-[var(--color-secondary-text)] uppercase tracking-widest opacity-40">Or use email</span>
+                        <div className="flex-1 h-px bg-[var(--color-border-color)] opacity-60" />
                     </div>
 
-                    {error && (
-                        <div className={`p-4 border text-sm rounded-xl text-center font-medium animate-fade-in ${
-                            error.isWarning 
-                            ? 'bg-blue-50 border-blue-100 text-blue-700' 
-                            : 'bg-red-50 border-red-100 text-red-600'
-                        }`}>
-                            {error.message}
-                        </div>
-                    )}
-
-                    <form onSubmit={handleAuth} className="space-y-5">
+                    {/* Email Form */}
+                    <form onSubmit={handleEmailAuth} className="w-full space-y-3">
                         <div className="space-y-1">
-                            <label className="block text-[10px] font-bold uppercase tracking-widest text-[var(--color-secondary-text)] ml-1">Email Address</label>
+                            <label className="text-[10px] font-bold text-[var(--color-secondary-text)] uppercase tracking-wider ml-1">Email Address</label>
                             <input 
-                                type="email" required value={email}
+                                type="email" 
+                                required 
+                                placeholder="name@example.com" 
+                                value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="w-full bg-[rgba(var(--color-border-color-rgb),0.1)] border border-[var(--color-border-color)] rounded-xl py-3 px-4 outline-none focus:border-[var(--color-primary)] transition-all text-[var(--color-primary-text)]"
-                                placeholder="name@example.com"
-                                autoComplete="email"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3.5 px-4 outline-none focus:border-blue-500 focus:bg-white transition-all text-base text-slate-900 placeholder:text-slate-400 font-medium"
                             />
                         </div>
                         <div className="space-y-1">
-                            <label className="block text-[10px] font-bold uppercase tracking-widest text-[var(--color-secondary-text)] ml-1">Password</label>
+                            <label className="text-[10px] font-bold text-[var(--color-secondary-text)] uppercase tracking-wider ml-1">Password</label>
                             <input 
-                                type="password" required value={password}
+                                type="password" 
+                                required 
+                                placeholder="••••••••" 
+                                value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="w-full bg-[rgba(var(--color-border-color-rgb),0.1)] border border-[var(--color-border-color)] rounded-xl py-3 px-4 outline-none focus:border-[var(--color-primary)] transition-all text-[var(--color-primary-text)]"
-                                placeholder="At least 6 characters"
-                                autoComplete={view === 'login' ? "current-password" : "new-password"}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3.5 px-4 outline-none focus:border-blue-500 focus:bg-white transition-all text-base text-slate-900 placeholder:text-slate-400 font-medium"
                             />
                         </div>
-
                         <button 
-                            type="submit" disabled={isLoading}
-                            className="w-full bg-[var(--color-primary)] text-white font-bold py-4 rounded-xl shadow-lg hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-3 mt-2 disabled:opacity-50"
+                            disabled={isLoading} 
+                            className="w-full bg-[var(--color-primary)] text-white font-bold py-3.5 rounded-xl shadow-md hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50 mt-4 flex items-center justify-center gap-2"
                         >
-                            {isLoading ? <IconSpinner className="w-5 h-5" /> : (view === 'login' ? 'Sign In' : 'Sign Up')}
+                            {isLoading ? <IconSpinner className="w-5 h-5" /> : (view === 'login' ? 'Sign In' : 'Create Account')}
                         </button>
                     </form>
-
-                    <div className="text-center pt-2">
-                        <div className="text-sm">
-                            <span className="text-[var(--color-secondary-text)]">
-                                {view === 'login' ? "Don't have an account?" : "Already a member?"}
-                            </span>
-                            <button 
-                                onClick={() => {
-                                    setView(view === 'login' ? 'signup' : 'login');
-                                    setError(null);
-                                }}
-                                className="ml-2 font-bold text-[var(--color-primary)] hover:underline"
-                            >
-                                {view === 'login' ? 'Join Zizhi' : 'Sign in here'}
-                            </button>
-                        </div>
-                    </div>
                 </div>
+
+                <footer className="text-center mt-10">
+                    <p className="text-sm text-[var(--color-secondary-text)]">
+                        {view === 'login' ? "Don't have an account?" : "Already a member?"}
+                        <button 
+                            onClick={() => setView(view === 'login' ? 'signup' : 'login')} 
+                            className="ml-2 text-[var(--color-primary)] font-bold hover:underline"
+                        >
+                            {view === 'login' ? 'Sign up' : 'Log in'}
+                        </button>
+                    </p>
+                </footer>
             </div>
         </div>
     );

@@ -1,8 +1,8 @@
 
-
 import React from 'react';
 import { IconClose, IconMicrophone, IconSpinner, IconPlay } from './icons';
-import type { GenerationStatus } from '../App';
+// Fixed: Import GenerationStatus from types.ts instead of App.tsx
+import type { GenerationStatus } from '../types';
 
 export interface BookCardData {
   id: string;
