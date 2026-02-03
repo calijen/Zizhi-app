@@ -33,20 +33,18 @@ export interface Book {
     id: string;
     title: string;
     author: string;
-    coverImageUrl: string | null; // This will now store Base64 strings for persistence
+    coverImageUrl: string | null;
     chapters: Chapter[];
     toc: TocItem[];
     progress: number;
     lastScrollTop: number;
     lastOpened?: number;
-    readingTime: number; // Cumulative seconds spent reading this book
+    readingTime: number; 
     
-    // Summary fields
     audioSummaryUrl?: string;
     summaryScript?: string;
     audioDuration?: number;
 
-    // For persistence (optional local file reference)
     epubFile?: File | Blob;
 }
 
@@ -72,4 +70,5 @@ export interface Theme {
   fontSize: number;
   lineHeight: number;
   texture: string;
+  readingMode: 'scroll' | 'page'; // Added to track layout preference
 }

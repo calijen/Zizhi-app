@@ -8,11 +8,11 @@ import ReaderView from './components/ReaderView';
 import SearchSidebar from './components/SearchSidebar';
 import Toast from './components/Toast';
 import { 
-    Logo, IconSettings, IconUser, IconLibrary, IconQuote, IconUpload, IconSpinner, IconLibrary as IconBookOpen
+    Logo, IconSettings, IconUser, IconLibrary, IconQuote, IconUpload, IconSpinner
 } from './components/icons';
 import * as db from './db';
 import { supabase, isSupabaseConfigured } from './supabase';
-import type { Book, Quote, Theme, ThemeFont, GenerationStatus } from './types';
+import type { Book, Quote, Theme, ThemeFont } from './types';
 import { parseEpub } from './epubParser';
 
 const FONTS: ThemeFont[] = [
@@ -30,7 +30,7 @@ export const THEMES: { [key: string]: Theme } = {
             'primary': '#2563eb', 'secondary': '#3b82f6', 'background': '#ffffff',
             'primary-text': '#111827', 'secondary-text': '#4b5563', 'border-color': '#e5e7eb'
         },
-        font: FONTS[0], fontSize: 1.1, lineHeight: 1.7, texture: 'none'
+        font: FONTS[0], fontSize: 1.1, lineHeight: 1.7, texture: 'none', readingMode: 'scroll'
     },
     dark: {
         name: 'Dark',
@@ -38,7 +38,7 @@ export const THEMES: { [key: string]: Theme } = {
             'primary': '#38bdf8', 'secondary': '#818cf8', 'background': '#0f172a',
             'primary-text': '#f8fafc', 'secondary-text': '#94a3b8', 'border-color': '#1e293b'
         },
-        font: FONTS[0], fontSize: 1.1, lineHeight: 1.7, texture: 'none'
+        font: FONTS[0], fontSize: 1.1, lineHeight: 1.7, texture: 'none', readingMode: 'scroll'
     },
     sepia: {
         name: 'Sepia',
@@ -46,15 +46,7 @@ export const THEMES: { [key: string]: Theme } = {
             'primary': '#704214', 'secondary': '#966032', 'background': '#fdf6e3',
             'primary-text': '#433422', 'secondary-text': '#657b83', 'border-color': '#eee8d5'
         },
-        font: FONTS[1], fontSize: 1.1, lineHeight: 1.7, texture: 'paper'
-    },
-    vintage: {
-        name: 'Vintage',
-        colors: {
-            'primary': '#5d4037', 'secondary': '#3e2723', 'background': '#f4ead5',
-            'primary-text': '#2c1810', 'secondary-text': '#5d4037', 'border-color': '#d7ccc8'
-        },
-        font: FONTS[2], fontSize: 1.1, lineHeight: 1.7, texture: 'paper'
+        font: FONTS[1], fontSize: 1.1, lineHeight: 1.7, texture: 'paper', readingMode: 'scroll'
     }
 };
 
@@ -295,161 +287,94 @@ const App: React.FC = () => {
                         )}
                     </div>
                     
-                    <h2 className="text-2xl font-bold font-serif mb-2">
+                    <h2 className="text-2xl font-bold font-serif mb-2 text-[var(--color-primary-text)]">
                         {user ? (user.user_metadata?.full_name || user.email) : 'Guest Reader'}
                     </h2>
                     
                     <div className="mb-10 w-full">
-                        <div className="flex justify-center mb-8">
-                            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest bg-black/5 border border-[var(--color-border-color)]">
-                                <span className={`w-2 h-2 rounded-full ${user ? 'bg-green-500' : 'bg-gray-300'}`} />
-                                {user ? 'Cloud Sync Active' : 'Local Only'}
-                            </div>
-                        </div>
-
                         {user ? (
-                            /* Stats Dashboard - Only Visible when Logged In */
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
-                                {/* Time Card */}
-                                <div className="bg-orange-50 border border-orange-100 rounded-[2.5rem] p-8 flex flex-col items-center text-center shadow-sm hover:shadow-md transition-shadow">
+                                <div className="bg-orange-50 border border-orange-100 rounded-[2.5rem] p-8 flex flex-col items-center text-center shadow-sm">
                                     <div className="w-16 h-16 bg-orange-200/50 rounded-2xl flex items-center justify-center mb-4">
                                         <svg viewBox="0 0 24 24" className="w-10 h-10 text-orange-600" fill="none" stroke="currentColor" strokeWidth="2">
-                                            <circle cx="12" cy="12" r="10" />
-                                            <path d="M12 6v6l4 2" />
+                                            <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
                                         </svg>
                                     </div>
                                     <span className="text-4xl font-bold text-orange-700 mb-1">{stats.totalHours}</span>
-                                    <span className="text-[11px] font-black uppercase tracking-widest text-orange-600/60">Hours Engaged</span>
+                                    <span className="text-[11px] font-black uppercase tracking-widest text-orange-600/60">Hours Read</span>
                                 </div>
-                                
-                                {/* Library Card */}
-                                <div className="bg-blue-50 border border-blue-100 rounded-[2.5rem] p-8 flex flex-col items-center text-center shadow-sm hover:shadow-md transition-shadow">
+                                <div className="bg-blue-50 border border-blue-100 rounded-[2.5rem] p-8 flex flex-col items-center text-center shadow-sm">
                                     <div className="w-16 h-16 bg-blue-200/50 rounded-2xl flex items-center justify-center mb-4">
                                         <svg viewBox="0 0 24 24" className="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2">
                                             <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
-                                            <path d="M6 2v18" />
                                         </svg>
                                     </div>
                                     <span className="text-4xl font-bold text-blue-700 mb-1">{stats.booksUploaded}</span>
-                                    <span className="text-[11px] font-black uppercase tracking-widest text-blue-600/60">Books Collected</span>
+                                    <span className="text-[11px] font-black uppercase tracking-widest text-blue-600/60">Books Uploaded</span>
                                 </div>
-
-                                {/* Finished Card */}
-                                <div className="bg-emerald-50 border border-emerald-100 rounded-[2.5rem] p-8 flex flex-col items-center text-center shadow-sm hover:shadow-md transition-shadow">
+                                <div className="bg-emerald-50 border border-emerald-100 rounded-[2.5rem] p-8 flex flex-col items-center text-center shadow-sm">
                                     <div className="w-16 h-16 bg-emerald-200/50 rounded-2xl flex items-center justify-center mb-4">
                                         <svg viewBox="0 0 24 24" className="w-10 h-10 text-emerald-600" fill="none" stroke="currentColor" strokeWidth="2">
-                                            <path d="M12 15l-3-3 1.5-1.5L12 12l4.5-4.5L18 9l-6 6Z" />
-                                            <circle cx="12" cy="12" r="10" />
+                                            <circle cx="12" cy="12" r="10" /><path d="M12 15l-3-3 1.5-1.5L12 12l4.5-4.5L18 9l-6 6Z" />
                                         </svg>
                                     </div>
                                     <span className="text-4xl font-bold text-emerald-700 mb-1">{stats.booksFinished}</span>
-                                    <span className="text-[11px] font-black uppercase tracking-widest text-emerald-600/60">Mastered Titles</span>
+                                    <span className="text-[11px] font-black uppercase tracking-widest text-emerald-600/60">Finished</span>
                                 </div>
                             </div>
                         ) : (
-                            /* Guest CTA Card */
-                            <div className="p-10 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 rounded-[3rem] border-2 border-dashed border-[var(--color-border-color)] text-center mb-10 group hover:border-[var(--color-primary)] transition-colors">
-                                <div className="w-20 h-20 bg-[var(--color-background)] rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-[var(--color-border-color)]">
-                                    <svg viewBox="0 0 24 24" className="w-10 h-10 text-[var(--color-primary)]" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" />
-                                        <path d="M12 8v4l3 3" />
-                                    </svg>
-                                </div>
-                                <h3 className="text-xl font-bold text-[var(--color-primary-text)] mb-3">
-                                    Unlock Your Reading Insights
-                                </h3>
-                                <p className="text-sm leading-relaxed text-[var(--color-secondary-text)] max-w-sm mx-auto mb-8">
-                                    Sign in to track your reading time, see detailed statistics, and keep your library perfectly synced across all your devices.
-                                </p>
-                                <div className="flex flex-wrap justify-center gap-3">
-                                    <div className="px-4 py-2 bg-white rounded-full text-[10px] font-bold text-indigo-600 border border-indigo-100 shadow-sm">Cloud Backup</div>
-                                    <div className="px-4 py-2 bg-white rounded-full text-[10px] font-bold text-purple-600 border border-purple-100 shadow-sm">Reading Stats</div>
-                                    <div className="px-4 py-2 bg-white rounded-full text-[10px] font-bold text-blue-600 border border-blue-100 shadow-sm">Cross-Device Sync</div>
-                                </div>
-                            </div>
-                        )}
-
-                        {user && (
-                            <div className="p-8 bg-black/5 rounded-3xl border border-[var(--color-border-color)] text-center mb-10">
-                                <h3 className="text-sm font-bold text-[var(--color-primary-text)] mb-2">
-                                    Your Library is Safe
-                                </h3>
-                                <p className="text-sm leading-relaxed text-[var(--color-secondary-text)]">
-                                    All your books, progress, and quotes are synchronized across your devices.
-                                </p>
+                            <div className="p-10 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 rounded-[3rem] border-2 border-dashed border-[var(--color-border-color)] text-center mb-10">
+                                <h3 className="text-xl font-bold text-[var(--color-primary-text)] mb-3">Unlock Insights</h3>
+                                <p className="text-sm text-[var(--color-secondary-text)] mb-8">Sign in to track your reading journey and sync across devices.</p>
+                                <button onClick={() => setShowAuth(true)} className="px-8 py-3 bg-[var(--color-primary)] text-white font-bold rounded-full">Get Started</button>
                             </div>
                         )}
                     </div>
-
-                    {!user ? (
-                        <button 
-                            onClick={() => setShowAuth(true)} 
-                            className="w-full max-w-sm py-4 bg-[var(--color-primary)] text-white font-bold rounded-2xl shadow-xl hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-3"
-                        >
-                            <IconUser className="w-5 h-5" />
-                            <span>Sign In / Join Zizhi</span>
-                        </button>
-                    ) : (
-                        <div className="w-full max-w-sm space-y-4">
-                            <button 
-                                onClick={() => fetchCloudData(user.id)} 
-                                className="w-full py-3 border border-[var(--color-border-color)] text-[var(--color-primary-text)] font-bold rounded-xl active:scale-95 transition-all flex items-center justify-center gap-2 hover:bg-black/5"
-                            >
-                                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                    <path d="M21 2v6h-6" />
-                                    <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
-                                    <path d="M3 22v-6h6" />
-                                    <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
-                                </svg>
-                                <span>Sync Library</span>
-                            </button>
-                            <button 
-                                onClick={() => { supabase.auth.signOut(); setUser(null); }} 
-                                className="w-full py-3 text-red-500 font-bold hover:bg-red-50 rounded-xl transition-colors active:scale-95"
-                            >
-                                Sign Out
-                            </button>
-                        </div>
-                    )}
                 </div>
             )}
-            {activeTab === 'settings' && <SettingsView currentTheme={theme} onThemeChange={(t) => { setTheme(t); localStorage.setItem('zizhi-theme', JSON.stringify(t)); }} themes={THEMES} fonts={FONTS} textures={{}} />}
+            {activeTab === 'settings' && (
+                <SettingsView 
+                    currentTheme={theme} 
+                    onThemeChange={(t) => { setTheme(t); localStorage.setItem('zizhi-theme', JSON.stringify(t)); }} 
+                    themes={THEMES} 
+                    fonts={FONTS} 
+                    textures={{}} 
+                />
+            )}
           </div>
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 h-20 bg-[var(--color-background)] border-t border-[var(--color-border-color)] shadow-2xl z-40 px-2 flex items-center justify-around">
-          <button onClick={() => setActiveTab('library')} className={`flex flex-col items-center gap-1 min-w-[64px] transition-colors ${activeTab === 'library' ? 'text-[var(--color-primary)]' : 'text-[var(--color-secondary-text)]'}`}>
-              <IconLibrary className="w-6 h-6" />
-              <span className="text-[10px] font-bold uppercase tracking-wider">Library</span>
+          <button onClick={() => setActiveTab('library')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'library' ? 'text-[var(--color-primary)]' : 'text-[var(--color-secondary-text)]'}`}>
+              <IconLibrary className="w-6 h-6" /><span className="text-[10px] font-bold uppercase">Library</span>
           </button>
-          <button onClick={() => setActiveTab('quotes')} className={`flex flex-col items-center gap-1 min-w-[64px] transition-colors ${activeTab === 'quotes' ? 'text-[var(--color-primary)]' : 'text-[var(--color-secondary-text)]'}`}>
-              <IconQuote className="w-6 h-6" />
-              <span className="text-[10px] font-bold uppercase tracking-wider">Quotes</span>
+          <button onClick={() => setActiveTab('quotes')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'quotes' ? 'text-[var(--color-primary)]' : 'text-[var(--color-secondary-text)]'}`}>
+              <IconQuote className="w-6 h-6" /><span className="text-[10px] font-bold uppercase">Quotes</span>
           </button>
-          
           <div className="relative -top-6">
               <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".epub" className="hidden" />
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                className="w-16 h-16 bg-[var(--color-primary)] text-white rounded-full shadow-[0_8px_25px_rgba(0,0,0,0.25)] border-4 border-[var(--color-background)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all"
-              >
-                  {isUploading ? <IconSpinner className="w-7 h-7" /> : <IconUpload className="w-7 h-7" />}
+              <button onClick={() => fileInputRef.current?.click()} className="w-16 h-16 bg-[var(--color-primary)] text-white rounded-full shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-all">
+                  <IconUpload className="w-7 h-7" />
               </button>
-              <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] font-bold uppercase tracking-wider text-[var(--color-secondary-text)]">Upload</span>
           </div>
-
-          <button onClick={() => setActiveTab('profile')} className={`flex flex-col items-center gap-1 min-w-[64px] transition-colors ${activeTab === 'profile' ? 'text-[var(--color-primary)]' : 'text-[var(--color-secondary-text)]'}`}>
-              <IconUser className="w-6 h-6" />
-              <span className="text-[10px] font-bold uppercase tracking-wider">Profile</span>
+          <button onClick={() => setActiveTab('profile')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'profile' ? 'text-[var(--color-primary)]' : 'text-[var(--color-secondary-text)]'}`}>
+              <IconUser className="w-6 h-6" /><span className="text-[10px] font-bold uppercase">Profile</span>
           </button>
-          <button onClick={() => setActiveTab('settings')} className={`flex flex-col items-center gap-1 min-w-[64px] transition-colors ${activeTab === 'settings' ? 'text-[var(--color-primary)]' : 'text-[var(--color-secondary-text)]'}`}>
-              <IconSettings className="w-6 h-6" />
-              <span className="text-[10px] font-bold uppercase tracking-wider">Settings</span>
+          <button onClick={() => setActiveTab('settings')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'settings' ? 'text-[var(--color-primary)]' : 'text-[var(--color-secondary-text)]'}`}>
+              <IconSettings className="w-6 h-6" /><span className="text-[10px] font-bold uppercase">Settings</span>
           </button>
       </nav>
 
-      {selectedBook && <ReaderView book={selectedBook} theme={theme} onClose={() => setSelectedBook(null)} onUpdateProgress={handleUpdateProgress} onSaveQuote={handleSaveQuote} onSearch={(q) => setSearchQuery(q)} />}
+      {selectedBook && (
+        <ReaderView 
+          book={selectedBook} 
+          theme={theme} 
+          onClose={() => setSelectedBook(null)} 
+          onUpdateProgress={handleUpdateProgress} 
+          onSaveQuote={handleSaveQuote} 
+          onSearch={(q) => setSearchQuery(q)} 
+        />
+      )}
       {searchQuery && <SearchSidebar query={searchQuery} onClose={() => setSearchQuery(null)} />}
       {showAuth && <AuthView onClose={() => setShowAuth(false)} onLogin={(u) => { setUser(u); if (u) fetchCloudData(u.id); }} />}
       {toast && <Toast message={toast.message} onClose={() => setToast(null)} />}
