@@ -18,7 +18,7 @@ interface ReaderViewProps {
 const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, initialChapterId, onClose, onUpdateProgress, onSaveQuote, onSearch }) => {
     const [currentChapterIndex, setCurrentChapterIndex] = useState(0);
     const [showToc, setShowToc] = useState(false);
-    const [selection, setSelection] = useState<{ top: number; left: number; text: string; width: number } | null>(null);
+    const [selection, setSelection] = useState<{ text: string } | null>(null);
     const [showShareDialog, setShowShareDialog] = useState<string | null>(null);
     const [pageTransition, setPageTransition] = useState<'next' | 'prev' | null>(null);
     const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
@@ -27,7 +27,6 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, initialChapterId, 
     const chapterRefs = useRef<(HTMLDivElement | null)[]>([]);
     const lastTickRef = useRef<number>(Date.now());
     const accumulatedTimeRef = useRef<number>(0);
-    const touchStartRef = useRef<number | null>(null);
 
     const isScrollMode = isDesktop || theme.readingMode === 'scroll';
 
@@ -59,24 +58,12 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, initialChapterId, 
         return () => observer.disconnect();
     }, [isScrollMode, book.chapters]);
 
-    // Track selection changes in real-time
+    // Simplified selection tracking - we only need to know if text is selected
     useEffect(() => {
         const handleSelectionChange = () => {
             const sel = window.getSelection();
             if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
-                try {
-                    const range = sel.getRangeAt(0);
-                    const rect = range.getBoundingClientRect();
-                    // Positioning the menu relative to the first/topmost rect of the selection
-                    setSelection({
-                        top: rect.top,
-                        left: rect.left + rect.width / 2,
-                        text: sel.toString().trim(),
-                        width: rect.width
-                    });
-                } catch (e) {
-                    setSelection(null);
-                }
+                setSelection({ text: sel.toString().trim() });
             } else {
                 setSelection(null);
             }
@@ -122,22 +109,6 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, initialChapterId, 
         const interval = setInterval(handleUpdateStats, 1000);
         return () => { clearInterval(interval); handleUpdateStats(); };
     }, [currentChapterIndex]);
-
-    const handleFlip = (direction: 'next' | 'prev') => {
-        if (direction === 'next' && currentChapterIndex < book.chapters.length - 1) {
-            setPageTransition('next');
-            setTimeout(() => {
-                setCurrentChapterIndex(i => i + 1);
-                setPageTransition(null);
-            }, 300);
-        } else if (direction === 'prev' && currentChapterIndex > 0) {
-            setPageTransition('prev');
-            setTimeout(() => {
-                setCurrentChapterIndex(i => i - 1);
-                setPageTransition(null);
-            }, 300);
-        }
-    };
 
     const styleVariables = {
         '--font-serif': theme.font.serif,
@@ -194,22 +165,9 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, initialChapterId, 
                 </div>
             </div>
 
-            {/* Bottom Navigation for Paging */}
-            {!isScrollMode && (
-                <div className="h-1 bg-[var(--color-border-color)] select-none">
-                    <div 
-                        className="h-full bg-[var(--color-primary)] transition-all duration-300" 
-                        style={{ width: `${((currentChapterIndex + 1) / (book.chapters.length || 1)) * 100}%` }} 
-                    />
-                </div>
-            )}
-
-            {/* Floating Selection Menu */}
+            {/* Floating Selection Menu - Fixed Position 20% from bottom */}
             {selection && (
                 <TextSelectionPopup 
-                    top={selection.top}
-                    left={selection.left}
-                    isMobile={window.innerWidth < 768}
                     onCopy={() => { 
                         navigator.clipboard.writeText(selection.text); 
                         window.getSelection()?.removeAllRanges();
@@ -229,7 +187,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, initialChapterId, 
                 />
             )}
 
-            {/* Chrome-Style Bottom Search Drawer */}
+            {/* Bottom Search Drawer */}
             <div 
                 className={`fixed bottom-0 left-0 right-0 z-[110] bg-[#1a1c1e] text-white px-6 py-4 flex items-center justify-between rounded-t-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)] transition-transform duration-300 ease-out select-none cursor-pointer ${selection ? 'translate-y-0' : 'translate-y-full'}`}
                 onClick={() => selection && onSearch(selection.text)}
@@ -290,10 +248,11 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, initialChapterId, 
                 .reader-content {
                     user-select: text !important;
                     -webkit-user-select: text !important;
-                    -webkit-touch-callout: default !important; /* Allow handles */
+                    -webkit-touch-callout: default !important;
                 }
+                /* Use higher opacity primary color for a bold highlight that is definitely visible */
                 .reader-content ::selection {
-                    background-color: rgba(var(--color-primary-rgb), 0.3) !important;
+                    background-color: rgba(var(--color-primary-rgb), 0.4) !important;
                     color: inherit !important;
                 }
                 .reader-content img { max-width: 100%; height: auto; margin: 1.5rem auto; display: block; border-radius: 12px; }
