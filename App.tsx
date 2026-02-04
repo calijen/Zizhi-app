@@ -14,6 +14,7 @@ import * as db from './db';
 import { supabase, isSupabaseConfigured } from './supabase';
 import type { Book, Quote, Theme, ThemeFont } from './types';
 import { parseEpub } from './epubParser';
+import { GoogleGenAI, Type } from "@google/genai";
 
 const FONTS: ThemeFont[] = [
     { name: 'Modern', sans: 'Inter', serif: 'Lora' },
@@ -50,6 +51,11 @@ export const THEMES: { [key: string]: Theme } = {
     }
 };
 
+const hexToRgb = (hex: string) => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '0, 0, 0';
+};
+
 const App: React.FC = () => {
   const [library, setLibrary] = useState<Book[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
@@ -57,11 +63,16 @@ const App: React.FC = () => {
   const [showAuth, setShowAuth] = useState(false);
   const [activeTab, setActiveTab] = useState<'library' | 'quotes' | 'profile' | 'settings'>('library');
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+  const [targetChapterId, setTargetChapterId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string } | null>(null);
   const [theme, setTheme] = useState<Theme>(THEMES.modern);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
+  const [streakMode, setStreakMode] = useState<'daily' | 'weekly'>('daily');
+  const [detectedGenres, setDetectedGenres] = useState<{ genre: string; score: number }[]>([]);
+  const [isAnalyzingGenres, setIsAnalyzingGenres] = useState(false);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -163,61 +174,134 @@ const App: React.FC = () => {
     loadLocalData();
   }, []);
 
+  const analyzeGenres = async () => {
+      if (library.length === 0) return;
+      setIsAnalyzingGenres(true);
+      try {
+          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+          const bookList = library.map(b => `"${b.title}" by ${b.author}`).join(', ');
+          
+          const response = await ai.models.generateContent({
+              model: "gemini-3-flash-preview",
+              contents: `Analyze this reading list and identify the top 5 most frequent genres or themes. For each genre, estimate a 'mastery score' from 1-100 based on the volume. Return exactly 5 items in JSON. List of books: ${bookList}`,
+              config: {
+                  responseMimeType: "application/json",
+                  responseSchema: {
+                      type: Type.ARRAY,
+                      items: {
+                          type: Type.OBJECT,
+                          properties: {
+                              genre: { type: Type.STRING },
+                              score: { type: Type.NUMBER }
+                          },
+                          required: ["genre", "score"]
+                      }
+                  }
+              }
+          });
+          
+          const result = JSON.parse(response.text);
+          setDetectedGenres(result);
+      } catch (err) {
+          console.error("Genre analysis failed", err);
+      } finally {
+          setIsAnalyzingGenres(false);
+      }
+  };
+
+  useEffect(() => {
+    if (library.length > 0 && activeTab === 'profile' && detectedGenres.length === 0 && !isAnalyzingGenres) {
+        analyzeGenres();
+    }
+  }, [library, activeTab]);
+
+  const sortedLibrary = useMemo(() => {
+      return [...library].sort((a, b) => (b.lastOpened || 0) - (a.lastOpened || 0));
+  }, [library]);
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
       setIsUploading(true);
       try {
           const newBook = await parseEpub(file);
+          newBook.lastOpened = Date.now();
           await db.saveBook(newBook);
           setLibrary(prev => [newBook, ...prev]);
           if (user && isSupabaseConfigured()) {
-            await supabase.from('books_metadata').upsert({
-              id: newBook.id, 
-              user_id: user.id, 
-              title: newBook.title, 
-              author: newBook.author, 
-              progress: 0,
-              chapters: newBook.chapters,
-              cover_image_base64: newBook.coverImageUrl,
-              reading_time: 0
-            }).catch(() => {});
+            try {
+              await supabase.from('books_metadata').upsert({
+                id: newBook.id, 
+                user_id: user.id, 
+                title: newBook.title, 
+                author: newBook.author, 
+                progress: 0,
+                chapters: newBook.chapters,
+                cover_image_base64: newBook.coverImageUrl,
+                reading_time: 0
+              });
+            } catch (err) {
+              console.error("Cloud upload error", err);
+            }
           }
-          setToast({ message: `"${newBook.title}" uploaded.` });
+          setToast({ message: `"${newBook.title}" added to your shelf.` });
           setActiveTab('library');
+          setDetectedGenres([]); 
       } catch (err) {
-          setToast({ message: "Failed to upload EPUB." });
+          console.error("Upload error", err);
+          setToast({ message: "Unable to process EPUB." });
       } finally {
           setIsUploading(false);
           if (fileInputRef.current) fileInputRef.current.value = '';
       }
   };
 
+  const openBook = useCallback((bookId: string, chapterId?: string) => {
+      const book = library.find(b => b.id === bookId);
+      if (book) {
+          const updatedBook = { ...book, lastOpened: Date.now() };
+          setSelectedBook(updatedBook);
+          setTargetChapterId(chapterId || null);
+          setLibrary(prev => prev.map(b => b.id === bookId ? updatedBook : b));
+          db.saveBook(updatedBook);
+      }
+  }, [library]);
+
   const handleUpdateProgress = useCallback(async (bookId: string, chapterIndex: number, scrollTop: number, timeSpent: number) => {
+    let updatedBook: Book | null = null;
+    
     setLibrary(prev => {
         const idx = prev.findIndex(b => b.id === bookId);
         if (idx === -1) return prev;
         const book = prev[idx];
         const progress = (chapterIndex + 1) / (book.chapters.length || 1);
-        const updatedBook = { 
+        updatedBook = { 
             ...book, 
             progress: Math.max(book.progress, progress), 
             lastScrollTop: scrollTop,
-            readingTime: (book.readingTime || 0) + timeSpent
+            readingTime: (book.readingTime || 0) + timeSpent,
+            lastOpened: Date.now()
         };
-        db.saveBook(updatedBook);
-        if (user && isSupabaseConfigured()) {
-            supabase.from('books_metadata').upsert({ 
-                id: bookId, 
-                user_id: user.id, 
-                progress: updatedBook.progress,
-                reading_time: updatedBook.readingTime
-            }).catch(() => {});
-        }
         const next = [...prev];
         next[idx] = updatedBook;
         return next;
     });
+
+    if (updatedBook) {
+        await db.saveBook(updatedBook);
+        if (user && isSupabaseConfigured()) {
+            try {
+                await supabase.from('books_metadata').upsert({ 
+                    id: bookId, 
+                    user_id: user.id, 
+                    progress: updatedBook.progress,
+                    reading_time: updatedBook.readingTime
+                });
+            } catch (err) {
+                console.error("Sync error", err);
+            }
+        }
+    }
   }, [user]);
 
   const handleSaveQuote = useCallback(async (text: string, chapterId: string) => {
@@ -225,9 +309,13 @@ const App: React.FC = () => {
     const newQuote: Quote = { id: crypto.randomUUID(), text, bookTitle: selectedBook.title, author: selectedBook.author, bookId: selectedBook.id, location: chapterId };
     await db.saveQuote(newQuote);
     setQuotes(prev => [newQuote, ...prev]);
-    setToast({ message: 'Quote saved to collection' });
+    setToast({ message: 'Insight saved to your quotes.' });
     if (user && isSupabaseConfigured()) {
-        supabase.from('quotes').insert({ id: newQuote.id, user_id: user.id, text, book_title: newQuote.bookTitle, author: newQuote.author, book_id: newQuote.bookId, location: chapterId }).catch(() => {});
+        try {
+            await supabase.from('quotes').insert({ id: newQuote.id, user_id: user.id, text, book_title: newQuote.bookTitle, author: newQuote.author, book_id: newQuote.bookId, location: chapterId });
+        } catch (err) {
+            console.error("Cloud quote error", err);
+        }
     }
   }, [selectedBook, user]);
 
@@ -235,16 +323,22 @@ const App: React.FC = () => {
     const totalSeconds = library.reduce((acc, book) => acc + (book.readingTime || 0), 0);
     const totalHours = (totalSeconds / 3600).toFixed(1);
     const booksUploaded = library.length;
-    const booksFinished = library.filter(b => b.progress >= 0.99).length;
-    return { totalHours, booksUploaded, booksFinished };
+    return { totalHours, totalSeconds, booksUploaded };
   }, [library]);
+
+  const recentlyOpened = useMemo(() => {
+    return sortedLibrary.filter(b => b.progress > 0).slice(0, 5);
+  }, [sortedLibrary]);
 
   const appStyles = {
       '--color-primary': theme.colors.primary,
+      '--color-primary-rgb': hexToRgb(theme.colors.primary),
       '--color-background': theme.colors.background,
       '--color-primary-text': theme.colors['primary-text'],
       '--color-secondary-text': theme.colors['secondary-text'],
-      '--color-border-color': theme.colors['border-color']
+      '--color-border-color': theme.colors['border-color'],
+      '--font-serif': theme.font.serif,
+      '--font-sans': theme.font.sans,
   } as React.CSSProperties;
 
   return (
@@ -265,71 +359,151 @@ const App: React.FC = () => {
       <main className="flex-1 overflow-y-auto pb-24">
           <div className="max-w-7xl mx-auto h-full">
             {activeTab === 'library' && (
-                <Library books={library} onBookSelect={(id) => setSelectedBook(library.find(b => b.id === id) || null)} 
+                <Library books={sortedLibrary} onBookSelect={openBook} 
                          isLoading={isUploading} error={null} onDelete={async (id) => { await db.deleteBook(id); setLibrary(prev => prev.filter(b => b.id !== id)); }} onGenerateSummary={() => {}} 
                          generationStatuses={{}} onViewSummary={() => {}} generatingSummaryForBookId={null} />
             )}
             {activeTab === 'quotes' && (
-                <QuotesView quotes={quotes} onDelete={async (id) => { await db.deleteQuote(id); setQuotes(prev => prev.filter(q => q.id !== id)); }} onShare={() => {}} onGenerateImage={() => {}} onGoToQuote={() => {}} />
+                <QuotesView quotes={quotes} onDelete={async (id) => { await db.deleteQuote(id); setQuotes(prev => prev.filter(q => q.id !== id)); }} onShare={() => {}} onGenerateImage={() => {}} onGoToQuote={(q) => openBook(q.bookId, q.location)} />
             )}
             {activeTab === 'profile' && (
-                <div className="p-8 max-w-4xl mx-auto flex flex-col items-center animate-fade-in">
-                    <div className="w-24 h-24 rounded-full bg-black/5 flex items-center justify-center mb-6 relative group">
-                        {user ? (
-                           <div className="w-full h-full rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center text-white text-3xl font-bold shadow-lg">
-                               {(user.user_metadata?.full_name || user.email || '?')[0].toUpperCase()}
-                           </div>
-                        ) : (
-                           <IconUser className="w-12 h-12 text-[var(--color-primary-text)] opacity-40" />
-                        )}
-                        {user && (
-                            <div className="absolute bottom-0 right-0 bg-green-500 w-6 h-6 rounded-full border-4 border-[var(--color-background)] shadow-sm" />
-                        )}
-                    </div>
-                    
-                    <h2 className="text-2xl font-bold font-serif mb-2 text-[var(--color-primary-text)]">
-                        {user ? (user.user_metadata?.full_name || user.email) : 'Guest Reader'}
-                    </h2>
-                    
-                    <div className="mb-10 w-full">
-                        {user ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
-                                <div className="bg-orange-50 border border-orange-100 rounded-[2.5rem] p-8 flex flex-col items-center text-center shadow-sm">
-                                    <div className="w-16 h-16 bg-orange-200/50 rounded-2xl flex items-center justify-center mb-4">
-                                        <svg viewBox="0 0 24 24" className="w-10 h-10 text-orange-600" fill="none" stroke="currentColor" strokeWidth="2">
-                                            <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
-                                        </svg>
-                                    </div>
-                                    <span className="text-4xl font-bold text-orange-700 mb-1">{stats.totalHours}</span>
-                                    <span className="text-[11px] font-black uppercase tracking-widest text-orange-600/60">Hours Read</span>
+                <div className={`p-6 min-h-full relative animate-fade-in text-[var(--color-primary-text)]`}>
+                    {!user ? (
+                        <div className="flex flex-col items-center justify-center py-20 text-center">
+                            <div className="w-24 h-24 mb-6 rounded-full border-2 border-dashed border-[var(--color-border-color)] flex items-center justify-center">
+                                <IconUser className="w-12 h-12 opacity-20" />
+                            </div>
+                            <h2 className="text-2xl font-bold mb-4 theme-serif">Join the Journey</h2>
+                            <p className="text-[var(--color-secondary-text)] mb-8 max-w-xs">Create an account to track your milestones and sync your library across devices.</p>
+                            <button onClick={() => setShowAuth(true)} className="px-8 py-3 bg-[var(--color-primary)] text-white rounded-xl font-bold shadow-lg active:scale-95 transition-all">Get Started</button>
+                        </div>
+                    ) : (
+                        <div className="max-w-xl mx-auto space-y-12 pb-10">
+                            {/* Profile Header */}
+                            <div className="flex justify-between items-end">
+                                <div>
+                                    <h2 className="text-3xl font-bold theme-serif mb-1">Your Journey</h2>
+                                    <p className="text-sm opacity-60 font-medium">Reading Insights & Milestones</p>
                                 </div>
-                                <div className="bg-blue-50 border border-blue-100 rounded-[2.5rem] p-8 flex flex-col items-center text-center shadow-sm">
-                                    <div className="w-16 h-16 bg-blue-200/50 rounded-2xl flex items-center justify-center mb-4">
-                                        <svg viewBox="0 0 24 24" className="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2">
-                                            <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
-                                        </svg>
+                                <div className="text-right">
+                                    <div className="w-12 h-12 rounded-2xl bg-[var(--color-primary)]/10 flex items-center justify-center text-[var(--color-primary)] font-black text-xl border border-[var(--color-primary)]/20 shadow-sm">
+                                        {(user.user_metadata?.full_name || user.email)[0].toUpperCase()}
                                     </div>
-                                    <span className="text-4xl font-bold text-blue-700 mb-1">{stats.booksUploaded}</span>
-                                    <span className="text-[11px] font-black uppercase tracking-widest text-blue-600/60">Books Uploaded</span>
-                                </div>
-                                <div className="bg-emerald-50 border border-emerald-100 rounded-[2.5rem] p-8 flex flex-col items-center text-center shadow-sm">
-                                    <div className="w-16 h-16 bg-emerald-200/50 rounded-2xl flex items-center justify-center mb-4">
-                                        <svg viewBox="0 0 24 24" className="w-10 h-10 text-emerald-600" fill="none" stroke="currentColor" strokeWidth="2">
-                                            <circle cx="12" cy="12" r="10" /><path d="M12 15l-3-3 1.5-1.5L12 12l4.5-4.5L18 9l-6 6Z" />
-                                        </svg>
-                                    </div>
-                                    <span className="text-4xl font-bold text-emerald-700 mb-1">{stats.booksFinished}</span>
-                                    <span className="text-[11px] font-black uppercase tracking-widest text-emerald-600/60">Finished</span>
                                 </div>
                             </div>
-                        ) : (
-                            <div className="p-10 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 rounded-[3rem] border-2 border-dashed border-[var(--color-border-color)] text-center mb-10">
-                                <h3 className="text-xl font-bold text-[var(--color-primary-text)] mb-3">Unlock Insights</h3>
-                                <p className="text-sm text-[var(--color-secondary-text)] mb-8">Sign in to track your reading journey and sync across devices.</p>
-                                <button onClick={() => setShowAuth(true)} className="px-8 py-3 bg-[var(--color-primary)] text-white font-bold rounded-full">Get Started</button>
+
+                            {/* Circular Reading Time Animation */}
+                            <div className="relative flex flex-col items-center py-4">
+                                <div className="w-72 h-72 rounded-full border border-[var(--color-border-color)] flex items-center justify-center relative bg-[var(--color-primary)]/[0.02] shadow-[inset_0_0_20px_rgba(var(--color-primary-rgb),0.05)]">
+                                    <div className="absolute inset-0 border-t border-[var(--color-primary)] rounded-full animate-spin [animation-duration:15s] opacity-20"></div>
+                                    <div className="absolute inset-4 border-b border-[var(--color-primary)] rounded-full animate-spin [animation-duration:25s] [animation-direction:reverse] opacity-10"></div>
+                                    
+                                    <div className="text-center z-10">
+                                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-40 mb-3">Time Invested</p>
+                                        <div className="flex items-end justify-center gap-1 h-12 mb-4">
+                                            {[1,2,3,4,5,6,5,4,3,2,1].map((h, i) => (
+                                                <div key={i} className="w-1.5 bg-[var(--color-primary)] rounded-full opacity-60" style={{ height: `${h * 10}%`, animation: `wave 1.5s ease-in-out infinite ${i * 0.1}s` }}></div>
+                                            ))}
+                                        </div>
+                                        <div className="text-6xl font-black theme-serif text-[var(--color-primary-text)]">{stats.totalHours}</div>
+                                        <p className="text-sm font-medium opacity-60 mt-1">Hours Reading</p>
+                                    </div>
+                                </div>
                             </div>
-                        )}
-                    </div>
+
+                            {/* Primary Stats Grid */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="p-6 rounded-3xl bg-[var(--color-primary)]/[0.03] border border-[var(--color-border-color)] shadow-sm">
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-40 mb-4">Books in Shelf</p>
+                                    <div className="text-4xl font-black theme-serif">{stats.booksUploaded}</div>
+                                    <p className="text-xs opacity-50 mt-1 font-medium">Stories Captured</p>
+                                </div>
+                                <div className="p-6 rounded-3xl bg-[var(--color-primary)]/[0.03] border border-[var(--color-border-color)] shadow-sm flex flex-col justify-between">
+                                    <div>
+                                        <div className="flex justify-between items-start mb-2">
+                                            <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-40">Active Pulse</p>
+                                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                                        </div>
+                                        <div className="text-4xl font-black theme-serif">3</div>
+                                        <p className="text-xs opacity-50 mt-1 font-medium">Daily Streak</p>
+                                    </div>
+                                    <div className="flex p-0.5 bg-[var(--color-primary)]/[0.05] rounded-lg mt-4">
+                                        <button onClick={() => setStreakMode('daily')} className={`flex-1 text-[9px] font-bold py-1.5 rounded-md transition-all ${streakMode === 'daily' ? 'bg-[var(--color-primary)] text-white shadow-md' : 'opacity-40'}`}>Daily</button>
+                                        <button onClick={() => setStreakMode('weekly')} className={`flex-1 text-[9px] font-bold py-1.5 rounded-md transition-all ${streakMode === 'weekly' ? 'bg-[var(--color-primary)] text-white shadow-md' : 'opacity-40'}`}>Weekly</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* AI Genre Mastery */}
+                            <div className="p-8 rounded-[2.5rem] bg-[var(--color-primary)]/[0.02] border border-[var(--color-border-color)]">
+                                <div className="flex items-center justify-between mb-8">
+                                    <h3 className="text-lg font-bold theme-serif">Genre Mastery</h3>
+                                    {isAnalyzingGenres ? (
+                                        <IconSpinner className="w-4 h-4 text-[var(--color-primary)] opacity-40" />
+                                    ) : (
+                                        <button onClick={analyzeGenres} className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-primary)] hover:underline opacity-60">Recalculate</button>
+                                    )}
+                                </div>
+                                <div className="space-y-6">
+                                    {detectedGenres.length > 0 ? detectedGenres.map((item, idx) => (
+                                        <div key={idx}>
+                                            <div className="flex justify-between text-sm font-medium mb-2">
+                                                <span className="capitalize">{item.genre}</span>
+                                                <span className="opacity-40 text-xs">{item.score}%</span>
+                                            </div>
+                                            <div className="h-1.5 w-full bg-[var(--color-primary)]/[0.05] rounded-full overflow-hidden">
+                                                <div className="h-full bg-[var(--color-primary)] transition-all duration-1000" style={{ width: `${item.score}%` }}></div>
+                                            </div>
+                                        </div>
+                                    )) : (
+                                        <div className="py-8 text-center text-sm opacity-40 italic">
+                                            {isAnalyzingGenres ? "Exploring patterns..." : "Scan your library to see your genre mastery."}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Milestones Horizontal Carousel */}
+                            <div>
+                                <h3 className="text-lg font-bold theme-serif mb-6 px-1">Recent Reads</h3>
+                                <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
+                                    {recentlyOpened.length > 0 ? recentlyOpened.map(book => (
+                                        <div key={book.id} className="flex-none w-32 group cursor-pointer" onClick={() => openBook(book.id)}>
+                                            <div className="aspect-[2/3] rounded-2xl border border-[var(--color-border-color)] mb-3 overflow-hidden shadow-sm transition-all group-hover:shadow-xl group-hover:-translate-y-1">
+                                                {book.coverImageUrl ? (
+                                                    <img src={book.coverImageUrl} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="w-full h-full bg-[var(--color-primary)]/[0.05] flex items-center justify-center p-3 text-center text-[10px] font-bold">{book.title}</div>
+                                                )}
+                                            </div>
+                                            <div className="text-[10px] font-bold truncate opacity-80 uppercase tracking-wider">{book.title}</div>
+                                        </div>
+                                    )) : (
+                                        <div className="w-full py-12 text-center rounded-3xl border border-dashed border-[var(--color-border-color)] opacity-30 text-sm italic">Open a book to start tracking milestones.</div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Bottom Actions */}
+                            <div className="grid grid-cols-2 gap-4 pt-4">
+                                <button 
+                                    onClick={() => {
+                                        if (navigator.share) {
+                                            navigator.share({
+                                                title: 'My Reading Journey',
+                                                text: `I've read ${stats.booksUploaded} books for a total of ${stats.totalHours} hours on Zizhi!`,
+                                                url: window.location.origin
+                                            }).catch(() => {});
+                                        } else {
+                                            setToast({ message: "Sharing is not supported on this device." });
+                                        }
+                                    }} 
+                                    className="py-4 bg-[var(--color-primary)] text-white rounded-2xl font-bold shadow-lg shadow-[rgba(var(--color-primary-rgb),0.2)] active:scale-95 transition-all"
+                                >Share Journey</button>
+                                <button onClick={() => { supabase.auth.signOut(); setUser(null); }} className="py-4 bg-transparent border border-[var(--color-border-color)] text-[var(--color-secondary-text)] rounded-2xl font-bold hover:bg-black/5 active:scale-95 transition-all">Sign Out</button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
             {activeTab === 'settings' && (
@@ -358,7 +532,7 @@ const App: React.FC = () => {
               </button>
           </div>
           <button onClick={() => setActiveTab('profile')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'profile' ? 'text-[var(--color-primary)]' : 'text-[var(--color-secondary-text)]'}`}>
-              <IconUser className="w-6 h-6" /><span className="text-[10px] font-bold uppercase">Profile</span>
+              <IconUser className="w-6 h-6" /><span className="text-[10px] font-bold uppercase">Journey</span>
           </button>
           <button onClick={() => setActiveTab('settings')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'settings' ? 'text-[var(--color-primary)]' : 'text-[var(--color-secondary-text)]'}`}>
               <IconSettings className="w-6 h-6" /><span className="text-[10px] font-bold uppercase">Settings</span>
@@ -369,7 +543,8 @@ const App: React.FC = () => {
         <ReaderView 
           book={selectedBook} 
           theme={theme} 
-          onClose={() => setSelectedBook(null)} 
+          initialChapterId={targetChapterId}
+          onClose={() => { setSelectedBook(null); setTargetChapterId(null); }} 
           onUpdateProgress={handleUpdateProgress} 
           onSaveQuote={handleSaveQuote} 
           onSearch={(q) => setSearchQuery(q)} 

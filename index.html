@@ -17,32 +17,29 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:ital,wght@0,400..700;1,400..700&family=Merriweather:ital,wght@0,400;0,700;1,400;1,700&family=Montserrat:wght@400;700&family=Nunito:wght@400;700&family=Roboto+Slab:wght@400;700&family=Roboto:wght@400;500;700&family=Source+Serif+Pro:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Lora:ital,wght@0,400..700;1,400..700&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar { width: 4px; height: 4px; }
       ::-webkit-scrollbar-track { background: transparent; }
       ::-webkit-scrollbar-thumb {
-        background-color: #BDBDBD;
+        background-color: var(--color-primary);
         border-radius: 20px;
-        border: 2px solid var(--color-background, #FAFAFA);
-        background-clip: content-box;
       }
-      ::-webkit-scrollbar-thumb:hover { background-color: #9E9E9E; }
 
       @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-      @keyframes fadeOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(10px); } }
-      .animate-fade-in-out { animation: fadeIn 0.15s ease-out forwards, fadeOut 0.3s ease-in 2.55s forwards; }
-      @keyframes slideInUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-      @keyframes slideInUpCentered { from { transform: translate(-50%, 100%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
-      .animate-slide-up-centered { animation: slideInUpCentered 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      @keyframes wave {
+        0%, 100% { transform: scaleY(0.5); }
+        50% { transform: scaleY(1.2); }
+      }
+
+      .theme-serif { font-family: var(--font-serif), 'Lora', serif; }
+      .theme-glow { filter: drop-shadow(0 0 8px rgba(var(--color-primary-rgb), 0.3)); }
       
-      @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-      .marquee-parent { position: relative; overflow: hidden; }
-      .marquee-child { display: flex; position: absolute; animation-name: marquee; animation-timing-function: linear; animation-iteration-count: infinite; }
-      
-      .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+      .animate-fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
   <script type="importmap">
 {
