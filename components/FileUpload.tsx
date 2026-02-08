@@ -1,8 +1,6 @@
-
 import React from 'react';
-import { IconClose, IconMicrophone, IconSpinner, IconPlay } from './icons';
-// Fixed: Import GenerationStatus from types.ts instead of App.tsx
-import type { GenerationStatus } from '../types';
+import { IconClose, IconMicrophone, IconSpinner, IconPlay, IconLibrary } from './icons';
+import type { Book, GenerationStatus } from '../types';
 
 export interface BookCardData {
   id: string;
@@ -11,6 +9,7 @@ export interface BookCardData {
   coverImageUrl: string | null;
   progress: number;
   audioSummaryUrl?: string;
+  genre?: string;
 }
 
 interface LibraryProps {
@@ -20,9 +19,9 @@ interface LibraryProps {
   error: string | null;
   onDelete: (bookId: string) => void;
   onGenerateSummary: (bookId: string) => void;
-  generatingSummaryForBookId: string | null; // Kept for compat, unused
   generationStatuses: Record<string, GenerationStatus>;
   onViewSummary: (bookId: string) => void;
+  viewMode: 'grid' | 'list';
 }
 
 const BookCard: React.FC<{ 
@@ -31,179 +30,126 @@ const BookCard: React.FC<{
     onDelete: (id: string) => void;
     onGenerateSummary: (id: string) => void;
     onViewSummary: (id: string) => void;
-    isGenerating: boolean;
-}> = ({ book, onSelect, onDelete, onGenerateSummary, onViewSummary, isGenerating }) => {
+    isGenerating?: boolean;
+    viewMode: 'grid' | 'list';
+}> = ({ book, onSelect, onDelete, onGenerateSummary, onViewSummary, isGenerating, viewMode }) => {
 
-    const handleDelete = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        onDelete(book.id);
-    };
+    const isList = viewMode === 'list';
     
+    if (isList) {
+        return (
+            <div className={`flex bg-[var(--color-surface)] border border-[var(--color-border-color)] rounded-xl overflow-hidden h-44 shadow-sm group animate-fade-in relative ${isGenerating ? 'opacity-50 pointer-events-none' : ''}`}>
+                <div className="w-32 flex-shrink-0 cursor-pointer bg-[var(--color-border-color)]/20" onClick={() => onSelect(book.id)}>
+                    {book.coverImageUrl ? (
+                        <img src={book.coverImageUrl} alt={book.title} className="w-full h-full object-cover" />
+                    ) : (
+                        <div className="w-full h-full flex items-center justify-center p-4">
+                             <IconLibrary className="w-8 h-8 opacity-20" />
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex-1 flex flex-col p-4 min-w-0 border-l border-[var(--color-border-color)]">
+                    <div className="flex justify-between items-start mb-2">
+                        <div className="min-w-0 flex-1 cursor-pointer" onClick={() => onSelect(book.id)}>
+                            <h3 className="text-base font-black text-[var(--color-primary-text)] truncate pr-4 leading-snug">{book.title}</h3>
+                            <p className="text-xs text-[var(--color-secondary-text)] font-medium mt-0.5 truncate">{book.author}</p>
+                        </div>
+                        <button 
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(book.id); }} 
+                            aria-label="Remove book from shelf"
+                            className="absolute top-2 right-2 p-1.5 text-[var(--color-secondary-text)] opacity-40 hover:opacity-100 hover:text-red-600 transition-all z-10"
+                        >
+                            <IconClose className="w-4 h-4" />
+                        </button>
+                    </div>
+
+                    <div className="flex-1 flex items-center justify-between pr-2">
+                         <span className="text-[10px] font-black uppercase tracking-widest text-[var(--color-secondary-text)] opacity-30">{book.genre}</span>
+                         <span className="text-[10px] font-black text-[var(--color-secondary-text)] opacity-50">{Math.round(book.progress * 100)}%</span>
+                    </div>
+
+                    <div className="flex gap-2 pt-3 border-t border-[var(--color-border-color)]">
+                        <button onClick={() => onSelect(book.id)} className="flex-1 py-2.5 bg-[var(--color-primary)] text-white text-[11px] font-black uppercase tracking-widest rounded-lg shadow-sm active:scale-95 transition-all">Read</button>
+                        <button 
+                            onClick={() => book.audioSummaryUrl ? onViewSummary(book.id) : onGenerateSummary(book.id)} 
+                            className="flex-1 py-2.5 bg-transparent border border-[var(--color-border-color)] text-[var(--color-secondary-text)] text-[11px] font-black uppercase tracking-widest rounded-lg flex items-center justify-center gap-2 hover:bg-black/5 active:scale-95 transition-all"
+                        >
+                            {isGenerating ? <IconSpinner className="w-3.5 h-3.5" /> : (book.audioSummaryUrl ? <IconPlay className="w-3.5 h-3.5" /> : <IconMicrophone className="w-3.5 h-3.5" />)}
+                            <span>Summary</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div 
-            className="bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-lg shadow-sm transition-shadow duration-300 overflow-hidden flex flex-row group text-[var(--color-primary-text)] h-full"
-            aria-label={`${book.title} by ${book.author}`}
-        >
-            <div className="relative w-1/3 flex-shrink-0 aspect-[2/3] bg-[rgba(var(--color-border-color-rgb),0.5)]">
+        <div className={`flex flex-col bg-[var(--color-surface)] border border-[var(--color-border-color)] rounded-[1.5rem] overflow-hidden transition-all shadow-sm animate-fade-in relative ${isGenerating ? 'opacity-50 pointer-events-none' : ''}`}>
+            <div className="relative aspect-[3/4.2] overflow-hidden cursor-pointer bg-black/5" onClick={() => onSelect(book.id)}>
                 {book.coverImageUrl ? (
                     <img src={book.coverImageUrl} alt={book.title} className="w-full h-full object-cover" />
                 ) : (
-                    <div className="w-full h-full flex items-center justify-center text-center text-[rgba(var(--color-secondary-text-rgb),0.5)] p-2">
-                        <span className="text-xs sm:text-sm font-serif break-words">{book.title}</span>
-                    </div>
+                    <div className="w-full h-full flex items-center justify-center opacity-10"><IconLibrary className="w-12 h-12" /></div>
                 )}
+                <div className="absolute top-3 right-10 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full text-[9px] font-black text-white">{Math.round(book.progress * 100)}%</div>
+                <button 
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(book.id); }} 
+                    aria-label="Remove book from shelf"
+                    className="absolute top-3 right-3 p-1.5 bg-black/20 text-white rounded-full hover:bg-red-500 transition-all z-10"
+                >
+                    <IconClose className="w-3.5 h-3.5" />
+                </button>
             </div>
-            <div className="w-2/3 flex flex-col flex-grow justify-between border-l border-[rgba(var(--color-border-color-rgb),0.5)]">
-                <div className="p-3 flex flex-col w-full space-y-1 flex-grow overflow-hidden">
-                    <div className="flex justify-between items-start gap-2">
-                         <h3 className="font-bold text-base sm:text-lg leading-tight truncate flex-grow" title={book.title}>{book.title}</h3>
-                         <button
-                            onClick={handleDelete}
-                            className="p-1 -mr-2 -mt-1 flex-shrink-0 text-[rgba(var(--color-secondary-text-rgb),0.5)] hover:text-[var(--color-primary)] transition-colors z-10"
-                            title="Delete book"
-                            aria-label={`Delete ${book.title}`}
-                         >
-                            <IconClose className="w-4 h-4" />
-                         </button>
-                    </div>
-                    <p className="text-xs sm:text-sm text-[var(--color-secondary-text)] truncate" title={book.author}>{book.author || 'Unknown Author'}</p>
-                    <div className="pt-2 mt-auto">
-                        <div 
-                            className="w-full bg-[rgba(var(--color-border-color-rgb),0.3)] rounded-full h-1"
-                            role="progressbar"
-                            aria-valuenow={Math.round(book.progress * 100)}
-                            aria-valuemin={0}
-                            aria-valuemax={100}
-                            aria-label={`Reading progress: ${Math.round(book.progress * 100)}%`}
-                        >
-                            <div className="bg-[var(--color-primary)] h-1 rounded-full" style={{ width: `${book.progress * 100}%` }}></div>
-                        </div>
-                        <p className="text-[10px] text-right mt-1 text-[var(--color-secondary-text)]">{Math.round(book.progress * 100)}%</p>
-                    </div>
+            <div className="p-4 flex flex-col gap-3">
+                <div className="min-w-0" onClick={() => onSelect(book.id)}>
+                    <h3 className="font-bold text-sm leading-tight truncate text-[var(--color-primary-text)]">{book.title}</h3>
+                    <p className="text-[10px] text-[var(--color-secondary-text)] truncate mt-1 uppercase tracking-widest font-bold opacity-50">{book.author}</p>
                 </div>
-                <div className="p-3 pt-0 border-t border-[rgba(var(--color-border-color-rgb),0.5)] grid grid-cols-2 gap-2 text-xs sm:text-sm font-medium">
-                    <button 
-                        onClick={() => onSelect(book.id)}
-                        className="w-full py-2 px-2 bg-[rgba(var(--color-primary-rgb),0.1)] text-[var(--color-primary)] rounded-md hover:bg-[rgba(var(--color-primary-rgb),0.2)] transition-colors text-center truncate"
-                    >
-                        Read
+                <div className="w-full h-1 bg-black/5 rounded-full overflow-hidden">
+                    <div className="h-full bg-[var(--color-primary)] transition-all duration-700" style={{ width: `${Math.max(book.progress * 100, 2)}%` }} />
+                </div>
+                <div className="flex gap-2">
+                    <button onClick={() => onSelect(book.id)} className="flex-1 py-2 bg-[var(--color-primary)] text-white text-[10px] font-black uppercase tracking-widest rounded-xl active:scale-95 transition-all">Read</button>
+                    <button onClick={() => book.audioSummaryUrl ? onViewSummary(book.id) : onGenerateSummary(book.id)} className="px-3 py-2 bg-black/[0.04] text-[var(--color-secondary-text)] rounded-xl hover:bg-black/5 transition-all">
+                        {isGenerating ? <IconSpinner className="w-3.5 h-3.5" /> : (book.audioSummaryUrl ? <IconPlay className="w-3.5 h-3.5" /> : <IconMicrophone className="w-3.5 h-3.5" />)}
                     </button>
-                    <div className="relative">
-                        {isGenerating ? (
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); onViewSummary(book.id); }}
-                                className="w-full py-2 px-2 bg-[rgba(var(--color-secondary-text-rgb),0.1)] text-[var(--color-secondary-text)] rounded-md hover:bg-[rgba(var(--color-secondary-text-rgb),0.2)] transition-colors flex items-center justify-center gap-1 truncate"
-                                title="Click to view progress"
-                            >
-                                <IconSpinner className="w-3 h-3 sm:w-4 sm:h-4" />
-                                <span>Generating...</span>
-                            </button>
-                        ) : book.audioSummaryUrl ? (
-                             <button 
-                                onClick={(e) => { e.stopPropagation(); onViewSummary(book.id); }}
-                                className="w-full py-2 px-2 bg-[rgba(var(--color-secondary-text-rgb),0.1)] text-[var(--color-secondary-text)] rounded-md hover:bg-[rgba(var(--color-secondary-text-rgb),0.2)] transition-colors flex items-center justify-center gap-1 truncate"
-                             >
-                                <IconPlay className="w-3 h-3 sm:w-4 sm:h-4" />
-                                <span>Summary</span>
-                             </button>
-                        ) : (
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); onGenerateSummary(book.id); }}
-                                className="w-full py-2 px-2 bg-[rgba(var(--color-secondary-text-rgb),0.1)] text-[var(--color-secondary-text)] rounded-md hover:bg-[rgba(var(--color-secondary-text-rgb),0.2)] transition-colors flex items-center justify-center gap-1 truncate"
-                            >
-                                <IconMicrophone className="w-3 h-3 sm:w-4 sm:h-4" />
-                                <span>Summary</span>
-                            </button>
-                        )}
-                    </div>
                 </div>
             </div>
         </div>
     );
 };
 
-
-const Library: React.FC<LibraryProps> = ({ books, onBookSelect, isLoading, error, onDelete, onGenerateSummary, generationStatuses, onViewSummary }) => {
+const Library: React.FC<LibraryProps> = ({ books, onBookSelect, isLoading, onDelete, onGenerateSummary, generationStatuses, onViewSummary, viewMode }) => {
   return (
-    <div className="p-4 sm:p-6 lg:p-8 h-full">
+    <div className="p-4 sm:p-8">
         {isLoading && (
-          <div className="mt-4 flex items-center justify-center space-x-2 text-lg" role="status" aria-live="polite">
-            <div className="w-6 h-6 rounded-full animate-spin border-2 border-solid border-[var(--color-primary)] border-t-transparent"></div>
-            <span>Processing book...</span>
+          <div className="mb-8 flex flex-col items-center justify-center p-12 bg-black/5 rounded-2xl border-2 border-dashed border-[var(--color-border-color)]">
+            <IconSpinner className="w-6 h-6 text-[var(--color-primary)] mb-2" />
+            <span className="text-[10px] font-bold uppercase tracking-widest opacity-40">Synchronizing Stories...</span>
           </div>
         )}
-        {error && (
-          <div className="my-4 text-red-900 bg-red-100 border border-red-300 rounded-md p-3 text-center" role="alert">
-            <strong>Error:</strong> {error}
-          </div>
-        )}
-
         {!isLoading && books.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center pb-20 px-4">
-            <div className="w-64 h-64 text-[var(--color-border-color)] mb-8 opacity-80">
-              <svg 
-                viewBox="0 0 240 240" 
-                fill="none" 
-                xmlns="http://www.w3.org/2000/svg" 
-                className="w-full h-full" 
-                stroke="currentColor" 
-                strokeWidth="1.2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                {/* Left Page */}
-                <path d="M120 50 L60 60 C 50 62 45 70 45 80 L 45 180 C 45 190 50 198 60 196 L 120 186" />
-                {/* Right Page */}
-                <path d="M120 50 L180 60 C 190 62 195 70 195 80 L 195 180 C 195 190 190 198 180 196 L 120 186" />
-                {/* Spine */}
-                <path d="M120 50 V 186" />
-                
-                {/* Abstract Text Lines - Left */}
-                <path d="M65 80 H 105" opacity="0.4"/>
-                <path d="M65 95 H 105" opacity="0.4"/>
-                <path d="M65 110 H 105" opacity="0.4"/>
-                <path d="M65 125 H 95" opacity="0.4"/>
-                
-                {/* Abstract Text Lines - Right */}
-                <path d="M135 80 H 175" opacity="0.4"/>
-                <path d="M135 95 H 175" opacity="0.4"/>
-                <path d="M135 110 H 175" opacity="0.4"/>
-                <path d="M135 125 H 165" opacity="0.4"/>
-
-                {/* Floating Particles/Dust Motes */}
-                <circle cx="120" cy="40" r="1.5" fill="currentColor" opacity="0.6"/>
-                <circle cx="180" cy="50" r="1" fill="currentColor" opacity="0.4"/>
-                <circle cx="60" cy="50" r="1" fill="currentColor" opacity="0.4"/>
-                <circle cx="90" cy="30" r="0.8" fill="currentColor" opacity="0.3"/>
-                <circle cx="150" cy="35" r="0.8" fill="currentColor" opacity="0.3"/>
-              </svg>
-            </div>
-            <h3 className="text-2xl font-serif font-medium text-[var(--color-primary-text)] mb-3">Your library awaits</h3>
-            <p className="max-w-md text-[var(--color-secondary-text)] leading-relaxed text-base">
-              Upload an EPUB file to begin your reading journey.<br/>
-              <span className="text-sm opacity-70 mt-2 block">Download e-books from sources like Welib or OceanPdf.</span>
-            </p>
+          <div className="flex flex-col items-center justify-center py-40 text-center">
+            <IconLibrary className="w-16 h-16 mb-4 text-[var(--color-primary-text)] opacity-10" />
+            <p className="theme-serif text-xl font-black text-[var(--color-primary-text)] opacity-30 italic">Capture your first story by uploading an EPUB.</p>
           </div>
         )}
-        
-        {books.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+        <div className={viewMode === 'grid' ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6' : 'flex flex-col gap-4 max-w-2xl mx-auto'}>
             {books.map(book => (
-              <BookCard 
-                key={book.id} 
-                book={book} 
-                onSelect={onBookSelect} 
-                onDelete={onDelete} 
-                onGenerateSummary={onGenerateSummary}
-                onViewSummary={onViewSummary}
-                isGenerating={!!generationStatuses[book.id]}
-              />
+                <BookCard 
+                    key={book.id} 
+                    book={book} 
+                    onSelect={onBookSelect} 
+                    onDelete={onDelete} 
+                    onGenerateSummary={onGenerateSummary} 
+                    onViewSummary={onViewSummary} 
+                    isGenerating={!!generationStatuses[book.id]} 
+                    viewMode={viewMode} 
+                />
             ))}
-          </div>
-        )}
+        </div>
     </div>
   );
 };
-
 export default Library;

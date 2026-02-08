@@ -1,61 +1,67 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>Zizhi EPUB Reader</title>
-    <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#FFFFFF" />
-    
-    <!-- Apple PWA Support -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Zizhi">
-    <link rel="apple-touch-icon" href="/logo.svg">
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Lora:ital,wght@0,400..700;1,400..700&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Zizhi — Elegant EPUB Reader</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Lora:ital,wght@0,400;0,700;1,400;1,700&family=Crimson+Pro:ital,wght@0,400;0,700;1,400;1,700&family=Literata:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
     <style>
-      ::-webkit-scrollbar { width: 4px; height: 4px; }
-      ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb {
-        background-color: var(--color-primary);
-        border-radius: 20px;
+      :root {
+        --font-sans: 'Inter', sans-serif;
+        --font-serif: 'Lora', serif;
       }
-
-      @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-      @keyframes wave {
-        0%, 100% { transform: scaleY(0.5); }
-        50% { transform: scaleY(1.2); }
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: var(--font-sans);
+        background-color: #000;
+        color: #fff;
+        -webkit-tap-highlight-color: transparent;
       }
-
-      .theme-serif { font-family: var(--font-serif), 'Lora', serif; }
-      .theme-glow { filter: drop-shadow(0 0 8px rgba(var(--color-primary-rgb), 0.3)); }
+      .theme-serif { font-family: var(--font-serif); }
+      .theme-sans { font-family: var(--font-sans); }
       
-      .animate-fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
       .no-scrollbar::-webkit-scrollbar { display: none; }
       .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+      .select-none {
+        user-select: none;
+        -webkit-user-select: none;
+        /* Ensure buttons remain clickable */
+        pointer-events: auto;
+      }
+      
+      @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+      .animate-fade-in { animation: fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+      @keyframes pop-in {
+        from { opacity: 0; transform: scale(0.95) translateY(10px); }
+        to { opacity: 1; transform: scale(1) translateY(0); }
+      }
+      .animate-pop-in { animation: pop-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      
+      @keyframes search-panel-in {
+        from { transform: translateX(100%); }
+        to { transform: translateX(0); }
+      }
+      .animate-search-panel-in { animation: search-panel-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     </style>
   <script type="importmap">
 {
   "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.0",
-    "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.48.1/+esm",
-    "jszip": "https://esm.sh/jszip@^3.10.1"
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.40.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.95.3"
   }
 }
 </script>
 </head>
-  <body class="bg-[var(--color-background)] font-sans text-[var(--color-primary-text)] selection:bg-[var(--color-primary)] selection:text-white">
+  <body>
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
   </body>
 </html>

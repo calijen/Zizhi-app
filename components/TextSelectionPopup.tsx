@@ -1,15 +1,16 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { IconCopy, IconShare, IconQuote, IconSearch } from './icons';
 
 interface TextSelectionPopupProps {
+  rect: DOMRect;
   onCopy: () => void;
   onQuote: () => void;
   onSearch: () => void;
   onShare: () => void;
 }
 
-const TextSelectionPopup: React.FC<TextSelectionPopupProps> = ({ onCopy, onQuote, onSearch, onShare }) => {
+const TextSelectionPopup: React.FC<TextSelectionPopupProps> = ({ rect, onCopy, onQuote, onSearch, onShare }) => {
   const Button = ({ onClick, icon: Icon, label }: { onClick: () => void; icon: any; label: string }) => (
     <button 
       onPointerDown={(e) => {
@@ -17,28 +18,43 @@ const TextSelectionPopup: React.FC<TextSelectionPopupProps> = ({ onCopy, onQuote
         e.stopPropagation();
         onClick();
       }} 
-      className="flex flex-col items-center justify-center gap-1.5 px-4 py-3 hover:bg-white/10 active:bg-white/20 transition-all min-w-[64px]"
+      className="flex flex-col items-center justify-center gap-1.5 px-5 py-3.5 hover:bg-white/10 active:bg-white/20 active:scale-90 transition-all min-w-[70px]"
     >
-      <Icon className="w-5 h-5" />
-      <span className="text-[10px] font-bold uppercase tracking-tight opacity-90">{label}</span>
+      <Icon className="w-4 h-4 text-white/90" />
+      <span className="text-[9px] font-black uppercase tracking-[0.15em] text-white/40">{label}</span>
     </button>
   );
 
-  const Separator = () => <div className="w-px h-8 bg-white/10 self-center" />;
+  const Separator = () => <div className="w-px h-8 bg-white/10 self-center mx-0.5" />;
 
-  const handleInteraction = (e: React.MouseEvent | React.TouchEvent) => {
-      e.stopPropagation();
-  };
+  const positionStyle = useMemo(() => {
+    const barWidth = 300;
+    const barHeight = 65;
+    
+    // Position above selection with a small offset
+    let top = rect.top - barHeight - 15;
+    let left = rect.left + (rect.width / 2) - (barWidth / 2);
+
+    // If too close to top of screen, show below selection
+    if (top < 80) {
+      top = rect.bottom + 15;
+    }
+
+    // Keep within horizontal bounds
+    left = Math.max(15, Math.min(window.innerWidth - barWidth - 15, left));
+    
+    return {
+        top: `${top}px`,
+        left: `${left}px`,
+        width: `${barWidth}px`
+    };
+  }, [rect]);
 
   return (
     <div
-      data-selection-popup="true"
-      className="fixed bottom-[20%] left-1/2 -translate-x-1/2 z-[1000] flex items-stretch bg-[#1a1a1a] text-white rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.6)] border border-white/20 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200"
-      onMouseUp={handleInteraction}
-      onMouseDown={handleInteraction}
-      onTouchStart={handleInteraction}
-      role="toolbar"
-      aria-label="Selection actions"
+      style={positionStyle}
+      className="fixed z-[1000] flex items-stretch bg-[#0A0A0B] text-white rounded-[1.25rem] shadow-[0_30px_70px_-15px_rgba(0,0,0,0.8)] border border-white/15 overflow-hidden animate-pop-in selection-popup backdrop-blur-2xl"
+      onPointerDown={(e) => e.stopPropagation()}
     >
       <Button onClick={onCopy} icon={IconCopy} label="Copy" />
       <Separator />

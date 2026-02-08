@@ -1,10 +1,10 @@
-
-import type { Book, Quote } from './types';
+import type { Book, Quote, ReadingActivity } from './types';
 
 const DB_NAME = 'ZizhiDB';
-const DB_VERSION = 3; // Bump version for quotes store
+const DB_VERSION = 4; 
 const BOOK_STORE = 'books';
 const QUOTE_STORE = 'quotes';
+const ACTIVITY_STORE = 'reading_activity';
 
 let db: IDBDatabase;
 
@@ -25,6 +25,9 @@ export const initDB = (): Promise<IDBDatabase> => {
       if (!dbInstance.objectStoreNames.contains(QUOTE_STORE)) {
         dbInstance.createObjectStore(QUOTE_STORE, { keyPath: 'id' });
       }
+      if (!dbInstance.objectStoreNames.contains(ACTIVITY_STORE)) {
+        dbInstance.createObjectStore(ACTIVITY_STORE, { keyPath: 'date' });
+      }
     };
   });
 };
@@ -34,29 +37,37 @@ export const saveBook = async (book: Book): Promise<void> => {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(BOOK_STORE, 'readwrite');
     const store = transaction.objectStore(BOOK_STORE);
-    store.put(book).onsuccess = () => resolve();
+    const request = store.put(book);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject();
   });
 };
 
 export const getBooks = async (): Promise<Book[]> => {
     const db = await initDB();
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         const transaction = db.transaction(BOOK_STORE, 'readonly');
-        db.transaction(BOOK_STORE, 'readonly').objectStore(BOOK_STORE).getAll().onsuccess = (e) => resolve((e.target as any).result);
+        transaction.objectStore(BOOK_STORE).getAll().onsuccess = (e) => resolve((e.target as any).result);
     });
 };
 
 export const deleteBook = async (id: string): Promise<void> => {
     const db = await initDB();
-    const transaction = db.transaction(BOOK_STORE, 'readwrite');
-    transaction.objectStore(BOOK_STORE).delete(id);
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(BOOK_STORE, 'readwrite');
+        const request = transaction.objectStore(BOOK_STORE).delete(id);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject();
+    });
 };
 
 export const saveQuote = async (quote: Quote): Promise<void> => {
     const db = await initDB();
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
         const transaction = db.transaction(QUOTE_STORE, 'readwrite');
-        transaction.objectStore(QUOTE_STORE).put(quote).onsuccess = () => resolve();
+        const request = transaction.objectStore(QUOTE_STORE).put(quote);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject();
     });
 };
 
@@ -70,6 +81,37 @@ export const getQuotes = async (): Promise<Quote[]> => {
 
 export const deleteQuote = async (id: string): Promise<void> => {
     const db = await initDB();
-    const transaction = db.transaction(QUOTE_STORE, 'readwrite');
-    transaction.objectStore(QUOTE_STORE).delete(id);
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(QUOTE_STORE, 'readwrite');
+        const request = transaction.objectStore(QUOTE_STORE).delete(id);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject();
+    });
+};
+
+export const logActivity = async (seconds: number): Promise<void> => {
+    const db = await initDB();
+    const date = new Date().toISOString().split('T')[0];
+    return new Promise((resolve) => {
+        const transaction = db.transaction(ACTIVITY_STORE, 'readwrite');
+        const store = transaction.objectStore(ACTIVITY_STORE);
+        const request = store.get(date);
+        request.onsuccess = () => {
+            const existing = request.result as ReadingActivity;
+            if (existing) {
+                existing.seconds += seconds;
+                store.put(existing).onsuccess = () => resolve();
+            } else {
+                store.put({ date, seconds }).onsuccess = () => resolve();
+            }
+        };
+    });
+};
+
+export const getActivity = async (): Promise<ReadingActivity[]> => {
+    const db = await initDB();
+    return new Promise((resolve) => {
+        const transaction = db.transaction(ACTIVITY_STORE, 'readonly');
+        transaction.objectStore(ACTIVITY_STORE).getAll().onsuccess = (e) => resolve((e.target as any).result);
+    });
 };

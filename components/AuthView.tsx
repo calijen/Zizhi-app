@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { IconClose, IconSpinner, Logo, IconGoogle } from './icons';
+import { IconClose, IconSpinner, Logo, IconGoogle, IconEye, IconEyeOff } from './icons';
 import { supabase, isSupabaseConfigured } from '../supabase';
 
 interface AuthViewProps {
@@ -12,6 +12,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
     const [view, setView] = useState<'login' | 'signup'>('signup');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<{message: string; isWarning?: boolean} | null>(null);
 
@@ -53,12 +54,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
                 onClose();
             } else {
                 const { data, error: authError } = await supabase.auth.signUp({ email, password });
-                if (authError) {
-                    if (authError.message.includes('apiKey')) {
-                        throw new Error("Invalid API Key. Please ensure the key in supabase.ts is correct.");
-                    }
-                    throw authError;
-                }
+                if (authError) throw authError;
                 
                 if (data.user && data.session) {
                     onLogin(data.user);
@@ -74,9 +70,25 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
         }
     };
 
+    const handleForgotPassword = async () => {
+        if (!email) {
+            setError({ message: "Please enter your email address first.", isWarning: true });
+            return;
+        }
+        setIsLoading(true);
+        try {
+            const { error } = await supabase.auth.resetPasswordForEmail(email);
+            if (error) throw error;
+            setError({ message: "Reset link sent! Check your inbox.", isWarning: true });
+        } catch (err: any) {
+            setError({ message: err.message, isWarning: false });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-[100] bg-[var(--color-background)] flex flex-col items-center justify-center p-6 animate-fade-in overflow-y-auto">
-            {/* Close Button */}
             <button 
                 onClick={onClose} 
                 className="absolute top-6 right-6 p-2 text-[var(--color-secondary-text)] hover:bg-black/5 rounded-full transition-all"
@@ -105,7 +117,6 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
                 )}
 
                 <div className="w-full space-y-6">
-                    {/* Standalone Google Button */}
                     <button 
                         onClick={handleGoogleLogin} 
                         disabled={isLoading}
@@ -121,30 +132,40 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
                         <div className="flex-1 h-px bg-[var(--color-border-color)] opacity-60" />
                     </div>
 
-                    {/* Email Form */}
                     <form onSubmit={handleEmailAuth} className="w-full space-y-3">
                         <div className="space-y-1">
                             <label className="text-[10px] font-bold text-[var(--color-secondary-text)] uppercase tracking-wider ml-1">Email Address</label>
                             <input 
-                                type="email" 
-                                required 
-                                placeholder="name@example.com" 
-                                value={email}
+                                type="email" required placeholder="name@example.com" value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3.5 px-4 outline-none focus:border-blue-500 focus:bg-white transition-all text-base text-slate-900 placeholder:text-slate-400 font-medium"
                             />
                         </div>
-                        <div className="space-y-1">
+                        <div className="space-y-1 relative">
                             <label className="text-[10px] font-bold text-[var(--color-secondary-text)] uppercase tracking-wider ml-1">Password</label>
-                            <input 
-                                type="password" 
-                                required 
-                                placeholder="••••••••" 
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3.5 px-4 outline-none focus:border-blue-500 focus:bg-white transition-all text-base text-slate-900 placeholder:text-slate-400 font-medium"
-                            />
+                            <div className="relative">
+                                <input 
+                                    type={showPassword ? "text" : "password"} required placeholder="••••••••" value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3.5 px-4 outline-none focus:border-blue-500 focus:bg-white transition-all text-base text-slate-900 placeholder:text-slate-400 font-medium pr-12"
+                                />
+                                <button 
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-slate-600"
+                                >
+                                    {showPassword ? <IconEyeOff className="w-5 h-5" /> : <IconEye className="w-5 h-5" />}
+                                </button>
+                            </div>
                         </div>
+                        {view === 'login' && (
+                            <button 
+                                type="button" onClick={handleForgotPassword}
+                                className="text-xs text-[var(--color-primary)] font-bold hover:underline block text-right w-full"
+                            >
+                                Forgot password?
+                            </button>
+                        )}
                         <button 
                             disabled={isLoading} 
                             className="w-full bg-[var(--color-primary)] text-white font-bold py-3.5 rounded-xl shadow-md hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50 mt-4 flex items-center justify-center gap-2"

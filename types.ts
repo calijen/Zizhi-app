@@ -19,6 +19,7 @@ export interface Quote {
   author: string;
   bookId: string;
   location?: string;
+  createdAt?: number;
 }
 
 export interface Chapter {
@@ -27,6 +28,11 @@ export interface Chapter {
     html: string;
     label: string;
     textContent: string;
+}
+
+export interface ReadingActivity {
+    date: string; // YYYY-MM-DD
+    seconds: number;
 }
 
 export interface Book {
@@ -40,6 +46,7 @@ export interface Book {
     lastScrollTop: number;
     lastOpened?: number;
     readingTime: number; 
+    genre?: string;
     
     audioSummaryUrl?: string;
     summaryScript?: string;
@@ -50,10 +57,12 @@ export interface Book {
 
 export interface ThemeColors {
   'primary': string;
-  'secondary':string;
+  'secondary': string;
   'background': string;
+  'surface': string;
   'primary-text': string;
   'secondary-text': string;
+  'muted-text': string;
   'border-color': string;
 }
 
@@ -64,11 +73,12 @@ export interface ThemeFont {
 }
 
 export interface Theme {
+  id: string;
   name: string;
   colors: ThemeColors;
   font: ThemeFont;
   fontSize: number;
   lineHeight: number;
   texture: string;
-  readingMode: 'scroll' | 'page'; // Added to track layout preference
+  readingMode: 'scroll' | 'page';
 }

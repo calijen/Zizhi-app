@@ -1,170 +1,155 @@
-
 import React, { useState, useMemo } from 'react';
-import type { Quote } from '../types';
-import { IconDownload, IconTrash } from './icons';
+import type { Quote, Theme } from '../types';
+import { IconTrash, IconSearch, IconQuote, IconShare } from './icons';
+import ShareDialog from './ShareDialog';
 
 interface QuotesViewProps {
   quotes: Quote[];
+  theme: Theme;
   onDelete: (id: string) => void;
-  onShare: (quote: Quote) => void;
-  onGenerateImage: (quote: Quote) => void;
   onGoToQuote: (quote: Quote) => void;
 }
 
-const QuotesView: React.FC<QuotesViewProps> = ({ quotes, onDelete, onShare, onGenerateImage, onGoToQuote }) => {
+const QuotesView: React.FC<QuotesViewProps> = ({ quotes, theme, onDelete, onGoToQuote }) => {
   const [sortBy, setSortBy] = useState<'date' | 'book'>('date');
   const [expandedQuotes, setExpandedQuotes] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterBook, setFilterBook] = useState('all');
+  const [activeShare, setActiveShare] = useState<Quote | null>(null);
+
+  const uniqueBooks = useMemo(() => {
+    const books = new Set(quotes.map(q => q.bookTitle));
+    return Array.from(books).sort();
+  }, [quotes]);
+
+  const filteredQuotes = useMemo(() => {
+    return quotes.filter(q => {
+        const matchesSearch = q.text.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                             q.author.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesBook = filterBook === 'all' || q.bookTitle === filterBook;
+        return matchesSearch && matchesBook;
+    });
+  }, [quotes, searchQuery, filterBook]);
 
   const toggleExpanded = (id: string) => {
     setExpandedQuotes(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
-      } else {
-        newSet.add(id);
-      }
+      if (newSet.has(id)) newSet.delete(id);
+      else newSet.add(id);
       return newSet;
     });
   };
 
-  const groupedByBook = useMemo(() => {
-    if (sortBy !== 'book') return null;
-    const grouped = quotes.reduce((acc, quote) => {
-      const key = quote.bookTitle || 'Unknown Book';
-      (acc[key] = acc[key] || []).push(quote);
-      return acc;
-    }, {} as { [key: string]: Quote[] });
-    
-    // Sort books by title
-    return Object.keys(grouped).sort().reduce(
-        (obj, key) => { 
-            obj[key] = grouped[key]; 
-            return obj;
-        }, 
-        {} as {[key: string]: Quote[]}
-    );
-  }, [quotes, sortBy]);
-
-  const sortedByDate = useMemo(() => {
-    if (sortBy !== 'date') return [];
-    return [...quotes].sort((a, b) => new Date(b.id).getTime() - new Date(a.id).getTime());
-  }, [quotes, sortBy]);
-
   const QuoteItem: React.FC<{ quote: Quote }> = ({ quote }) => {
     const isExpanded = expandedQuotes.has(quote.id);
     const words = quote.text.trim().split(/\s+/);
-    const wordCount = words.length;
-    const isTooLongForImage = wordCount > 100;
-    const needsTruncation = wordCount > 50;
+    const needsTruncation = words.length > 50;
     const displayText = needsTruncation && !isExpanded ? words.slice(0, 50).join(' ') + '...' : quote.text;
 
     return (
-        <div className="py-8 border-b border-[var(--color-border-color)] last:border-b-0">
-            <div className="text-sm text-[var(--color-secondary-text)] mb-3">
-                <span className="font-semibold text-[var(--color-primary-text)]">{quote.author}</span> in <span className="italic">{quote.bookTitle}</span>
+        <div className="py-8 border-b border-[var(--color-border-color)] last:border-b-0 animate-fade-in group">
+            <div className="text-xs text-[var(--color-secondary-text)] mb-3 flex items-center justify-between">
+                <div>
+                   <span className="font-black text-[var(--color-primary-text)] uppercase tracking-widest">{quote.author}</span>
+                   <span className="opacity-40 font-bold uppercase tracking-widest text-[9px] ml-2">from {quote.bookTitle}</span>
+                </div>
             </div>
             <p 
               className={`text-lg text-[var(--color-primary-text)] font-serif leading-relaxed whitespace-pre-wrap ${quote.location ? 'cursor-pointer hover:opacity-80' : ''}`}
               onClick={() => quote.location && onGoToQuote(quote)}
-              onKeyDown={(e) => {
-                if (quote.location && (e.key === 'Enter' || e.key === ' ')) {
-                  e.preventDefault();
-                  onGoToQuote(quote);
-                }
-              }}
-              role={quote.location ? "button" : undefined}
-              tabIndex={quote.location ? 0 : undefined}
-              title={quote.location ? "View in book" : "Location not available for this quote"}
             >
                 {displayText}
             </p>
             {needsTruncation && (
-                <button onClick={() => toggleExpanded(quote.id)} className="text-[var(--color-primary)] font-semibold mt-2 text-sm">
-                    {isExpanded ? 'Show less' : 'Read more'}
+                <button onClick={() => toggleExpanded(quote.id)} className="text-[var(--color-primary)] font-black uppercase tracking-widest mt-4 text-[9px] bg-black/5 px-3 py-1.5 rounded-full border border-black/5">
+                    {isExpanded ? 'Collapse' : 'Expand'}
                 </button>
             )}
-            <div className="w-full flex items-center justify-end gap-6 mt-5">
+            <div className="w-full flex items-center justify-end gap-6 mt-6 opacity-40 group-hover:opacity-100 transition-opacity">
                 <button 
-                    onClick={() => onGenerateImage(quote)} 
-                    title={isTooLongForImage ? "Quote is too long to download as an image (max 100 words)" : "Download as image"}
-                    disabled={isTooLongForImage}
-                    className={`flex items-center gap-1.5 text-[var(--color-secondary-text)] hover:text-[var(--color-primary)] transition-colors text-sm font-medium ${isTooLongForImage ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    aria-label={isTooLongForImage ? "Quote too long to download" : "Download quote as image"}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveShare(quote); }} 
+                    className="flex items-center gap-1.5 text-[var(--color-secondary-text)] hover:text-[var(--color-primary)] transition-colors text-[10px] font-black uppercase tracking-widest"
                 >
-                    <IconDownload className="w-4 h-4" />
-                    <span>Download</span>
+                    <IconShare className="w-4 h-4" />
+                    <span>share</span>
                 </button>
                 <button 
-                    onClick={() => onDelete(quote.id)} 
-                    className="flex items-center gap-1.5 text-[var(--color-secondary-text)] hover:text-red-600 transition-colors text-sm font-medium"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(quote.id); }} 
                     aria-label="Delete quote"
+                    className="flex items-center gap-1.5 text-[var(--color-secondary-text)] hover:text-red-600 transition-colors text-[10px] font-black uppercase tracking-widest"
                 >
                     <IconTrash className="w-4 h-4" />
-                    <span>Delete</span>
+                    <span>delete</span>
                 </button>
             </div>
         </div>
     );
   };
 
-  if (quotes.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-center p-8 space-y-4">
-        <div className="w-24 h-24 text-[var(--color-border-color)]">
-          <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full" aria-hidden="true">
-            <path d="M12 11C12 9.34315 13.3431 8 15 8H33C34.6569 8 36 9.34315 36 11V37C36 38.6569 34.6569 40 33 40H15C13.3431 40 12 38.6569 12 37V11Z" stroke="currentColor" strokeOpacity="0.5" strokeWidth="2" strokeLinejoin="round"/>
-            <path d="M20 18H28" stroke="currentColor" strokeOpacity="0.7" strokeWidth="2" strokeLinecap="round"/>
-            <path d="M20 26H28" stroke="currentColor" strokeOpacity="0.7" strokeWidth="2" strokeLinecap="round"/>
-            <rect x="18" y="24" width="12" height="4" fill="var(--color-secondary)" fillOpacity="0.3"/>
-          </svg>
-        </div>
-        <h3 className="text-xl font-semibold text-[var(--color-primary-text)]">Your quotes will appear here</h3>
-        <p className="max-w-md text-[var(--color-secondary-text)]">
-          To save a quote, highlight text while reading a book and select the 'Quote' option.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8">
-      <div className="flex items-center justify-end mb-4">
-        <span className="text-sm text-[var(--color-secondary-text)] mr-2" id="sort-label">Sort by:</span>
-        <div className="flex items-center border border-[var(--color-border-color)] rounded-md bg-[var(--color-background)]" role="group" aria-labelledby="sort-label">
-          <button 
-            onClick={() => setSortBy('date')} 
-            className={`px-3 py-1 text-sm rounded-l-md transition-colors ${sortBy === 'date' ? 'bg-[rgba(var(--color-border-color-rgb),0.2)] text-[var(--color-primary-text)] font-semibold' : 'text-[var(--color-secondary-text)] hover:bg-[rgba(var(--color-border-color-rgb),0.1)]'}`}
-            aria-pressed={sortBy === 'date'}
+    <div className="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+      <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1">
+              <IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 opacity-40" />
+              <input 
+                type="text" placeholder="Search quotes" value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-2xl py-3 pl-12 pr-4 text-[11px] font-black uppercase tracking-widest focus:border-[var(--color-primary)] outline-none"
+              />
+          </div>
+          <select 
+            value={filterBook} onChange={(e) => setFilterBook(e.target.value)}
+            className="bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-2xl px-5 py-3 text-[11px] font-black uppercase tracking-widest focus:border-[var(--color-primary)] outline-none"
           >
-            Date
-          </button>
-          <button 
-            onClick={() => setSortBy('book')} 
-            className={`px-3 py-1 text-sm rounded-r-md transition-colors border-l border-[var(--color-border-color)] ${sortBy === 'book' ? 'bg-[rgba(var(--color-border-color-rgb),0.2)] text-[var(--color-primary-text)] font-semibold' : 'text-[var(--color-secondary-text)] hover:bg-[rgba(var(--color-border-color-rgb),0.1)]'}`}
-            aria-pressed={sortBy === 'book'}
-          >
-            Book
-          </button>
+              <option value="all">all books</option>
+              {uniqueBooks.map(b => <option key={b} value={b}>{b}</option>)}
+          </select>
+      </div>
+
+      <div className="flex items-center justify-end gap-4">
+        <div className="flex items-center border border-[var(--color-border-color)] rounded-full overflow-hidden bg-[var(--color-background)]">
+          <button onClick={() => setSortBy('date')} className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest transition-all ${sortBy === 'date' ? 'bg-[var(--color-primary)] text-white' : 'text-[var(--color-secondary-text)] hover:bg-black/5'}`}>date</button>
+          <button onClick={() => setSortBy('book')} className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest transition-all border-l border-[var(--color-border-color)] ${sortBy === 'book' ? 'bg-[var(--color-primary)] text-white' : 'text-[var(--color-secondary-text)] hover:bg-black/5'}`}>book</button>
         </div>
       </div>
       
-      <div className="bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-lg px-4 sm:px-8">
-        {sortBy === 'date' && sortedByDate.map(quote => <QuoteItem key={quote.id} quote={quote} />)}
-        
-        {sortBy === 'book' && groupedByBook && Object.keys(groupedByBook).map((bookTitle) => {
-            const bookQuotes = groupedByBook[bookTitle];
-            return (
-              <div key={bookTitle} className="py-8 border-b border-[var(--color-border-color)] last:border-b-0">
-                  <h2 className="text-xl font-bold font-sans text-[var(--color-primary-text)] pb-4 mb-4 border-b border-[var(--color-border-color)]">
-                      From <span className="italic">{bookTitle}</span>
+      <div className="bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-[2.5rem] px-8 sm:px-12 shadow-sm min-h-[500px]">
+        {filteredQuotes.length === 0 ? (
+            <div className="py-40 flex flex-col items-center justify-center text-center">
+                <IconQuote className="w-16 h-16 mb-8 text-[var(--color-primary)] opacity-10" />
+                <p className="text-xl font-black text-[var(--color-primary-text)] opacity-30 italic theme-serif">
+                    Nothing found.
+                </p>
+            </div>
+        ) : sortBy === 'date' ? (
+            filteredQuotes.map(quote => <QuoteItem key={quote.id} quote={quote} />)
+        ) : (
+            Object.entries(filteredQuotes.reduce((acc, q) => {
+              const key = q.bookTitle || 'Unknown';
+              (acc[key] = acc[key] || []).push(q);
+              return acc;
+            }, {} as Record<string, Quote[]>)).map(([bookTitle, qs]) => (
+              <div key={bookTitle} className="py-10 border-b border-[var(--color-border-color)] last:border-b-0">
+                  <h2 className="text-xs font-black uppercase tracking-[0.4em] text-[var(--color-primary)] pb-4 mb-6 border-b border-black/5">
+                      {bookTitle}
                   </h2>
-                  <div className="space-y-8 divide-y divide-[var(--color-border-color)]">
-                    {bookQuotes.map(quote => <QuoteItem key={quote.id} quote={quote} />)}
+                  <div className="space-y-4">
+                    {(qs as Quote[]).map(quote => <QuoteItem key={quote.id} quote={quote} />)}
                   </div>
               </div>
-            );
-        })}
+            ))
+        )}
        </div>
+
+       {activeShare && (
+           <ShareDialog 
+              text={activeShare.text} 
+              bookTitle={activeShare.bookTitle} 
+              author={activeShare.author} 
+              theme={theme} 
+              onClose={() => setActiveShare(null)} 
+           />
+       )}
     </div>
   );
 };
