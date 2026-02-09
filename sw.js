@@ -5,20 +5,20 @@ const STATIC_ASSETS = [
   '/manifest.json',
   '/logo.svg',
   'https://cdn.tailwindcss.com',
-  'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'
+  'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
+  'https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Lora:ital,wght@0,400;0,700;1,400;1,700&family=Crimson+Pro:ital,wght@0,400;0,700;1,400;1,700&family=Literata:ital,wght@0,400;0,700;1,400;1,700&display=swap'
 ];
 
-// Install event: cache static assets
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
+      console.log('Zizhi: Pre-caching core assets');
       return cache.addAll(STATIC_ASSETS);
     })
   );
   self.skipWaiting();
 });
 
-// Activate event: cleanup old caches
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => {
@@ -30,33 +30,45 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-// Fetch event: stale-while-revalidate strategy
 self.addEventListener('fetch', event => {
-  // Skip Supabase, Google Generative Language, and other API requests
+  const url = new URL(event.request.url);
+
+  // Do not cache API requests or non-GET requests
   if (
-    event.request.url.includes('supabase.co') || 
-    event.request.url.includes('generativelanguage.googleapis.com') ||
-    event.request.method !== 'GET'
+    event.request.method !== 'GET' ||
+    url.hostname.includes('supabase.co') ||
+    url.hostname.includes('generativelanguage.googleapis.com')
   ) {
     return;
   }
 
+  // Network-first for the main entry point to ensure updates, fallback to cache
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          const clonedResponse = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clonedResponse));
+          return response;
+        })
+        .catch(() => caches.match('/index.html') || caches.match(event.request))
+    );
+    return;
+  }
+
+  // Stale-While-Revalidate for everything else (fonts, libraries, icons)
   event.respondWith(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.match(event.request).then(response => {
-        const fetchPromise = fetch(event.request).then(networkResponse => {
+    caches.match(event.request).then(cachedResponse => {
+      const fetchedResponse = fetch(event.request)
+        .then(networkResponse => {
           if (networkResponse.ok) {
-            cache.put(event.request, networkResponse.clone());
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, networkResponse.clone()));
           }
           return networkResponse;
-        }).catch(() => {
-          // Fallback if offline and not in cache
-          if (event.request.mode === 'navigate') {
-            return cache.match('/index.html');
-          }
-        });
-        return response || fetchPromise;
-      });
+        })
+        .catch(() => cachedResponse);
+
+      return cachedResponse || fetchedResponse;
     })
   );
 });
