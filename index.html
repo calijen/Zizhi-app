@@ -7,77 +7,115 @@
     
     <!-- PWA & Mobile Optimization -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <meta name="theme-color" content="#6366F1" />
+    <meta name="theme-color" content="#ffffff" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Zizhi" />
     <link rel="apple-touch-icon" href="/logo.svg" />
     
-    <title>Zizhi — Elegant EPUB Reader</title>
+    <title>Zizhi — Monolith</title>
     
     <!-- External Dependencies -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Lora:ital,wght@0,400;0,700;1,400;1,700&family=Crimson+Pro:ital,wght@0,400;0,700;1,400;1,700&family=Literata:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=Lora:ital,wght@0,400;0,700;1,400;1,700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     
+    <!-- Mantine Core Styles -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mantine/core@7.16.2/styles.css" />
+
     <style>
       :root {
         --font-sans: 'Inter', sans-serif;
         --font-serif: 'Lora', serif;
+        --font-mono: 'JetBrains Mono', monospace;
       }
       body {
         margin: 0;
         padding: 0;
         font-family: var(--font-sans);
-        background-color: #000;
-        color: #fff;
+        background-color: #000000;
+        color: #ffffff;
         -webkit-tap-highlight-color: transparent;
         overscroll-behavior-y: none;
+        overflow: hidden;
       }
-      .theme-serif { font-family: var(--font-serif); }
-      .theme-sans { font-family: var(--font-sans); }
-      
+
+      /* Subtle Mono Drift Background */
+      .bg-blob {
+        position: fixed;
+        width: 800px;
+        height: 800px;
+        border-radius: 50%;
+        filter: blur(180px);
+        opacity: 0.05;
+        z-index: -1;
+        animation: drift 30s infinite alternate ease-in-out;
+      }
+      .blob-1 { background: #ffffff; top: -20%; left: -20%; }
+      .blob-2 { background: #0080ff; bottom: -20%; right: -20%; animation-delay: -10s; }
+
+      @keyframes drift {
+        from { transform: translate(0, 0) scale(1); }
+        to { transform: translate(100px, 50px) scale(1.2); }
+      }
+
+      /* High-Precision Grid Overlay */
+      .bg-grid {
+        position: fixed;
+        inset: 0;
+        background-image: 
+          linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px);
+        background-size: 20px 20px;
+        mask-image: radial-gradient(circle at center, black, transparent 95%);
+        pointer-events: none;
+        z-index: 0;
+      }
+
       .no-scrollbar::-webkit-scrollbar { display: none; }
       .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-      .select-none {
-        user-select: none;
-        -webkit-user-select: none;
-        pointer-events: auto;
+      /* Monolithic Glass */
+      .glass {
+        background: rgba(10, 10, 10, 0.7);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
       }
-      
-      @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-      .animate-fade-in { animation: fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
-      @keyframes pop-in {
-        from { opacity: 0; transform: scale(0.95) translateY(10px); }
-        to { opacity: 1; transform: scale(1) translateY(0); }
+      /* Printed Page Texture - Softer & More Natural */
+      .printed-texture {
+        position: relative;
       }
-      .animate-pop-in { animation: pop-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-      
-      @keyframes search-panel-in {
-        from { transform: translateX(100%); }
-        to { transform: translateX(0); }
+      .printed-texture::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 100 100'%3E%3Cfilter id='noise' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.02'/%3E%3C/svg%3E");
+        pointer-events: none;
+        z-index: 1;
       }
-      .animate-search-panel-in { animation: search-panel-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     </style>
 
     <script type="importmap">
     {
       "imports": {
-        "react": "https://esm.sh/react@^19.2.4",
-        "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-        "react/": "https://esm.sh/react@^19.2.4/",
-        "@google/genai": "https://esm.sh/@google/genai@^1.40.0",
-        "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.95.3"
+        "react": "https://esm.sh/react@18.3.1",
+        "react-dom": "https://esm.sh/react-dom@18.3.1",
+        "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+        "@mantine/core": "https://esm.sh/@mantine/core@7.16.2?external=react,react-dom",
+        "@mantine/hooks": "https://esm.sh/@mantine/hooks@7.16.2?external=react,react-dom",
+        "@google/genai": "https://esm.sh/@google/genai@1.40.0",
+        "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.45.4",
+        "react-dom/": "https://esm.sh/react-dom@18.3.1/",
+        "react/": "https://esm.sh/react@18.3.1/"
       }
     }
     </script>
   </head>
   <body>
     <div id="root"></div>
-    <!-- CRITICAL: The entry point for the React application -->
     <script type="module" src="index.tsx"></script>
   </body>
 </html>

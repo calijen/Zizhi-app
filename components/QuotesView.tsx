@@ -1,142 +1,104 @@
+
 import React, { useState, useMemo } from 'react';
-import type { Quote, Theme } from '../types';
-import { IconTrash, IconSearch, IconQuote, IconShare } from './icons';
+import { Text, Group, ActionIcon, Box } from '@mantine/core';
+import type { Quote, Theme, Book } from '../types';
+import { IconTrash, IconSearch, IconShare } from './icons';
 import ShareDialog from './ShareDialog';
 
 interface QuotesViewProps {
   quotes: Quote[];
+  library?: Book[];
   theme: Theme;
   onDelete: (id: string) => void;
   onGoToQuote: (quote: Quote) => void;
 }
 
-const QuotesView: React.FC<QuotesViewProps> = ({ quotes, theme, onDelete, onGoToQuote }) => {
-  const [sortBy, setSortBy] = useState<'date' | 'book'>('date');
-  const [expandedQuotes, setExpandedQuotes] = useState<Set<string>>(new Set());
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterBook, setFilterBook] = useState('all');
-  const [activeShare, setActiveShare] = useState<Quote | null>(null);
-
-  const uniqueBooks = useMemo(() => {
-    const books = new Set(quotes.map(q => q.bookTitle));
-    return Array.from(books).sort();
-  }, [quotes]);
-
-  const filteredQuotes = useMemo(() => {
-    return quotes.filter(q => {
-        const matchesSearch = q.text.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                             q.author.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesBook = filterBook === 'all' || q.bookTitle === filterBook;
-        return matchesSearch && matchesBook;
-    });
-  }, [quotes, searchQuery, filterBook]);
-
-  const toggleExpanded = (id: string) => {
-    setExpandedQuotes(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(id)) newSet.delete(id);
-      else newSet.add(id);
-      return newSet;
-    });
-  };
-
-  const QuoteItem: React.FC<{ quote: Quote }> = ({ quote }) => {
-    const isExpanded = expandedQuotes.has(quote.id);
-    const words = quote.text.trim().split(/\s+/);
-    const needsTruncation = words.length > 50;
-    const displayText = needsTruncation && !isExpanded ? words.slice(0, 50).join(' ') + '...' : quote.text;
+const QuoteCard: React.FC<{ 
+    quote: Quote; 
+    onDelete: (id: string) => void; 
+    onGoToQuote: (q: Quote) => void;
+    onShare: (q: Quote) => void;
+}> = ({ quote, onDelete, onGoToQuote, onShare }) => {
+    const [expanded, setExpanded] = useState(false);
+    
+    const words = useMemo(() => quote.text.trim().split(/\s+/), [quote.text]);
+    const isLong = words.length > 20;
+    const displayText = expanded || !isLong 
+        ? quote.text 
+        : words.slice(0, 20).join(' ') + '...';
 
     return (
-        <div className="py-8 border-b border-[var(--color-border-color)] last:border-b-0 animate-fade-in group">
-            <div className="text-xs text-[var(--color-secondary-text)] mb-3 flex items-center justify-between">
-                <div>
-                   <span className="font-black text-[var(--color-primary-text)] uppercase tracking-widest">{quote.author}</span>
-                   <span className="opacity-40 font-bold uppercase tracking-widest text-[9px] ml-2">from {quote.bookTitle}</span>
-                </div>
+        <div className="p-5 bg-[var(--color-surface)] border-4 border-black group relative shadow-[6px_6px_0_black] hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[8px_8px_0_black] transition-all flex flex-col h-auto">
+            <div className="flex justify-between items-start mb-3">
+                <Text className="text-[9px] font-black uppercase tracking-widest text-pink-500 truncate max-w-[140px]">{quote.author}</Text>
+                <Group gap={6}>
+                    <ActionIcon variant="filled" color="cyan" size="xs" className="border-2 border-black rounded-none shadow-[1px_1px_0_black]" onClick={() => onShare(quote)}><IconShare className="w-3 h-3 text-black" /></ActionIcon>
+                    <ActionIcon variant="filled" color="red" size="xs" className="border-2 border-black rounded-none shadow-[1px_1px_0_black]" onClick={() => onDelete(quote.id)}><IconTrash className="w-3 h-3 text-black" /></ActionIcon>
+                </Group>
             </div>
             <p 
-              className={`text-lg text-[var(--color-primary-text)] font-serif leading-relaxed whitespace-pre-wrap ${quote.location ? 'cursor-pointer hover:opacity-80' : ''}`}
-              onClick={() => quote.location && onGoToQuote(quote)}
+                className={`text-lg font-serif leading-tight text-[var(--color-primary-text)] cursor-pointer hover:opacity-80 transition-opacity mb-2`}
+                onClick={() => onGoToQuote(quote)}
             >
-                {displayText}
+                “{displayText}”
             </p>
-            {needsTruncation && (
-                <button onClick={() => toggleExpanded(quote.id)} className="text-[var(--color-primary)] font-black uppercase tracking-widest mt-4 text-[9px] bg-black/5 px-3 py-1.5 rounded-full border border-black/5">
-                    {isExpanded ? 'Collapse' : 'Expand'}
+            {isLong && (
+                <button 
+                    className="text-[9px] font-black uppercase tracking-widest text-cyan-600 hover:underline inline-block mb-3 self-start"
+                    onClick={() => setExpanded(!expanded)}
+                >
+                    {expanded ? 'Show Less' : 'Show More'}
                 </button>
             )}
-            <div className="w-full flex items-center justify-end gap-6 mt-6 opacity-40 group-hover:opacity-100 transition-opacity">
-                <button 
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveShare(quote); }} 
-                    className="flex items-center gap-1.5 text-[var(--color-secondary-text)] hover:text-[var(--color-primary)] transition-colors text-[10px] font-black uppercase tracking-widest"
-                >
-                    <IconShare className="w-4 h-4" />
-                    <span>share</span>
-                </button>
-                <button 
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(quote.id); }} 
-                    aria-label="Delete quote"
-                    className="flex items-center gap-1.5 text-[var(--color-secondary-text)] hover:text-red-600 transition-colors text-[10px] font-black uppercase tracking-widest"
-                >
-                    <IconTrash className="w-4 h-4" />
-                    <span>delete</span>
-                </button>
+            <div className="mt-auto pt-2 border-t border-black/10">
+                <Text className="text-[8px] font-black text-black/40 uppercase tracking-widest truncate">{quote.bookTitle}</Text>
             </div>
         </div>
     );
-  };
+};
+
+const QuotesView: React.FC<QuotesViewProps> = ({ quotes, library = [], theme, onDelete, onGoToQuote }) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeShare, setActiveShare] = useState<Quote | null>(null);
+
+  const filteredQuotes = useMemo(() => {
+    return quotes.filter(q => {
+        return q.text.toLowerCase().includes(searchQuery.toLowerCase()) || 
+               q.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
+               q.bookTitle.toLowerCase().includes(searchQuery.toLowerCase());
+    });
+  }, [quotes, searchQuery]);
+
+  const activeBookCover = useMemo(() => {
+    if (!activeShare) return null;
+    const book = library.find(b => b.id === activeShare.bookId);
+    return book?.coverImageUrl || null;
+  }, [activeShare, library]);
 
   return (
-    <div className="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-      <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-              <IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 opacity-40" />
-              <input 
-                type="text" placeholder="Search quotes" value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-2xl py-3 pl-12 pr-4 text-[11px] font-black uppercase tracking-widest focus:border-[var(--color-primary)] outline-none"
-              />
-          </div>
-          <select 
-            value={filterBook} onChange={(e) => setFilterBook(e.target.value)}
-            className="bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-2xl px-5 py-3 text-[11px] font-black uppercase tracking-widest focus:border-[var(--color-primary)] outline-none"
-          >
-              <option value="all">all books</option>
-              {uniqueBooks.map(b => <option key={b} value={b}>{b}</option>)}
-          </select>
+    <div className="max-w-4xl mx-auto p-6 space-y-10 pb-40 animate-fade-in">
+      <header className="border-b-4 border-black pb-6">
+          <h2 className="text-4xl font-black text-black uppercase tracking-tight">Personal archive</h2>
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-pink-500 mt-2">Captured insights</p>
+      </header>
+
+      <div className="relative">
+          <IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-black opacity-40" />
+          <input 
+            type="text" placeholder="Search insights..." value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-white border-4 border-black p-4 pl-12 text-[14px] font-black text-black placeholder:text-gray-300 outline-none shadow-[4px_4px_0_black] focus:translate-x-[-2px] focus:translate-y-[-2px] focus:shadow-[6px_6px_0_black] transition-all"
+          />
       </div>
 
-      <div className="flex items-center justify-end gap-4">
-        <div className="flex items-center border border-[var(--color-border-color)] rounded-full overflow-hidden bg-[var(--color-background)]">
-          <button onClick={() => setSortBy('date')} className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest transition-all ${sortBy === 'date' ? 'bg-[var(--color-primary)] text-white' : 'text-[var(--color-secondary-text)] hover:bg-black/5'}`}>date</button>
-          <button onClick={() => setSortBy('book')} className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest transition-all border-l border-[var(--color-border-color)] ${sortBy === 'book' ? 'bg-[var(--color-primary)] text-white' : 'text-[var(--color-secondary-text)] hover:bg-black/5'}`}>book</button>
-        </div>
-      </div>
-      
-      <div className="bg-[var(--color-background)] border border-[var(--color-border-color)] rounded-[2.5rem] px-8 sm:px-12 shadow-sm min-h-[500px]">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-min">
         {filteredQuotes.length === 0 ? (
-            <div className="py-40 flex flex-col items-center justify-center text-center">
-                <IconQuote className="w-16 h-16 mb-8 text-[var(--color-primary)] opacity-10" />
-                <p className="text-xl font-black text-[var(--color-primary-text)] opacity-30 italic theme-serif">
-                    Nothing found.
-                </p>
+            <div className="col-span-full py-20 flex flex-col items-center justify-center text-center opacity-30">
+                <p className="text-[12px] font-black uppercase tracking-[0.2em]">Archive Empty</p>
             </div>
-        ) : sortBy === 'date' ? (
-            filteredQuotes.map(quote => <QuoteItem key={quote.id} quote={quote} />)
         ) : (
-            Object.entries(filteredQuotes.reduce((acc, q) => {
-              const key = q.bookTitle || 'Unknown';
-              (acc[key] = acc[key] || []).push(q);
-              return acc;
-            }, {} as Record<string, Quote[]>)).map(([bookTitle, qs]) => (
-              <div key={bookTitle} className="py-10 border-b border-[var(--color-border-color)] last:border-b-0">
-                  <h2 className="text-xs font-black uppercase tracking-[0.4em] text-[var(--color-primary)] pb-4 mb-6 border-b border-black/5">
-                      {bookTitle}
-                  </h2>
-                  <div className="space-y-4">
-                    {(qs as Quote[]).map(quote => <QuoteItem key={quote.id} quote={quote} />)}
-                  </div>
-              </div>
+            filteredQuotes.map(quote => (
+                <QuoteCard key={quote.id} quote={quote} onDelete={onDelete} onGoToQuote={onGoToQuote} onShare={setActiveShare} />
             ))
         )}
        </div>
@@ -146,6 +108,7 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, theme, onDelete, onGoTo
               text={activeShare.text} 
               bookTitle={activeShare.bookTitle} 
               author={activeShare.author} 
+              coverImageUrl={activeBookCover}
               theme={theme} 
               onClose={() => setActiveShare(null)} 
            />

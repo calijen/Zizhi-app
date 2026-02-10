@@ -1,242 +1,291 @@
-import React, { useMemo } from 'react';
-import { IconClose, IconDownload, IconShare } from './icons';
+
+import React, { useMemo, useState, useRef, useEffect } from 'react';
+import { IconClose, IconDownload, IconShare, IconCopy } from './icons';
 import type { Theme } from '../types';
 
 interface ShareDialogProps {
     text: string;
     bookTitle: string;
     author: string;
+    coverImageUrl?: string | null;
     theme: Theme;
     onClose: () => void;
 }
 
-const ShareDialog: React.FC<ShareDialogProps> = ({ text, bookTitle, author, theme, onClose }) => {
-    const wordCount = useMemo(() => text.trim().split(/\s+/).length, [text]);
-    const isTooLong = wordCount > 100;
+const PRESETS = [
+    { name: 'Sky', bg: '#7096c1', text: '#ffffff' },
+    { name: 'Midnight', bg: '#0b162a', text: '#ffffff' },
+    { name: 'Vapor', bg: '#d0e3f5', text: '#0b162a' },
+    { name: 'Ocean', bg: '#1e3a5f', text: '#ffffff' },
+    { name: 'Cloud', bg: '#ffffff', text: '#0b162a' },
+    { name: 'Ink', bg: '#1a1a1a', text: '#ffffff' },
+];
 
-    const platforms = [
-        { 
-            name: 'Twitter / X', 
-            url: `https://twitter.com/intent/tweet?text=${encodeURIComponent(`"${text}" — ${author}, ${bookTitle}`)}` 
-        },
-        { 
-            name: 'WhatsApp', 
-            url: `https://wa.me/?text=${encodeURIComponent(`"${text}" — ${author}, ${bookTitle}`)}` 
-        },
-        { 
-            name: 'Substack', 
-            url: `https://substack.com/refer?text=${encodeURIComponent(`"${text}" — ${author}, ${bookTitle}`)}` 
-        }
-    ];
+const SocialIcon = ({ type }: { type: string }) => {
+    switch (type) {
+        case 'WhatsApp':
+            return <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>;
+        case 'Twitter':
+            return <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>;
+        case 'Substack':
+            return <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M22.539 8.242H1.46V5.406h21.078v2.836zM1.46 10.812V24L12 18.11 22.54 24V10.812H1.46zM22.54 0H1.46v2.836h21.078V0z"/></svg>;
+        case 'Facebook':
+            return <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>;
+        default:
+            return null;
+    }
+};
 
-    const generateImage = () => {
-        if (isTooLong) return;
+const ShareDialog: React.FC<ShareDialogProps> = ({ text, bookTitle, author, coverImageUrl, theme, onClose }) => {
+    const [step, setStep] = useState<'choice' | 'image' | 'social'>('choice');
+    const [selectedPreset, setSelectedPreset] = useState(PRESETS[0]);
+    const [layout, setLayout] = useState<'pretty' | 'classic'>('pretty');
+    const [widthMode, setWidthMode] = useState<'wide' | 'square'>('wide');
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
 
-        const canvas = document.createElement('canvas');
+    const generatePreview = () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        // High Fidelity Scaling for 4K Ready Output
-        const scale = 3;
-        const width = 1080 * scale;
-        const padding = 80 * scale;
-        const borderRadius = 40 * scale;
+        const scale = 2; 
+        const w = widthMode === 'wide' ? 800 : 600;
+        const h = layout === 'pretty' ? 450 : 600;
         
-        // Font sizing logic
-        let fontSize = 48 * scale;
-        if (text.length > 250) fontSize = 42 * scale;
-        if (text.length > 500) fontSize = 36 * scale;
+        canvas.width = w * scale;
+        canvas.height = h * scale;
+        ctx.scale(scale, scale);
+
+        ctx.fillStyle = selectedPreset.bg;
+        ctx.fillRect(0, 0, w, h);
+
+        const padding = 40;
+        const contentW = w - padding * 2;
         
-        const metaFontSize = 22 * scale; // Ultra-small metadata font
-        const brandingFontSize = 30 * scale;
-        const lineHeight = 1.6;
+        if (layout === 'pretty') {
+            const coverW = 180;
+            const coverH = 260;
+            const textW = contentW - coverW - 40;
 
-        // Step 1: Wrap text and calculate body height for dynamic content-hugging
-        ctx.font = `${fontSize}px 'Lora', serif`;
-        const words = text.split(/\s+/);
-        let lines: string[] = [];
-        let currentLine = '';
-        const maxWidth = width - (padding * 2);
-
-        words.forEach(word => {
-            const testLine = currentLine + word + ' ';
-            if (ctx.measureText(testLine).width > maxWidth) {
-                lines.push(currentLine.trim());
-                currentLine = word + ' ';
+            if (coverImageUrl) {
+                const img = new Image();
+                img.crossOrigin = "anonymous";
+                img.onload = () => {
+                    ctx.save();
+                    ctx.shadowColor = 'rgba(0,0,0,0.4)';
+                    ctx.shadowBlur = 30;
+                    ctx.drawImage(img, w - padding - coverW, (h - coverH) / 2, coverW, coverH);
+                    ctx.restore();
+                    setPreviewUrl(canvas.toDataURL());
+                };
+                img.src = coverImageUrl;
             } else {
-                currentLine = testLine;
+                ctx.fillStyle = 'rgba(0,0,0,0.1)';
+                ctx.fillRect(w - padding - coverW, (h - coverH) / 2, coverW, coverH);
             }
-        });
-        lines.push(currentLine.trim());
 
-        const quoteHeight = lines.length * fontSize * lineHeight;
-        const headerAreaHeight = metaFontSize * 4;
-        const footerAreaHeight = brandingFontSize * 4;
-        
-        // Dynamic Height Calculation
-        const canvasHeight = Math.round(padding * 2 + headerAreaHeight + quoteHeight + footerAreaHeight);
-        
-        canvas.width = width;
-        canvas.height = canvasHeight;
+            ctx.fillStyle = selectedPreset.text;
+            ctx.font = `italic 700 22px 'Lora', serif`;
+            const lines = wrapText(ctx, `“${text}”`, textW);
+            lines.slice(0, 8).forEach((line, i) => {
+                ctx.fillText(line, padding + 10, padding + 60 + (i * 32));
+            });
 
-        // CRITICAL: NO full-canvas fill. Use clearRect to ensure corner transparency in the exported PNG.
-        ctx.clearRect(0, 0, width, canvasHeight);
+            ctx.font = `900 12px 'Inter', sans-serif`;
+            ctx.fillText(bookTitle.toUpperCase(), padding + 10, h - padding - 20);
+            ctx.font = `400 10px 'Inter', sans-serif`;
+            ctx.globalAlpha = 0.6;
+            ctx.fillText(author.toUpperCase(), padding + 10, h - padding - 5);
+            ctx.globalAlpha = 1;
 
-        // Define the rounded frame path
-        const borderSize = 3 * scale;
-        const r = borderRadius;
-        const x = borderSize / 2;
-        const y = borderSize / 2;
-        const w = width - borderSize;
-        const h = canvasHeight - borderSize;
-
-        // 2. Render Rounded Card
-        ctx.save();
-        ctx.beginPath();
-        ctx.roundRect(x, y, w, h, r);
-        
-        // Background Fill (Internal to the path)
-        ctx.fillStyle = theme.colors.background;
-        ctx.fill();
-
-        // High-Contrast Visible Border
-        ctx.strokeStyle = theme.colors['border-color'];
-        ctx.lineWidth = borderSize;
-        ctx.stroke();
-        
-        // Clip so everything else stays inside the rounded frame
-        ctx.clip();
-
-        // 3. Header: [Author] in [Book Title]
-        // Style: Bold Author, Regular "in", Italic Book
-        let cursorX = padding;
-        const cursorY = padding;
-
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        
-        // Author (Bold)
-        ctx.font = `700 ${metaFontSize}px 'Inter', sans-serif`;
-        ctx.fillStyle = theme.colors['primary-text'];
-        ctx.fillText(author, cursorX, cursorY);
-        cursorX += ctx.measureText(author).width + (8 * scale);
-
-        // "in"
-        ctx.font = `400 ${metaFontSize}px 'Inter', sans-serif`;
-        ctx.fillStyle = theme.colors['secondary-text'];
-        ctx.fillText("in", cursorX, cursorY);
-        cursorX += ctx.measureText("in").width + (10 * scale);
-
-        // Book Title (Italic)
-        ctx.font = `italic 400 ${metaFontSize}px 'Lora', serif`;
-        ctx.fillStyle = theme.colors['secondary-text'];
-        
-        let displayTitle = bookTitle;
-        const maxTitleWidth = width - cursorX - padding;
-        if (ctx.measureText(displayTitle).width > maxTitleWidth) {
-            while (ctx.measureText(displayTitle + '...').width > maxTitleWidth && displayTitle.length > 0) {
-                displayTitle = displayTitle.slice(0, -1);
-            }
-            displayTitle += '...';
+            ctx.fillStyle = selectedPreset.text;
+            ctx.fillRect(padding - 5, padding + 60, 4, 100);
+        } else {
+            ctx.textAlign = 'center';
+            ctx.fillStyle = selectedPreset.text;
+            ctx.font = `italic 700 26px 'Lora', serif`;
+            const lines = wrapText(ctx, `“${text}”`, contentW);
+            const startY = (h / 2) - (lines.length * 36 / 2);
+            lines.forEach((line, i) => {
+                ctx.fillText(line, w / 2, startY + (i * 40));
+            });
+            
+            ctx.font = `900 12px 'Inter', sans-serif`;
+            ctx.fillText(`— ${author}, ${bookTitle} —`.toUpperCase(), w / 2, h - padding);
         }
-        ctx.fillText(displayTitle, cursorX, cursorY);
 
-        // 4. Quote Body
-        ctx.font = `${fontSize}px 'Lora', serif`;
-        ctx.fillStyle = theme.colors['primary-text'];
-        ctx.textBaseline = 'top';
-        
-        const quoteStartY = cursorY + headerAreaHeight + (10 * scale);
-        lines.forEach((line, i) => {
-            ctx.fillText(line, padding, quoteStartY + (i * fontSize * lineHeight));
-        });
+        setPreviewUrl(canvas.toDataURL());
+    };
 
-        // 5. Footer Branding: The Bookshelf Logo
-        const footerY = canvasHeight - padding;
-        const logoX = padding;
-        const stickW = 4 * scale;
-        const stickH = brandingFontSize;
-        const stickG = 8 * scale;
-        
-        ctx.strokeStyle = theme.colors.primary;
-        ctx.lineWidth = stickW;
-        ctx.lineCap = 'round';
-        
-        // Bookshelf Logo Implementation
-        ctx.beginPath();
-        // Stick 1 (Vertical)
-        ctx.moveTo(logoX, footerY - stickH);
-        ctx.lineTo(logoX, footerY);
-        // Stick 2 (Vertical)
-        ctx.moveTo(logoX + stickG, footerY - stickH);
-        ctx.lineTo(logoX + stickG, footerY);
-        // Stick 3 (Leaning)
-        ctx.moveTo(logoX + stickG * 2.5, footerY);
-        ctx.lineTo(logoX + stickG * 1.5, footerY - stickH * 0.9);
-        ctx.stroke();
-        
-        // Zizhi Typography
-        ctx.font = `700 ${brandingFontSize}px 'Lora', serif`;
-        ctx.fillStyle = theme.colors['primary-text'];
-        ctx.textBaseline = 'bottom';
-        ctx.fillText("Zizhi", logoX + (stickG * 3.5), footerY);
+    const wrapText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number) => {
+        const words = text.split(' ');
+        const lines = [];
+        let currentLine = words[0];
+        for (let i = 1; i < words.length; i++) {
+            const word = words[i];
+            const width = ctx.measureText(currentLine + " " + word).width;
+            if (width < maxWidth) {
+                currentLine += " " + word;
+            } else {
+                lines.push(currentLine);
+                currentLine = word;
+            }
+        }
+        lines.push(currentLine);
+        return lines;
+    };
 
-        ctx.restore();
+    useEffect(() => {
+        if (step === 'image') generatePreview();
+    }, [selectedPreset, layout, widthMode, text, step]);
 
-        // Export as High-Quality PNG with transparency
+    const handleDownload = () => {
         const link = document.createElement('a');
         link.download = `zizhi-insight-${Date.now()}.png`;
-        link.href = canvas.toDataURL('image/png', 1.0);
+        link.href = previewUrl || '';
         link.click();
     };
 
+    const copyToClipboard = () => {
+        navigator.clipboard.writeText(`“${text}” — ${author}, from ${bookTitle}`);
+    };
+
+    const socialPlatforms = [
+        { name: 'WhatsApp', color: '#25D366' },
+        { name: 'Twitter', color: '#000000' },
+        { name: 'Substack', color: '#FF6719' },
+        { name: 'Facebook', color: '#1877F2' }
+    ];
+
     return (
-        <div className="fixed inset-0 z-[1200] flex items-center justify-center p-6 bg-black/95 backdrop-blur-2xl animate-fade-in">
-            <div className="w-full max-w-sm bg-white rounded-[2.5rem] overflow-hidden shadow-2xl animate-pop-in relative">
-                <button onClick={onClose} className="absolute top-8 right-8 p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition-colors">
-                    <IconClose className="w-4 h-4 text-slate-400" />
-                </button>
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-fade-in">
+            <div className="w-full max-w-lg bg-white border-8 border-black shadow-[12px_12px_0_black] flex flex-col relative animate-pop-in">
                 
-                <div className="p-10 text-center">
-                    <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner">
-                        <IconShare className="w-8 h-8 text-indigo-600" />
-                    </div>
-                    
-                    <h3 className="text-xl font-black mb-1 text-slate-900 uppercase tracking-widest text-center">Share Insight</h3>
-                    <p className="text-[9px] text-slate-400 mb-8 font-black uppercase tracking-widest opacity-60 text-center">
-                        {isTooLong ? "Selection too long for frame" : "Generating high-fidelity frame"}
-                    </p>
+                <button 
+                    onClick={onClose} 
+                    className="absolute -top-4 -right-4 w-12 h-12 bg-red-500 border-4 border-black text-white flex items-center justify-center shadow-[4px_4px_0_black] hover:translate-y-1 hover:shadow-none transition-all z-50"
+                    aria-label="Close dialog"
+                >
+                    <IconClose className="w-8 h-8" />
+                </button>
 
-                    <div className="space-y-2.5 mb-8">
-                        {platforms.map(p => (
-                            <a 
-                                key={p.name} 
-                                href={p.url} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="flex items-center justify-between w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-slate-100 transition-all group"
+                {step === 'choice' && (
+                    <div className="p-10 space-y-10">
+                        <header className="text-center space-y-3">
+                            <h2 className="text-4xl font-black uppercase tracking-tighter italic">Share Insight</h2>
+                            <p className="text-[11px] font-black uppercase text-black/60 tracking-widest">Select your delivery method</p>
+                        </header>
+                        
+                        <div className="grid grid-cols-1 gap-6">
+                            <button 
+                                onClick={() => setStep('image')}
+                                className="group p-8 border-4 border-black bg-cyan-400 shadow-[6px_6px_0_black] hover:translate-y-[-4px] hover:shadow-[10px_10px_0_black] active:translate-y-1 active:shadow-none transition-all flex flex-col items-center gap-4"
                             >
-                                <span className="text-xs font-black text-slate-700 uppercase tracking-tight">{p.name}</span>
-                                <span className="text-[10px] font-black opacity-10 group-hover:opacity-40 group-hover:translate-x-1 transition-all">→</span>
-                            </a>
-                        ))}
+                                <IconDownload className="w-10 h-10 text-black" />
+                                <span className="font-black uppercase tracking-widest text-base text-black">Download Visual Frame</span>
+                            </button>
+                            <button 
+                                onClick={() => setStep('social')}
+                                className="group p-8 border-4 border-black bg-white shadow-[6px_6px_0_black] hover:translate-y-[-4px] hover:shadow-[10px_10px_0_black] active:translate-y-1 active:shadow-none transition-all flex flex-col items-center gap-4"
+                            >
+                                <IconShare className="w-10 h-10 text-black" />
+                                <span className="font-black uppercase tracking-widest text-base text-black">Post to Social Hubs</span>
+                            </button>
+                        </div>
                     </div>
+                )}
 
-                    <button 
-                        onClick={generateImage}
-                        disabled={isTooLong}
-                        className={`w-full py-5 bg-slate-900 text-white font-black uppercase tracking-[0.25em] text-[10px] rounded-2xl flex items-center justify-center gap-3 transition-all ${isTooLong ? 'opacity-20 cursor-not-allowed grayscale' : 'hover:scale-[1.02] active:scale-95 shadow-xl'}`}
-                    >
-                        <IconDownload className="w-4 h-4" />
-                        Download 4K Frame
-                    </button>
-                    
-                    {isTooLong && (
-                        <p className="mt-4 text-[9px] text-red-500 font-black uppercase tracking-[0.2em] animate-pulse">
-                            Limit: 100 words per share
-                        </p>
-                    )}
-                </div>
+                {step === 'social' && (
+                    <div className="p-8 space-y-8">
+                        <header className="flex items-center justify-between">
+                            <button onClick={() => setStep('choice')} className="text-[12px] font-black uppercase underline hover:text-cyan-600 transition-colors">← Back</button>
+                            <h3 className="text-2xl font-black uppercase italic">Social Hub</h3>
+                            <div className="w-10"></div>
+                        </header>
+                        
+                        <div className="p-6 bg-slate-50 border-4 border-black font-serif italic text-base text-black shadow-inner">
+                            “{text.length > 150 ? text.slice(0, 150) + '...' : text}”
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            {socialPlatforms.map(platform => (
+                                <button 
+                                    key={platform.name}
+                                    onClick={copyToClipboard}
+                                    className="p-5 border-4 border-black font-black uppercase text-[11px] flex items-center justify-between hover:bg-slate-100 active:translate-y-1 transition-all shadow-[2px_2px_0_black]"
+                                    style={{ color: 'black' }}
+                                >
+                                    <span>{platform.name}</span>
+                                    <div className="p-1.5 bg-white border-2 border-black rounded-sm" style={{ color: platform.color }}>
+                                        <SocialIcon type={platform.name} />
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+
+                        <button 
+                            onClick={copyToClipboard}
+                            className="w-full py-5 bg-yellow-400 border-4 border-black font-black uppercase tracking-[0.2em] shadow-[6px_6px_0_black] hover:translate-y-[-2px] hover:shadow-[8px_8px_0_black] active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-3 text-black text-sm"
+                        >
+                            <IconCopy className="w-5 h-5" /> Copy Insight Text
+                        </button>
+                    </div>
+                )}
+
+                {step === 'image' && (
+                    <div className="flex flex-col">
+                        <div className="p-4 border-b-4 border-black flex items-center justify-between bg-white">
+                            <button onClick={() => setStep('choice')} className="text-[12px] font-black uppercase underline hover:text-cyan-600 transition-colors">← Back</button>
+                            <h3 className="text-[12px] font-black uppercase tracking-[0.2em] italic">Visual Customizer</h3>
+                            <div className="w-12"></div>
+                        </div>
+
+                        <div className="p-6 bg-slate-200 border-b-4 border-black flex items-center justify-center min-h-[300px]">
+                            <canvas ref={canvasRef} className="hidden" />
+                            {previewUrl && (
+                                <img src={previewUrl} className="w-full h-auto border-4 border-black shadow-[10px_10px_0_black] bg-white" alt="Preview" />
+                            )}
+                        </div>
+
+                        <div className="p-8 space-y-6 bg-white">
+                            <div className="flex flex-wrap gap-3 justify-center">
+                                {PRESETS.map((p) => (
+                                    <button 
+                                        key={p.name}
+                                        onClick={() => setSelectedPreset(p)}
+                                        className={`w-10 h-10 rounded-none border-4 border-black transition-all ${selectedPreset.name === p.name ? 'scale-110 shadow-[4px_4px_0_black] -translate-y-1' : 'opacity-80 hover:opacity-100 hover:scale-105'}`}
+                                        style={{ backgroundColor: p.bg }}
+                                        title={p.name}
+                                    />
+                                ))}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <button 
+                                    onClick={() => setLayout(l => l === 'pretty' ? 'classic' : 'pretty')}
+                                    className={`py-4 border-4 border-black font-black uppercase text-[11px] tracking-widest transition-all ${layout === 'pretty' ? 'bg-pink-500 text-white shadow-[4px_4px_0_black] -translate-y-1' : 'bg-white text-black'}`}
+                                >
+                                    {layout === 'pretty' ? 'Pretty Mode' : 'Classic Mode'}
+                                </button>
+                                <button 
+                                    onClick={() => setWidthMode(w => w === 'wide' ? 'square' : 'wide')}
+                                    className={`py-4 border-4 border-black font-black uppercase text-[11px] tracking-widest transition-all ${widthMode === 'wide' ? 'bg-cyan-400 text-black shadow-[4px_4px_0_black] -translate-y-1' : 'bg-white text-black'}`}
+                                >
+                                    {widthMode === 'wide' ? 'Wide' : 'Square'}
+                                </button>
+                            </div>
+
+                            <button 
+                                onClick={handleDownload}
+                                className="w-full py-5 bg-black text-white font-black uppercase tracking-[0.2em] text-sm border-4 border-black shadow-[6px_6px_0_cyan] hover:translate-y-[-2px] hover:shadow-[8px_8px_0_cyan] active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-3"
+                            >
+                                <IconDownload className="w-5 h-5" /> Export Final Frame
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

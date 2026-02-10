@@ -1,6 +1,8 @@
+
 import React from 'react';
-import { IconClose, IconMicrophone, IconSpinner, IconPlay, IconLibrary } from './icons';
-import type { Book, GenerationStatus } from '../types';
+import { Box, SimpleGrid, Stack, Text, Image, Group, Progress, ActionIcon, Button } from '@mantine/core';
+import { IconClose, IconSpinner, IconLibrary } from './icons';
+import type { GenerationStatus, Theme } from '../types';
 
 export interface BookCardData {
   id: string;
@@ -9,11 +11,12 @@ export interface BookCardData {
   coverImageUrl: string | null;
   progress: number;
   audioSummaryUrl?: string;
-  genre?: string;
+  summaryScript?: string;
 }
 
 interface LibraryProps {
   books: BookCardData[];
+  theme: Theme;
   onBookSelect: (bookId: string) => void;
   isLoading: boolean;
   error: string | null;
@@ -24,132 +27,142 @@ interface LibraryProps {
   viewMode: 'grid' | 'list';
 }
 
+const CartoonRobotSVG = () => (
+    <svg width="240" height="240" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="70" y="80" width="100" height="80" rx="10" fill="#00D1FF" stroke="currentColor" strokeWidth="6" />
+        <rect x="85" y="100" width="20" height="20" rx="10" fill="white" stroke="currentColor" strokeWidth="4" />
+        <rect x="135" y="100" width="20" height="20" rx="10" fill="white" stroke="currentColor" strokeWidth="4" />
+        <path d="M100 140Q120 150 140 140" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+        <rect x="110" y="60" width="20" height="20" fill="#FF007A" stroke="currentColor" strokeWidth="4" />
+        <path d="M120 40V60" stroke="currentColor" strokeWidth="4" />
+        <rect x="60" y="110" width="10" height="30" fill="currentColor" />
+        <rect x="170" y="110" width="10" height="30" fill="currentColor" />
+    </svg>
+);
+
 const BookCard: React.FC<{ 
     book: BookCardData; 
+    theme: Theme;
     onSelect: (id: string) => void; 
     onDelete: (id: string) => void;
-    onGenerateSummary: (id: string) => void;
     onViewSummary: (id: string) => void;
-    isGenerating?: boolean;
+    onGenerateSummary: (id: string) => void;
+    generationStatus?: GenerationStatus;
     viewMode: 'grid' | 'list';
-}> = ({ book, onSelect, onDelete, onGenerateSummary, onViewSummary, isGenerating, viewMode }) => {
-
+}> = ({ book, theme, onSelect, onDelete, onViewSummary, onGenerateSummary, generationStatus, viewMode }) => {
     const isList = viewMode === 'list';
-    
-    if (isList) {
-        return (
-            <div className={`flex bg-[var(--color-surface)] border border-[var(--color-border-color)] rounded-xl overflow-hidden h-44 shadow-sm group animate-fade-in relative ${isGenerating ? 'opacity-50 pointer-events-none' : ''}`}>
-                <div className="w-32 flex-shrink-0 cursor-pointer bg-[var(--color-border-color)]/20" onClick={() => onSelect(book.id)}>
-                    {book.coverImageUrl ? (
-                        <img src={book.coverImageUrl} alt={book.title} className="w-full h-full object-cover" />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center p-4">
-                             <IconLibrary className="w-8 h-8 opacity-20" />
-                        </div>
-                    )}
-                </div>
-
-                <div className="flex-1 flex flex-col p-4 min-w-0 border-l border-[var(--color-border-color)]">
-                    <div className="flex justify-between items-start mb-2">
-                        <div className="min-w-0 flex-1 cursor-pointer" onClick={() => onSelect(book.id)}>
-                            <h3 className="text-base font-black text-[var(--color-primary-text)] truncate pr-4 leading-snug">{book.title}</h3>
-                            <p className="text-xs text-[var(--color-secondary-text)] font-medium mt-0.5 truncate">{book.author}</p>
-                        </div>
-                        <button 
-                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(book.id); }} 
-                            aria-label="Remove book from shelf"
-                            className="absolute top-2 right-2 p-1.5 text-[var(--color-secondary-text)] opacity-40 hover:opacity-100 hover:text-red-600 transition-all z-10"
-                        >
-                            <IconClose className="w-4 h-4" />
-                        </button>
-                    </div>
-
-                    <div className="flex-1 flex items-center justify-between pr-2">
-                         <span className="text-[10px] font-black uppercase tracking-widest text-[var(--color-secondary-text)] opacity-30">{book.genre}</span>
-                         <span className="text-[10px] font-black text-[var(--color-secondary-text)] opacity-50">{Math.round(book.progress * 100)}%</span>
-                    </div>
-
-                    <div className="flex gap-2 pt-3 border-t border-[var(--color-border-color)]">
-                        <button onClick={() => onSelect(book.id)} className="flex-1 py-2.5 bg-[var(--color-primary)] text-white text-[11px] font-black uppercase tracking-widest rounded-lg shadow-sm active:scale-95 transition-all">Read</button>
-                        <button 
-                            onClick={() => book.audioSummaryUrl ? onViewSummary(book.id) : onGenerateSummary(book.id)} 
-                            className="flex-1 py-2.5 bg-transparent border border-[var(--color-border-color)] text-[var(--color-secondary-text)] text-[11px] font-black uppercase tracking-widest rounded-lg flex items-center justify-center gap-2 hover:bg-black/5 active:scale-95 transition-all"
-                        >
-                            {isGenerating ? <IconSpinner className="w-3.5 h-3.5" /> : (book.audioSummaryUrl ? <IconPlay className="w-3.5 h-3.5" /> : <IconMicrophone className="w-3.5 h-3.5" />)}
-                            <span>Summary</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    const hasSummary = !!book.audioSummaryUrl;
+    const isGenerating = !!generationStatus;
+    const progressPercent = Math.round((book.progress || 0) * 100);
 
     return (
-        <div className={`flex flex-col bg-[var(--color-surface)] border border-[var(--color-border-color)] rounded-[1.5rem] overflow-hidden transition-all shadow-sm animate-fade-in relative ${isGenerating ? 'opacity-50 pointer-events-none' : ''}`}>
-            <div className="relative aspect-[3/4.2] overflow-hidden cursor-pointer bg-black/5" onClick={() => onSelect(book.id)}>
-                {book.coverImageUrl ? (
-                    <img src={book.coverImageUrl} alt={book.title} className="w-full h-full object-cover" />
-                ) : (
-                    <div className="w-full h-full flex items-center justify-center opacity-10"><IconLibrary className="w-12 h-12" /></div>
-                )}
-                <div className="absolute top-3 right-10 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-full text-[9px] font-black text-white">{Math.round(book.progress * 100)}%</div>
-                <button 
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(book.id); }} 
-                    aria-label="Remove book from shelf"
-                    className="absolute top-3 right-3 p-1.5 bg-black/20 text-white rounded-full hover:bg-red-500 transition-all z-10"
+        <Box 
+            bg="var(--color-surface)"
+            className={`relative group border-4 border-[var(--color-border-color)] shadow-[6px_6px_0px_var(--color-border-color)] hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[8px_8px_0px_var(--color-border-color)] transition-all overflow-hidden`}
+        >
+            <Box className={`${isList ? 'flex flex-row h-48' : 'flex flex-col'}`}>
+                <Box 
+                    className={`relative cursor-pointer overflow-hidden ${isList ? 'w-32 flex-shrink-0 border-r-4 border-[var(--color-border-color)]' : 'aspect-[3/4] border-b-4 border-[var(--color-border-color)]'}`}
+                    onClick={() => onSelect(book.id)}
                 >
-                    <IconClose className="w-3.5 h-3.5" />
-                </button>
-            </div>
-            <div className="p-4 flex flex-col gap-3">
-                <div className="min-w-0" onClick={() => onSelect(book.id)}>
-                    <h3 className="font-bold text-sm leading-tight truncate text-[var(--color-primary-text)]">{book.title}</h3>
-                    <p className="text-[10px] text-[var(--color-secondary-text)] truncate mt-1 uppercase tracking-widest font-bold opacity-50">{book.author}</p>
-                </div>
-                <div className="w-full h-1 bg-black/5 rounded-full overflow-hidden">
-                    <div className="h-full bg-[var(--color-primary)] transition-all duration-700" style={{ width: `${Math.max(book.progress * 100, 2)}%` }} />
-                </div>
-                <div className="flex gap-2">
-                    <button onClick={() => onSelect(book.id)} className="flex-1 py-2 bg-[var(--color-primary)] text-white text-[10px] font-black uppercase tracking-widest rounded-xl active:scale-95 transition-all">Read</button>
-                    <button onClick={() => book.audioSummaryUrl ? onViewSummary(book.id) : onGenerateSummary(book.id)} className="px-3 py-2 bg-black/[0.04] text-[var(--color-secondary-text)] rounded-xl hover:bg-black/5 transition-all">
-                        {isGenerating ? <IconSpinner className="w-3.5 h-3.5" /> : (book.audioSummaryUrl ? <IconPlay className="w-3.5 h-3.5" /> : <IconMicrophone className="w-3.5 h-3.5" />)}
-                    </button>
-                </div>
-            </div>
-        </div>
+                    {book.coverImageUrl ? (
+                        <Image src={book.coverImageUrl} className="w-full h-full object-cover" />
+                    ) : (
+                        <Box className="w-full h-full bg-slate-100 flex items-center justify-center"><IconLibrary className="w-12 h-12 text-slate-300" /></Box>
+                    )}
+                    <div className="absolute top-2 right-2 px-2 py-1 bg-yellow-300 border-2 border-black text-[10px] font-black text-black">
+                        {progressPercent}%
+                    </div>
+                </Box>
+
+                <Stack p="md" gap="xs" className="flex-1 justify-between min-w-0">
+                    <Stack gap={2}>
+                        <Group justify="space-between" align="start" wrap="nowrap">
+                            <Text className="font-black text-[14px] leading-tight truncate text-[var(--color-primary-text)] uppercase" title={book.title}>{book.title}</Text>
+                            <ActionIcon variant="subtle" color="red" size="sm" className="opacity-40 hover:opacity-100" onClick={(e) => { e.stopPropagation(); onDelete(book.id); }}>
+                                <IconClose className="w-4 h-4" />
+                            </ActionIcon>
+                        </Group>
+                        <Text className="text-[10px] font-bold text-[var(--color-secondary-text)] truncate uppercase tracking-widest">{book.author}</Text>
+                    </Stack>
+
+                    <Stack gap={6}>
+                        <Group justify="space-between" align="center">
+                             <Text className="text-[8px] font-black uppercase text-[var(--color-muted-text)]">{progressPercent}% read</Text>
+                        </Group>
+                        <Progress value={progressPercent} size="xl" radius={0} color="var(--color-primary-text)" className="border-2 border-[var(--color-border-color)] h-4 bg-transparent" />
+                        <Group gap={4} wrap="nowrap">
+                            <Button 
+                                variant="filled" 
+                                color="cyan" 
+                                className="flex-1 border-2 border-black rounded-none shadow-[2px_2px_0_#000] h-10 p-0 text-[11px] font-black uppercase text-black"
+                                onClick={() => onSelect(book.id)}
+                            >
+                                {book.progress > 0 ? 'CONTINUE' : 'START'}
+                            </Button>
+                            <Button 
+                                variant="filled" 
+                                color={hasSummary ? "pink" : "yellow"} 
+                                className="flex-1 border-2 border-black rounded-none shadow-[2px_2px_0_#000] h-10 p-0 text-[11px] font-black uppercase text-black flex items-center justify-center gap-2"
+                                onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    if (hasSummary) onViewSummary(book.id);
+                                    else onGenerateSummary(book.id);
+                                }}
+                                loading={isGenerating}
+                            >
+                                {isGenerating ? "SYNCING" : (hasSummary ? "LISTEN" : "SUMMARIZE")}
+                            </Button>
+                        </Group>
+                    </Stack>
+                </Stack>
+            </Box>
+        </Box>
     );
 };
 
-const Library: React.FC<LibraryProps> = ({ books, onBookSelect, isLoading, onDelete, onGenerateSummary, generationStatuses, onViewSummary, viewMode }) => {
+const Library: React.FC<LibraryProps> = ({ books, theme, onBookSelect, isLoading, onDelete, onViewSummary, onGenerateSummary, generationStatuses, viewMode }) => {
   return (
-    <div className="p-4 sm:p-8">
+    <Box className="py-8 animate-fade-in">
+        <header className="mb-8 flex justify-between items-end border-b-2 border-[var(--color-border-color)] pb-4">
+            <div>
+                <Text className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--color-muted-text)]">Mission Logs</Text>
+                <Text className="text-xl md:text-3xl font-black text-[var(--color-primary-text)] uppercase">{books.length} Archives Loaded</Text>
+            </div>
+        </header>
+
         {isLoading && (
-          <div className="mb-8 flex flex-col items-center justify-center p-12 bg-black/5 rounded-2xl border-2 border-dashed border-[var(--color-border-color)]">
-            <IconSpinner className="w-6 h-6 text-[var(--color-primary)] mb-2" />
-            <span className="text-[10px] font-bold uppercase tracking-widest opacity-40">Synchronizing Stories...</span>
-          </div>
+            <Box className="bg-[var(--color-surface)] border-4 border-[var(--color-border-color)] p-20 flex flex-col items-center justify-center text-center shadow-[8px_8px_0_var(--color-border-color)]">
+                <IconSpinner className="w-10 h-10 text-[var(--color-primary)] mb-4" />
+                <Text className="text-[12px] font-black uppercase tracking-[0.2em] text-[var(--color-primary-text)]">Parsing Multiverse Data...</Text>
+            </Box>
         )}
+        
         {!isLoading && books.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-40 text-center">
-            <IconLibrary className="w-16 h-16 mb-4 text-[var(--color-primary-text)] opacity-10" />
-            <p className="theme-serif text-xl font-black text-[var(--color-primary-text)] opacity-30 italic">Capture your first story by uploading an EPUB.</p>
-          </div>
+            <Box className="py-24 flex flex-col items-center justify-center text-center text-[var(--color-primary-text)]">
+                <CartoonRobotSVG />
+                <h2 className="text-3xl font-black mt-8 uppercase tracking-tighter">Monolith is empty</h2>
+                <p className="text-[12px] font-bold opacity-60 mt-2 uppercase tracking-[0.1em]">Upload an archive to begin link.</p>
+            </Box>
         )}
-        <div className={viewMode === 'grid' ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6' : 'flex flex-col gap-4 max-w-2xl mx-auto'}>
+
+        <SimpleGrid cols={viewMode === 'list' ? 1 : { base: 2, sm: 3, lg: 4, xl: 5 }} spacing="xl">
             {books.map(book => (
                 <BookCard 
                     key={book.id} 
                     book={book} 
+                    theme={theme}
                     onSelect={onBookSelect} 
                     onDelete={onDelete} 
-                    onGenerateSummary={onGenerateSummary} 
-                    onViewSummary={onViewSummary} 
-                    isGenerating={!!generationStatuses[book.id]} 
+                    onViewSummary={onViewSummary}
+                    onGenerateSummary={onGenerateSummary}
+                    generationStatus={generationStatuses[book.id]}
                     viewMode={viewMode} 
                 />
             ))}
-        </div>
-    </div>
+        </SimpleGrid>
+    </Box>
   );
 };
+
 export default Library;

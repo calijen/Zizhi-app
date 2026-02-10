@@ -1,12 +1,43 @@
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+// Import Box from @mantine/core to fix missing component error
+import { Box } from '@mantine/core';
 import type { Book, GenerationStatus } from '../types';
-import { IconPlay, IconPause, IconClose, IconRewind, IconForward, IconSpinner } from './icons';
+import { IconPlay, IconPause, IconClose, IconRewind, IconForward } from './icons';
 
 interface SummaryViewProps {
   book: Book;
   onClose: () => void;
   generationStatus?: GenerationStatus;
+}
+
+function decodeBase64(base64: string) {
+  const binaryString = atob(base64.split(',')[1] || base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+async function decodeAudioData(
+  data: Uint8Array,
+  ctx: AudioContext,
+  sampleRate: number,
+  numChannels: number,
+): Promise<AudioBuffer> {
+  const dataInt16 = new Int16Array(data.buffer);
+  const frameCount = dataInt16.length / numChannels;
+  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = buffer.getChannelData(channel);
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
+  }
+  return buffer;
 }
 
 const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
@@ -15,77 +46,22 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
   const [duration, setDuration] = useState(0); 
   const [activePhraseIndex, setActivePhraseIndex] = useState<number>(-1);
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [isReady, setIsReady] = useState(false);
+  const [userInteracted, setUserInteracted] = useState(false);
 
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const activePhraseRef = useRef<HTMLParagraphElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioBufferRef = useRef<AudioBuffer | null>(null);
+  const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
+  const startTimeRef = useRef<number>(0);
+  const pauseTimeRef = useRef<number>(0);
   const rafRef = useRef<number>(0);
+  const activePhraseRef = useRef<HTMLParagraphElement>(null);
 
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    
-    const updateProgress = () => {
-        setCurrentTime(audio.currentTime);
-        rafRef.current = requestAnimationFrame(updateProgress);
-    };
-
-    const handleLoadedMetadata = () => {
-        if (isFinite(audio.duration)) setDuration(audio.duration);
-    };
-
-    const handlePlay = () => { setIsPlaying(true); rafRef.current = requestAnimationFrame(updateProgress); };
-    const handlePause = () => { setIsPlaying(false); cancelAnimationFrame(rafRef.current); };
-    const handleEnded = () => { setIsPlaying(false); cancelAnimationFrame(rafRef.current); setCurrentTime(0); };
-
-    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-    audio.addEventListener('play', handlePlay);
-    audio.addEventListener('pause', handlePause);
-    audio.addEventListener('ended', handleEnded);
-
-    if (audio.readyState >= 1) handleLoadedMetadata();
-
-    return () => {
-      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      audio.removeEventListener('play', handlePlay);
-      audio.removeEventListener('pause', handlePause);
-      audio.removeEventListener('ended', handleEnded);
-      cancelAnimationFrame(rafRef.current);
-    };
-  }, []);
-
-  const handlePlayPause = () => {
-    if (!audioRef.current || !book.audioSummaryUrl) return;
-    if (audioRef.current.paused) audioRef.current.play();
-    else audioRef.current.pause();
-  };
-
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const val = parseFloat(e.target.value);
-      if (audioRef.current) {
-          audioRef.current.currentTime = val;
-          setCurrentTime(val);
-      }
-  };
-
-  const cycleSpeed = () => {
-      const speeds = [0.75, 1, 1.25, 1.5, 2];
-      const next = speeds[(speeds.indexOf(playbackRate) + 1) % speeds.length];
-      setPlaybackRate(next);
-      if (audioRef.current) audioRef.current.playbackRate = next;
-  };
-
-  // Sync Engine: Split script into meaningful Line blocks
   const timedLines = useMemo(() => {
     if (!book.summaryScript || !duration) return [];
-    
-    // Split on punctuation (. ! ?)
-    const rawLines = book.summaryScript.match(/[^.!?]+[.!?]+/g) || [book.summaryScript];
-    const processedLines = rawLines.map(line => line.trim()).filter(l => l.length > 0);
-    
+    const processedLines = book.summaryScript.split(/\n\n+/).flatMap(p => p.match(/[^.!?]+[.!?]+/g) || [p]).map(line => line.trim()).filter(l => l.length > 5);
     const totalChars = processedLines.reduce((acc, l) => acc + l.length, 0);
     let accumulatedTime = 0;
-    
     return processedLines.map((text) => {
         const lineDuration = (text.length / totalChars) * duration;
         const start = accumulatedTime;
@@ -94,6 +70,89 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
         return { text, start, end };
     });
   }, [book.summaryScript, duration]);
+
+  const playAt = useCallback(async (time: number) => {
+    if (!audioBufferRef.current || !audioContextRef.current) return;
+    
+    // Resume context if it was suspended (autoplay policy)
+    if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume();
+    }
+
+    sourceNodeRef.current?.stop();
+    const source = audioContextRef.current.createBufferSource();
+    source.buffer = audioBufferRef.current;
+    source.playbackRate.value = playbackRate;
+    source.connect(audioContextRef.current.destination);
+    
+    const offset = Math.max(0, Math.min(time, duration - 0.01));
+    source.start(0, offset);
+    
+    startTimeRef.current = audioContextRef.current.currentTime - offset;
+    sourceNodeRef.current = source;
+    setIsPlaying(true);
+    setCurrentTime(offset);
+  }, [duration, playbackRate]);
+
+  useEffect(() => {
+    const initAudio = async () => {
+      if (!book.audioSummaryUrl) return;
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      audioContextRef.current = audioContext;
+      try {
+        const rawBytes = decodeBase64(book.audioSummaryUrl);
+        const buffer = await decodeAudioData(rawBytes, audioContext, 24000, 1);
+        audioBufferRef.current = buffer;
+        setDuration(buffer.duration);
+        setIsReady(true);
+      } catch (err) {
+        console.error("Audio error:", err);
+      }
+    };
+    initAudio();
+    return () => {
+      sourceNodeRef.current?.stop();
+      audioContextRef.current?.close();
+      cancelAnimationFrame(rafRef.current);
+    };
+  }, [book.audioSummaryUrl]);
+
+  const updateProgress = useCallback(() => {
+    if (!audioContextRef.current || !isPlaying) return;
+    const now = audioContextRef.current.currentTime;
+    const elapsed = now - startTimeRef.current;
+    setCurrentTime(elapsed);
+    
+    if (elapsed >= duration) {
+        setIsPlaying(false);
+        setCurrentTime(0);
+        pauseTimeRef.current = 0;
+        cancelAnimationFrame(rafRef.current);
+    } else {
+        rafRef.current = requestAnimationFrame(updateProgress);
+    }
+  }, [isPlaying, duration]);
+
+  useEffect(() => {
+    if (isPlaying) {
+      rafRef.current = requestAnimationFrame(updateProgress);
+    } else {
+        cancelAnimationFrame(rafRef.current);
+    }
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [isPlaying, updateProgress]);
+
+  const handlePlayPause = () => {
+    if (!audioBufferRef.current || !audioContextRef.current) return;
+    if (isPlaying) {
+      pauseTimeRef.current = currentTime;
+      sourceNodeRef.current?.stop();
+      setIsPlaying(false);
+    } else {
+      playAt(pauseTimeRef.current);
+    }
+    setUserInteracted(true);
+  };
 
   useEffect(() => {
     const index = timedLines.findIndex(p => currentTime >= p.start && currentTime < p.end);
@@ -106,59 +165,99 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
     }
   }, [activePhraseIndex]);
 
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const time = parseFloat(e.target.value);
+    pauseTimeRef.current = time;
+    if (isPlaying) {
+        playAt(time);
+    } else {
+        setCurrentTime(time);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-[200] bg-[#050505] text-white flex flex-col animate-search-panel-in select-none">
-        {book.audioSummaryUrl && <audio ref={audioRef} src={book.audioSummaryUrl} preload="auto" />}
-        <header className="p-6 flex items-center justify-between z-20">
-            <button onClick={onClose} className="p-3 hover:bg-white/10 rounded-full transition-colors"><IconClose className="w-6 h-6" /></button>
+    <div className="fixed inset-0 z-[2000] bg-white text-black flex flex-col animate-fade-in select-none overflow-hidden">
+        <header className="p-8 flex items-center justify-between z-20 relative bg-white border-b-4 border-black shadow-[0_4px_0_#000]">
+            <button onClick={onClose} className="p-3 bg-cyan-400 border-2 border-black shadow-[2px_2px_0_#000] transition-all"><IconClose className="w-6 h-6" /></button>
             <div className="text-center">
-                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-400">Master Editorial</p>
-                <p className="text-xs font-bold truncate max-w-[200px] opacity-30 mt-1">{book.title}</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.5em] text-pink-500">Insights</p>
+                <p className="text-xs font-black truncate max-w-[200px] uppercase mt-1">{book.title}</p>
             </div>
-            <button onClick={cycleSpeed} className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-[11px] font-black hover:bg-white/10 transition-colors border border-white/5">
-                {playbackRate}x
+            <button onClick={() => {
+                const speeds = [1, 1.25, 1.5, 2];
+                const next = speeds[(speeds.indexOf(playbackRate) + 1) % speeds.length];
+                setPlaybackRate(next);
+                if (sourceNodeRef.current) sourceNodeRef.current.playbackRate.value = next;
+            }} className="w-12 h-12 bg-yellow-300 border-2 border-black flex items-center justify-center text-[12px] font-black shadow-[2px_2px_0_#000]">
+                {playbackRate}X
             </button>
         </header>
-        <main className="flex-1 flex flex-col md:flex-row p-6 md:p-16 gap-8 md:gap-24 items-center overflow-hidden">
-            <div className="w-48 md:w-full md:max-w-[450px] aspect-square shadow-[0_50px_150px_rgba(0,0,0,1)] rounded-[3rem] overflow-hidden bg-[#1a1a1a] flex-none border border-white/10 relative">
-                {book.coverImageUrl ? (
-                    <img src={book.coverImageUrl} className="w-full h-full object-cover" />
-                ) : (
-                    <div className="w-full h-full flex items-center justify-center p-8 opacity-20 italic text-center text-lg md:text-2xl font-serif">{book.title}</div>
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-            </div>
-            <div className="flex-1 flex flex-col justify-center w-full max-w-5xl h-full overflow-hidden">
-                <div ref={scrollContainerRef} className="h-full overflow-y-auto no-scrollbar py-60 md:py-80" style={{ maskImage: 'linear-gradient(to bottom, transparent, black 25%, black 75%, transparent)' }}>
-                    <div className="font-serif text-3xl md:text-6xl leading-[1.6] text-left px-4 space-y-16">
-                        {timedLines.map((item, index) => (
-                            <p 
-                                key={index} 
-                                ref={index === activePhraseIndex ? activePhraseRef : null} 
-                                className={`transition-all duration-1000 ease-out py-2 ${index === activePhraseIndex ? 'text-white opacity-100 translate-x-4 blur-0 scale-105' : 'text-white/10 blur-[2px] scale-95 origin-left'}`}
-                            >
-                                {item.text}
-                            </p>
-                        ))}
+
+        <main className="flex-1 flex flex-col md:flex-row p-10 md:p-20 gap-16 items-center overflow-hidden relative">
+            {!isReady ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-center">
+                    <div className="w-12 h-12 border-4 border-black border-t-cyan-400 animate-spin mb-6"></div>
+                    <p className="text-[11px] font-black uppercase tracking-widest">Loading session...</p>
+                </div>
+            ) : !userInteracted ? (
+                 <div className="flex-1 flex flex-col items-center justify-center text-center space-y-8">
+                     <Box className="w-48 aspect-square border-4 border-black shadow-[10px_10px_0_#000] overflow-hidden">
+                        <img src={book.coverImageUrl || ''} className="w-full h-full object-cover" />
+                     </Box>
+                     <button 
+                        onClick={() => { setUserInteracted(true); playAt(0); }}
+                        className="px-12 py-6 bg-pink-500 text-white font-black border-4 border-black shadow-[8px_8px_0_#000] active:translate-y-1 active:shadow-none transition-all uppercase tracking-widest text-xl"
+                     >
+                         Start Insight
+                     </button>
+                 </div>
+            ) : (
+                <>
+                    <div className="w-48 md:w-full md:max-w-[400px] aspect-square shadow-[10px_10px_0_#000] border-4 border-black overflow-hidden bg-white">
+                        {book.coverImageUrl && <img src={book.coverImageUrl} className="w-full h-full object-cover" />}
                     </div>
-                </div>
-            </div>
+
+                    <div className="flex-1 flex flex-col justify-center h-full overflow-hidden w-full">
+                        <div className="h-full overflow-y-auto no-scrollbar py-[50vh]" style={{ maskImage: 'linear-gradient(to bottom, transparent, black 40%, black 60%, transparent)' }}>
+                            <div className="font-sans text-2xl md:text-5xl leading-[1.6] text-left px-4 space-y-16">
+                                {timedLines.map((item, index) => (
+                                    <p 
+                                        key={index} 
+                                        ref={index === activePhraseIndex ? activePhraseRef : null} 
+                                        onClick={() => playAt(item.start)}
+                                        className={`transition-all duration-500 font-black uppercase tracking-tighter cursor-pointer ${index === activePhraseIndex ? 'bg-yellow-300 text-black px-4 py-2 border-l-8 border-black shadow-[6px_6px_0_#000] scale-105' : 'text-gray-300 scale-95 hover:text-black'}`}
+                                    >
+                                        {item.text}
+                                    </p>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
         </main>
-        <footer className="p-8 md:p-12 pb-16 bg-gradient-to-t from-black via-black to-transparent flex flex-col gap-8 flex-none border-t border-white/5">
+
+        <footer className="p-10 bg-white border-t-4 border-black relative z-20 shadow-[0_-4px_0_#000]">
             <div className="max-w-4xl mx-auto w-full space-y-4">
-                <input type="range" min="0" max={duration || 100} step="0.1" value={currentTime} onChange={handleSeek}
-                    className="w-full h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-white" />
-                <div className="flex justify-between text-[11px] font-black opacity-30 tabular-nums tracking-[0.2em] uppercase">
+                <div className="h-6 bg-gray-100 border-4 border-black relative overflow-hidden">
+                   <div className="absolute inset-y-0 left-0 bg-cyan-400" style={{ width: `${(currentTime / (duration || 1)) * 100}%` }} />
+                   <input type="range" min="0" max={duration || 100} step="0.1" value={currentTime} onChange={handleSeek} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+                </div>
+                <div className="flex justify-between text-[11px] font-black tracking-widest uppercase">
                     <span>{Math.floor(currentTime / 60)}:{Math.floor(currentTime % 60).toString().padStart(2, '0')}</span>
-                    <span>{duration > 0 ? `${Math.floor(duration / 60)}:${Math.floor(duration % 60).toString().padStart(2, '0')}` : '--:--'}</span>
+                    <span>{Math.floor(duration / 60)}:{Math.floor(duration % 60).toString().padStart(2, '0')}</span>
                 </div>
             </div>
-            <div className="flex items-center justify-center gap-10 md:gap-14">
-                <button onClick={() => { if(audioRef.current) audioRef.current.currentTime -= 15; }} className="opacity-40 hover:opacity-100 transition-all active:scale-90"><IconRewind className="w-8 h-8 md:w-10 md:h-10" /></button>
-                <button onClick={handlePlayPause} className="w-20 h-20 md:w-24 md:h-24 bg-white text-black rounded-full flex items-center justify-center hover:scale-105 active:scale-90 transition-all shadow-2xl">
-                    {isPlaying ? <IconPause className="w-10 h-10 md:w-12 md:h-12" /> : <IconPlay className="w-10 h-10 md:w-12 md:h-12 pl-2" />}
+            <div className="flex items-center justify-center gap-12 mt-6">
+                <button onClick={() => playAt(Math.max(0, currentTime - 10))} className="bg-white border-2 border-black p-3 shadow-[2px_2px_0_#000]"><IconRewind className="w-8 h-8" /></button>
+                <button 
+                    onClick={handlePlayPause} 
+                    disabled={!isReady}
+                    className="w-24 h-24 bg-pink-500 border-4 border-black shadow-[6px_6px_0_#000] flex flex-col items-center justify-center transition-all disabled:opacity-50"
+                >
+                    {isPlaying ? <IconPause className="w-8 h-8 text-white" /> : <IconPlay className="w-8 h-8 pl-1 text-white" />}
                 </button>
-                <button onClick={() => { if(audioRef.current) audioRef.current.currentTime += 15; }} className="opacity-40 hover:opacity-100 transition-all active:scale-90"><IconForward className="w-8 h-8 md:w-10 md:h-10" /></button>
+                <button onClick={() => playAt(Math.min(duration, currentTime + 10))} className="bg-white border-2 border-black p-3 shadow-[2px_2px_0_#000]"><IconForward className="w-8 h-8" /></button>
             </div>
         </footer>
     </div>

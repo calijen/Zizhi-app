@@ -15,7 +15,7 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
 const normalizePath = (base: string, relative: string): string => {
     const stack = base.split("/");
     const parts = relative.split("/");
-    stack.pop(); // remove current file name
+    stack.pop(); 
     for (const part of parts) {
         if (part === ".") continue;
         if (part === "..") stack.pop();
@@ -32,9 +32,16 @@ const resolveImages = async (html: string, zip: any, chapterPath: string): Promi
     for (const img of Array.from(imgs)) {
         let src = img.getAttribute('src') || img.getAttribute('xlink:href');
         if (!src) continue;
-        
+        if (src.startsWith('http') || src.startsWith('data:')) continue;
+
         const fullPath = src.startsWith('/') ? src.slice(1) : normalizePath(chapterPath, src);
-        const imgFile = zip.file(fullPath);
+        let imgFile = zip.file(fullPath);
+        if (!imgFile) {
+            const allFiles = Object.keys(zip.files);
+            const lowerPath = fullPath.toLowerCase();
+            const matchedKey = allFiles.find(k => k.toLowerCase() === lowerPath || k.toLowerCase().endsWith('/' + lowerPath));
+            if (matchedKey) imgFile = zip.file(matchedKey);
+        }
         
         if (imgFile) {
             const blob = await imgFile.async('blob');
@@ -51,35 +58,39 @@ const resolveImages = async (html: string, zip: any, chapterPath: string): Promi
 
 export const parseEpub = async (file: File): Promise<Book> => {
     if (typeof JSZip === 'undefined') {
-        throw new Error('JSZip library not loaded.');
+        throw new Error('Reader library is not ready.');
     }
     
     const zip = await new JSZip().loadAsync(file);
     const containerXmlFile = zip.file('META-INF/container.xml');
-    if (!containerXmlFile) throw new Error('Invalid EPUB');
+    if (!containerXmlFile) throw new Error('Invalid book format.');
     const containerXml = await containerXmlFile.async('string');
     
     const parser = new DOMParser();
     const containerDoc = parser.parseFromString(containerXml, 'application/xml');
     const opfPath = containerDoc.querySelector('rootfile')?.getAttribute('full-path');
-    if (!opfPath) throw new Error('Cannot find OPF');
+    if (!opfPath) throw new Error('Could not find book contents.');
 
     const opfDir = opfPath.includes('/') ? opfPath.substring(0, opfPath.lastIndexOf('/') + 1) : '';
     const opfFile = zip.file(opfPath);
-    if (!opfFile) throw new Error('Missing OPF');
+    if (!opfFile) throw new Error('Book data is missing.');
     const opfXml = await opfFile.async('string');
     const opfDoc = parser.parseFromString(opfXml, 'application/xml');
 
-    const title = opfDoc.querySelector('dc\\:title, title')?.textContent || 'Unknown Title';
-    const author = opfDoc.querySelector('dc\\:creator, creator')?.textContent || 'Unknown Author';
+    const title = opfDoc.querySelector('dc\\:title, title')?.textContent?.trim() || 'Untitled Book';
+    const author = opfDoc.querySelector('dc\\:creator, creator')?.textContent?.trim() || 'Unknown Author';
     
-    const manifestItems: Record<string, { href: string; mediaType: string }> = {};
+    const genreElements = Array.from(opfDoc.querySelectorAll('dc\\:subject, subject, meta[name="subject"]'));
+    const genres = genreElements.map(el => el.textContent?.trim() || el.getAttribute('content')?.trim()).filter(Boolean) as string[];
+
+    const manifestItems: Record<string, { href: string; mediaType: string; properties?: string }> = {};
     opfDoc.querySelectorAll('manifest > item').forEach((item: any) => {
         const id = item.getAttribute('id');
         const href = item.getAttribute('href');
         const mediaType = item.getAttribute('media-type');
+        const properties = item.getAttribute('properties');
         if (id && href && mediaType) {
-            manifestItems[id] = { href: opfDir + href, mediaType };
+            manifestItems[id] = { href: opfDir + href, mediaType, properties };
         }
     });
 
@@ -97,19 +108,18 @@ export const parseEpub = async (file: File): Promise<Book> => {
         const resolvedHtml = await resolveImages(rawHtml, zip, item.href);
         const doc = parser.parseFromString(resolvedHtml, 'text/html');
         
-        // Improve Label extraction: If title is missing or generic (like part001.xhtml), try to find a header
-        let label = doc.title || '';
-        const isGeneric = !label || label.match(/\.(xhtml|html|xml|htm)$/i) || label.match(/^part\d+/i) || label.match(/^chapter\d+/i);
+        let label = doc.title?.trim() || '';
+        const isGeneric = !label || label.toLowerCase().match(/\.(xhtml|html|xml|htm)$/i) || label.toLowerCase().match(/^(part|chapter|section|text|file)_?\d+/i);
         
         if (isGeneric) {
             const header = doc.querySelector('h1, h2, h3');
-            if (header && header.textContent) {
+            if (header && header.textContent?.trim()) {
                 label = header.textContent.trim();
             }
         }
         
         if (!label) {
-            label = item.href.split('/').pop()?.replace(/\.(xhtml|html|xml|htm)$/i, '') || 'Untitled Chapter';
+            label = item.href.split('/').pop()?.replace(/\.(xhtml|html|xml|htm)$/i, '') || 'Chapter';
         }
 
         chapters.push({
@@ -134,11 +144,39 @@ export const parseEpub = async (file: File): Promise<Book> => {
         }
     }
 
+    // COVER EXTRACTION
     let coverImageUrl: string | null = null;
-    const coverItem = opfDoc.querySelector('item[properties~="cover-image"]') || opfDoc.querySelector('item#cover-image');
-    if (coverItem) {
-        const href = coverItem.getAttribute('href');
-        const coverFile = zip.file(opfDir + href);
+    let coverManifestItem = Object.values(manifestItems).find(item => item.properties?.includes('cover-image'));
+
+    if (!coverManifestItem) {
+        const coverMeta = opfDoc.querySelector('meta[name="cover"]');
+        if (coverMeta) {
+            const coverId = coverMeta.getAttribute('content');
+            if (coverId && manifestItems[coverId]) {
+                coverManifestItem = manifestItems[coverId];
+            }
+        }
+    }
+
+    if (!coverManifestItem) {
+        const commonIds = ['cover', 'Cover', 'cover-image', 'title-page', 'titlepage'];
+        for (const id of commonIds) {
+            if (manifestItems[id]) {
+                coverManifestItem = manifestItems[id];
+                break;
+            }
+        }
+    }
+
+    if (!coverManifestItem) {
+        coverManifestItem = Object.values(manifestItems).find(item => 
+            (item.href.toLowerCase().includes('cover') || item.href.toLowerCase().includes('title')) && 
+            item.mediaType.startsWith('image/')
+        );
+    }
+
+    if (coverManifestItem) {
+        const coverFile = zip.file(coverManifestItem.href);
         if (coverFile) {
             const coverData = await coverFile.async('blob');
             coverImageUrl = await blobToBase64(coverData);
@@ -149,6 +187,7 @@ export const parseEpub = async (file: File): Promise<Book> => {
         id: crypto.randomUUID(),
         title, author, coverImageUrl, chapters,
         toc: tocItems.length ? tocItems : chapters.map(c => ({ id: c.id, href: c.href, label: c.label })),
-        progress: 0, lastScrollTop: 0, readingTime: 0, lastOpened: Date.now()
+        progress: 0, lastScrollTop: 0, readingTime: 0, lastOpened: Date.now(),
+        genre: genres.join(', ')
     };
 };
