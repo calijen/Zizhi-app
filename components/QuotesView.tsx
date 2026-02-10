@@ -76,25 +76,25 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, library = [], theme, on
   }, [activeShare, library]);
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-10 pb-40 animate-fade-in">
+    <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-10 pb-40 animate-fade-in">
       <header className="border-b-4 border-black pb-6">
-          <h2 className="text-4xl font-black text-black uppercase tracking-tight">Personal archive</h2>
-          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-pink-500 mt-2">Captured insights</p>
+          <h2 className="text-4xl font-black text-black uppercase tracking-tight">Saved Quotes</h2>
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-pink-500 mt-2">Your collection of highlights</p>
       </header>
 
       <div className="relative">
           <IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-black opacity-40" />
           <input 
-            type="text" placeholder="Search insights..." value={searchQuery}
+            type="text" placeholder="Search your quotes..." value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-white border-4 border-black p-4 pl-12 text-[14px] font-black text-black placeholder:text-gray-300 outline-none shadow-[4px_4px_0_black] focus:translate-x-[-2px] focus:translate-y-[-2px] focus:shadow-[6px_6px_0_black] transition-all"
           />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-min">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 auto-rows-min">
         {filteredQuotes.length === 0 ? (
             <div className="col-span-full py-20 flex flex-col items-center justify-center text-center opacity-30">
-                <p className="text-[12px] font-black uppercase tracking-[0.2em]">Archive Empty</p>
+                <p className="text-[12px] font-black uppercase tracking-[0.2em]">No Quotes Found</p>
             </div>
         ) : (
             filteredQuotes.map(quote => (

@@ -11,7 +11,7 @@ import SummaryView from './components/TrailerView';
 import ProfileView from './components/ProfileView';
 import Toast from './components/Toast';
 import { 
-    Logo, IconSettings, IconUser, IconLibrary, IconQuote, IconUpload, IconLayoutGrid, IconLayoutList
+    Logo, IconSettings, IconUser, IconLibrary, IconQuote, IconUpload, IconLayoutGrid, IconLayoutList, IconSpinner
 } from './components/icons';
 import * as db from './db';
 import { supabase } from './supabase';
@@ -130,25 +130,43 @@ const App: React.FC = () => {
     return currentStreak;
   }, [activity]);
 
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    try {
+        const newBook = await parseEpub(file);
+        newBook.lastOpened = Date.now();
+        await db.saveBook(newBook);
+        setLibrary(prev => [newBook, ...prev]);
+        setToast({ message: `Uploaded: ${newBook.title}` });
+    } catch (err) {
+        setToast({ message: "Upload failed." });
+    } finally {
+        setIsUploading(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const handleGenerateSummary = async (bookId: string) => {
     const book = library.find(b => b.id === bookId);
     if (!book) return;
 
-    setGenerationStatuses(prev => ({ ...prev, [bookId]: { stage: 'analyzing', progress: 0.2, currentAction: 'Reading themes...' } }));
+    setGenerationStatuses(prev => ({ ...prev, [bookId]: { stage: 'analyzing', progress: 0.2, currentAction: 'Reading book...' } }));
 
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const scriptResponse = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
-            contents: `Generate a high-quality summary for "${book.title}" by ${book.author}. Focus on themes and key ideas. Script for audio playback.`,
+            contents: `Summarize "${book.title}" by ${book.author}. Focus on the core message.`,
         });
 
         const script = scriptResponse.text;
-        setGenerationStatuses(prev => ({ ...prev, [bookId]: { stage: 'synthesizing', progress: 0.6, currentAction: 'Generating voice...' } }));
+        setGenerationStatuses(prev => ({ ...prev, [bookId]: { stage: 'synthesizing', progress: 0.6, currentAction: 'Generating audio...' } }));
 
         const ttsResponse = await ai.models.generateContent({
             model: "gemini-2.5-flash-preview-tts",
-            contents: [{ parts: [{ text: `Narrate: ${script}` }] }],
+            contents: [{ parts: [{ text: script }] }],
             config: {
                 responseModalities: [Modality.AUDIO],
                 speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Charon' } } },
@@ -156,15 +174,15 @@ const App: React.FC = () => {
         });
 
         const base64Audio = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-        if (!base64Audio) throw new Error("TTS failed");
+        if (!base64Audio) throw new Error("Audio generation failed");
 
         const audioUrl = `data:audio/pcm;base64,${base64Audio}`;
         const updatedBook = { ...book, summaryScript: script, audioSummaryUrl: audioUrl };
         await db.saveBook(updatedBook);
         setLibrary(prev => prev.map(b => b.id === bookId ? updatedBook : b));
-        setToast({ message: "Summary created!" });
+        setToast({ message: "Summary generated!" });
     } catch (err) {
-        setToast({ message: "Summary failed." });
+        setToast({ message: "Failed to summarize." });
     } finally {
         setGenerationStatuses(prev => {
             const next = { ...prev };
@@ -178,10 +196,10 @@ const App: React.FC = () => {
     const isActive = activeTab === tab;
     return (
         <Stack gap={4} align="center" className={`cursor-pointer transition-all duration-200 group w-full md:w-auto ${isActive ? 'text-[var(--color-primary-text)]' : 'text-[var(--color-muted-text)] hover:text-[var(--color-primary-text)]'}`} onClick={() => setActiveTab(tab)}>
-            <Box className={`relative flex items-center justify-center w-10 h-10 md:w-full md:px-4 transition-all border-2 ${isActive ? 'bg-[var(--color-primary)] border-[var(--color-border-color)] md:translate-x-1 shadow-[4px_4px_0px_var(--color-border-color)]' : 'border-transparent'}`} style={{ borderRadius: '0px' }}>
-                <Group gap="xs" wrap="nowrap" className="w-full justify-center md:justify-start">
+            <Box className={`relative flex items-center justify-center w-10 h-10 md:w-full md:px-6 md:py-6 transition-all border-2 ${isActive ? 'bg-[var(--color-primary)] border-[var(--color-border-color)] md:translate-x-1 shadow-[4px_4px_0px_var(--color-border-color)]' : 'border-transparent'}`} style={{ borderRadius: '0px' }}>
+                <Group gap="md" wrap="nowrap" className="w-full justify-center md:justify-start">
                     <Icon className={`w-5 h-5 transition-transform ${isActive ? 'scale-110' : ''}`} />
-                    {desktopLabel && <Text className="hidden md:block text-[12px] font-black uppercase tracking-widest">{desktopLabel}</Text>}
+                    {desktopLabel && <Text className="hidden md:block text-[13px] font-black uppercase tracking-widest">{desktopLabel}</Text>}
                 </Group>
             </Box>
             <Text className="md:hidden text-[10px] font-black uppercase tracking-widest">{label}</Text>
@@ -205,48 +223,47 @@ const App: React.FC = () => {
     <MantineProvider theme={mantineTheme} defaultColorScheme={theme.colors.background === '#000000' ? 'dark' : 'light'}>
       <Box style={appStyles} className="relative h-[100dvh] w-full overflow-hidden transition-colors duration-300 flex flex-col md:flex-row" bg="var(--color-background)">
         
-        {/* Desktop Sidebar */}
-        <aside className="hidden md:flex w-64 bg-[var(--color-surface)] border-r-4 border-[var(--color-border-color)] flex-col z-[150] shadow-[4px_0_0_rgba(0,0,0,0.02)]">
+        {/* Sidebar (Desktop/Tablet) */}
+        <aside className="hidden md:flex w-64 lg:w-72 bg-[var(--color-surface)] border-r-4 border-[var(--color-border-color)] flex-col z-[150] shadow-[4px_0_0_rgba(0,0,0,0.02)]">
             <div className="p-8 border-b-4 border-[var(--color-border-color)]">
                 <Logo className="h-6 w-auto text-[var(--color-primary-text)]" />
             </div>
             <nav className="flex-1 p-6 space-y-4">
-                <NavItem tab="library" icon={IconLibrary} label="Books" desktopLabel="Collection" />
-                <NavItem tab="quotes" icon={IconQuote} label="Quotes" desktopLabel="Insights" />
-                <NavItem tab="profile" icon={IconUser} label="Me" desktopLabel="Mission" />
-                <NavItem tab="settings" icon={IconSettings} label="Settings" desktopLabel="Vault" />
+                <NavItem tab="library" icon={IconLibrary} label="Library" desktopLabel="Library" />
+                <NavItem tab="quotes" icon={IconQuote} label="Quotes" desktopLabel="Quotes" />
+                <NavItem tab="profile" icon={IconUser} label="Profile" desktopLabel="Profile" />
+                <NavItem tab="settings" icon={IconSettings} label="Settings" desktopLabel="Settings" />
             </nav>
             <div className="p-8 border-t-2 border-[var(--color-border-color)] opacity-50">
-                <Text className="text-[10px] font-black uppercase tracking-tighter">Zizhi Monolith v4.0</Text>
+                <Text className="text-[10px] font-black uppercase tracking-tighter">Zizhi Reader v4.2</Text>
             </div>
         </aside>
 
         <Box className="flex-1 flex flex-col h-full overflow-hidden relative">
-            {/* Header (Simplified on desktop) */}
-            <header className="h-16 bg-[var(--color-surface)] z-[100] px-8 flex items-center justify-between border-b-4 border-[var(--color-border-color)]">
+            <header className="h-16 md:h-20 bg-[var(--color-surface)] z-[100] px-8 flex items-center justify-between border-b-4 border-[var(--color-border-color)]">
                 <div className="md:hidden">
                     <Logo className="h-4 w-auto text-[var(--color-primary-text)]" />
                 </div>
-                <div className="hidden md:block">
-                   <Text className="text-[10px] font-black uppercase tracking-widest text-[var(--color-muted-text)]">System Status: Active</Text>
+                <div className="hidden md:flex items-center gap-10">
+                   <Text className="text-[10px] font-black uppercase tracking-widest text-[var(--color-muted-text)]">Status: Active</Text>
+                   <Text className="text-[10px] font-black uppercase tracking-widest text-pink-500">Streak: {streak} Days</Text>
                 </div>
                 <Group gap="sm">
-                    <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => setViewMode(v => v === 'grid' ? 'list' : 'grid')} className="border-2 border-[var(--color-border-color)] rounded-none shadow-[2px_2px_0_var(--color-border-color)] bg-[var(--color-surface)]">
-                        {viewMode === 'grid' ? <IconLayoutList className="w-4 h-4 text-[var(--color-primary-text)]" /> : <IconLayoutGrid className="w-4 h-4 text-[var(--color-primary-text)]" />}
+                    <ActionIcon 
+                      variant="subtle" 
+                      color="gray" 
+                      size="lg" 
+                      onClick={() => setViewMode(v => v === 'grid' ? 'list' : 'grid')} 
+                      className="border-2 border-[var(--color-border-color)] rounded-none shadow-[2px_2px_0_var(--color-border-color)] bg-[var(--color-surface)]"
+                      title={viewMode === 'grid' ? "List View" : "Grid View"}
+                    >
+                        {viewMode === 'grid' ? <IconLayoutList className="w-5 h-5 text-black" /> : <IconLayoutGrid className="w-5 h-5 text-black" />}
                     </ActionIcon>
-                    {user ? (
-                        <div className="hidden md:flex items-center gap-2 px-3 py-1 border-2 border-black bg-yellow-400">
-                             <Text className="text-[10px] font-black uppercase text-black">{user.email?.split('@')[0]}</Text>
-                        </div>
-                    ) : (
-                        <ActionIcon variant="filled" color="cyan" size="sm" onClick={() => setShowAuth(true)} className="border-2 border-black rounded-none shadow-[2px_2px_0_black]">
-                             <IconUser className="w-4 h-4 text-black" />
-                        </ActionIcon>
-                    )}
+                    {/* Extra profile icons removed as requested */}
                 </Group>
             </header>
 
-            <main className="flex-1 overflow-y-auto no-scrollbar pb-32 md:pb-24">
+            <main className="flex-1 overflow-y-auto no-scrollbar pb-32 md:pb-12">
                 <Box className="max-w-7xl mx-auto px-6 py-6 h-full">
                     {activeTab === 'library' && (
                         <Library 
@@ -254,7 +271,12 @@ const App: React.FC = () => {
                             onBookSelect={(id) => setSelectedBook(library.find(b => b.id === id) || null)} 
                             isLoading={isUploading} 
                             error={null} 
-                            onDelete={async (id) => { if(confirm("Remove book from monolith?")) { await db.deleteBook(id); setLibrary(prev => prev.filter(b => b.id !== id)); } }} 
+                            onDelete={async (id) => { 
+                                if(window.confirm("Delete this book? This action cannot be undone.")) { 
+                                    await db.deleteBook(id); 
+                                    setLibrary(prev => prev.filter(b => b.id !== id)); 
+                                } 
+                            }} 
                             onGenerateSummary={handleGenerateSummary} 
                             generationStatuses={generationStatuses} 
                             onViewSummary={(id) => setSummaryBook(library.find(b => b.id === id) || null)} 
@@ -267,32 +289,30 @@ const App: React.FC = () => {
                 </Box>
             </main>
 
-            {/* Floating Upload Button */}
-            <Box className="fixed bottom-24 right-8 md:bottom-12 md:right-12 z-[250]">
-                <input type="file" ref={fileInputRef} onChange={async (e) => { 
-                    const file = e.target.files?.[0]; if (!file) return;
-                    setIsUploading(true);
-                    try {
-                        const newBook = await parseEpub(file); newBook.lastOpened = Date.now();
-                        await db.saveBook(newBook); setLibrary(prev => [newBook, ...prev]);
-                        setToast({ message: `Successfully Linked: ${newBook.title}` });
-                    } catch (err) { setToast({ message: "Sync failure." }); } 
-                    finally { setIsUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
-                }} accept=".epub" className="hidden" />
-                <Tooltip label="UPLOAD MISSION" position="left" withArrow color="black" offset={10}>
-                    <ActionIcon size={72} className="bg-yellow-400 border-4 border-[var(--color-border-color)] shadow-[6px_6px_0_var(--color-border-color)] hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[8px_8px_0_var(--color-border-color)] active:translate-y-[2px] active:shadow-[2px_2px_0_var(--color-border-color)] transition-all rounded-none" onClick={() => fileInputRef.current?.click()}>
-                        {isUploading ? <IconSpinner className="w-8 h-8 text-black" /> : <IconUpload className="w-8 h-8 text-black" />}
+            {/* Desktop FAB (Tablet/Laptop/Desktop) */}
+            <Box className="hidden md:block fixed bottom-12 right-12 z-[250]">
+                <input type="file" ref={fileInputRef} onChange={handleUpload} accept=".epub" className="hidden" />
+                <Tooltip label="Upload Book" position="left" withArrow color="black" offset={15}>
+                    <ActionIcon size={80} className="bg-yellow-400 border-4 border-black shadow-[8px_8px_0_black] hover:translate-y-[-2px] hover:shadow-[10px_10px_0_black] active:translate-y-[2px] active:shadow-none transition-all rounded-none" onClick={() => fileInputRef.current?.click()}>
+                        {isUploading ? <IconSpinner className="w-10 h-10 text-black" /> : <IconUpload className="w-10 h-10 text-black" />}
                     </ActionIcon>
                 </Tooltip>
             </Box>
         </Box>
 
-        {/* Mobile Nav */}
+        {/* Mobile Navigation (Bottom Nav) - Preserved as "Perfect" Mobile Version */}
         <nav className="fixed bottom-0 left-0 right-0 bg-[var(--color-surface)] h-20 flex items-center justify-around z-[200] border-t-4 border-[var(--color-border-color)] md:hidden">
-            <NavItem tab="library" icon={IconLibrary} label="Books" />
+            <NavItem tab="library" icon={IconLibrary} label="Library" />
             <NavItem tab="quotes" icon={IconQuote} label="Quotes" />
-            <div className="w-20" /> {/* Spacer for FAB position alignment if needed */}
-            <NavItem tab="profile" icon={IconUser} label="Me" />
+            
+            <Box className="relative -top-6">
+                <input type="file" ref={fileInputRef} onChange={handleUpload} accept=".epub" className="hidden" />
+                <ActionIcon size={72} className="bg-yellow-400 border-4 border-black shadow-[6px_6px_0_black] rounded-none" onClick={() => fileInputRef.current?.click()}>
+                    {isUploading ? <IconSpinner className="w-8 h-8 text-black" /> : <IconUpload className="w-8 h-8 text-black" />}
+                </ActionIcon>
+            </Box>
+
+            <NavItem tab="profile" icon={IconUser} label="Profile" />
             <NavItem tab="settings" icon={IconSettings} label="Settings" />
         </nav>
 
@@ -309,9 +329,9 @@ const App: React.FC = () => {
                 }} 
                 onSaveQuote={async (t, c) => {
                     const nq: Quote = { id: crypto.randomUUID(), text: t, bookTitle: selectedBook.title, author: selectedBook.author, bookId: selectedBook.id, location: c, createdAt: Date.now() };
-                    await db.saveQuote(nq); setQuotes(prev => [nq, ...prev]); setToast({ message: "Insight captured." });
+                    await db.saveQuote(nq); setQuotes(prev => [nq, ...prev]); setToast({ message: "Quote saved." });
                 }} 
-                onSearch={(q) => { setSearchQuery(q); setToast({ message: `Initiating Scan: ${q}` }); }} 
+                onSearch={(q) => { setSearchQuery(q); setToast({ message: `Searching: ${q}` }); }} 
             />
         )}
         
