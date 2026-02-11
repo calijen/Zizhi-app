@@ -131,16 +131,16 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
     };
 
     return (
-        <div className="fixed inset-0 z-[100] bg-white flex flex-col items-center p-6 animate-fade-in overflow-y-auto no-scrollbar">
-            <button onClick={onClose} className="absolute top-6 right-6 p-2 text-black hover:bg-black/10 transition-colors rounded-full z-[110]" aria-label="Close auth">
+        <div className="fixed inset-0 z-[100] bg-[var(--color-background)] flex flex-col items-center p-6 animate-fade-in overflow-y-auto no-scrollbar">
+            <button onClick={onClose} className="absolute top-6 right-6 p-2 text-[var(--color-primary-text)] hover:bg-black/10 transition-colors rounded-full z-[110]" aria-label="Close auth">
                 <IconClose className="w-8 h-8" />
             </button>
             
-            <div className="w-full max-w-sm flex flex-col items-center pt-12 pb-32">
+            <div className="w-full max-w-sm flex flex-col items-center pt-12 pb-48">
                 <header className="text-center mb-8">
                     <LoginRobot />
-                    <h1 className="text-3xl font-black mb-2 text-black uppercase tracking-tight">{view === 'login' ? 'Welcome Back' : 'Get Started'}</h1>
-                    <p className="text-sm text-black/60 font-black uppercase tracking-widest">Store your library in the cloud</p>
+                    <h1 className="text-3xl font-black mb-2 text-[var(--color-primary-text)] uppercase tracking-tight">{view === 'login' ? 'Welcome Back' : 'Get Started'}</h1>
+                    <p className="text-sm text-[var(--color-muted-text)] font-black uppercase tracking-widest">Store your credentials in the cloud</p>
                 </header>
 
                 {error && (
@@ -153,33 +153,33 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
                     <button 
                         onClick={handleGoogleLogin} 
                         disabled={isLoading} 
-                        className="w-full flex items-center justify-center gap-4 py-4 bg-white border-4 border-black font-black uppercase text-[12px] shadow-[4px_4px_0_black] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_black] active:translate-y-1 active:shadow-none transition-all disabled:opacity-50 text-black"
+                        className="w-full flex items-center justify-center gap-4 py-4 bg-[var(--color-surface)] border-4 border-[var(--color-border-color)] font-black uppercase text-[12px] shadow-[4px_4px_0_var(--color-border-color)] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_var(--color-border-color)] active:translate-y-1 active:shadow-none transition-all disabled:opacity-50 text-[var(--color-primary-text)]"
                     >
                         <IconGoogle className="w-6 h-6" />
                         <span>Continue with Google</span>
                     </button>
 
                     <div className="relative flex items-center gap-4 py-4">
-                        <div className="flex-1 h-1 bg-black/10" />
-                        <span className="text-[10px] font-black uppercase text-black/40 px-2">Account Credentials</span>
-                        <div className="flex-1 h-1 bg-black/10" />
+                        <div className="flex-1 h-1 bg-[var(--color-border-color)] opacity-20" />
+                        <span className="text-[10px] font-black uppercase text-[var(--color-muted-text)] px-2">Identity Credentials</span>
+                        <div className="flex-1 h-1 bg-[var(--color-border-color)] opacity-20" />
                     </div>
 
                     <form onSubmit={handleEmailAuth} className="w-full space-y-6">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-black/80 ml-1 tracking-widest">Email Identity</label>
+                            <label className="text-[10px] font-black uppercase text-[var(--color-secondary-text)] ml-1 tracking-widest">Email Identity</label>
                             <input 
                                 type="email" 
                                 required 
                                 placeholder="name@domain.com" 
                                 value={email} 
                                 onChange={(e) => setEmail(e.target.value)} 
-                                className="w-full bg-white border-4 border-black p-4 outline-none font-black text-black placeholder:text-black/25 focus:shadow-[4px_4px_0_black] transition-all text-base" 
+                                className="w-full bg-[var(--color-surface)] border-4 border-[var(--color-border-color)] p-4 outline-none font-black text-[var(--color-primary-text)] placeholder:text-[var(--color-muted-text)] focus:shadow-[4px_4px_0_var(--color-border-color)] transition-all text-base" 
                             />
                         </div>
                         
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-black/80 ml-1 tracking-widest">Secret Key</label>
+                            <label className="text-[10px] font-black uppercase text-[var(--color-secondary-text)] ml-1 tracking-widest">Secret Key</label>
                             <div className="relative">
                                 <input 
                                     type={showPassword ? "text" : "password"} 
@@ -187,9 +187,9 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
                                     placeholder="••••••••" 
                                     value={password} 
                                     onChange={(e) => setPassword(e.target.value)} 
-                                    className="w-full bg-white border-4 border-black p-4 outline-none font-black text-black placeholder:text-black/25 pr-14 focus:shadow-[4px_4px_0_black] transition-all text-base" 
+                                    className="w-full bg-[var(--color-surface)] border-4 border-[var(--color-border-color)] p-4 outline-none font-black text-[var(--color-primary-text)] placeholder:text-[var(--color-muted-text)] pr-14 focus:shadow-[4px_4px_0_var(--color-border-color)] transition-all text-base" 
                                 />
-                                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-black/60 hover:text-black transition-colors">
+                                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-[var(--color-muted-text)] hover:text-[var(--color-primary-text)] transition-colors">
                                     {showPassword ? <IconEyeOff className="w-6 h-6" /> : <IconEye className="w-6 h-6" />}
                                 </button>
                             </div>
@@ -204,9 +204,9 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
                     </form>
                 </div>
 
-                <footer className="text-center mt-12 w-full space-y-4">
-                    <button className="text-[10px] font-black uppercase tracking-widest text-black/40 hover:text-black transition-colors block mx-auto">Forgot Secret Key?</button>
-                    <p className="text-xs font-black text-black/60 uppercase tracking-widest">
+                <footer className="text-center mt-12 w-full space-y-6">
+                    <button className="text-[11px] font-black uppercase tracking-widest text-[var(--color-primary-text)] bg-white border-2 border-black px-4 py-2 shadow-[4px_4px_0_black] hover:translate-y-1 hover:shadow-none transition-all block mx-auto">Forgot Secret Key?</button>
+                    <p className="text-xs font-black text-[var(--color-muted-text)] uppercase tracking-widest">
                         {view === 'login' ? "Identity unknown?" : "Registered user?"} 
                         <button onClick={() => setView(view === 'login' ? 'signup' : 'login')} className="ml-2 text-pink-600 font-black underline decoration-4 underline-offset-4 hover:text-pink-700 transition-colors">
                             {view === 'login' ? 'Create Hub Account' : 'Log Into Archive'}

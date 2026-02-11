@@ -115,9 +115,9 @@ const BookCard: React.FC<{
     const progressPercent = Math.round((book.progress || 0) * 100);
 
     return (
-        <Box bg="var(--color-surface)" className="relative group border-4 border-black shadow-[4px_4px_0_black] hover:translate-x-[-1px] transition-all overflow-hidden">
+        <Box bg="var(--color-surface)" className="relative group border-4 border-[var(--color-border-color)] shadow-[4px_4px_0_var(--color-border-color)] hover:translate-x-[-1px] transition-all overflow-hidden">
             <Box className={`${isList ? 'flex flex-row' : 'flex flex-col'}`}>
-                <Box className={`relative cursor-pointer overflow-hidden ${isList ? 'w-24 md:w-32 flex-shrink-0 border-r-4 border-black' : 'aspect-[3/4] border-b-4 border-black'}`} onClick={() => onSelect(book.id)}>
+                <Box className={`relative cursor-pointer overflow-hidden ${isList ? 'w-24 md:w-32 flex-shrink-0 border-r-4 border-[var(--color-border-color)]' : 'aspect-[3/4] border-b-4 border-[var(--color-border-color)]'}`} onClick={() => onSelect(book.id)}>
                     {book.coverImageUrl ? <Image src={book.coverImageUrl} className="w-full h-full object-cover" /> : <Box className="w-full h-full bg-slate-100 flex items-center justify-center font-black text-slate-300">EPUB</Box>}
                 </Box>
                 <Stack p="md" gap="xs" className="flex-1 justify-between min-w-0">
@@ -141,7 +141,7 @@ const BookCard: React.FC<{
                             {book.audioSummaryUrl ? (
                                 <Button variant="filled" color="yellow" className="border-2 border-black rounded-none shadow-[2px_2px_0_#000] h-8 p-0 text-[10px] font-black uppercase text-black" onClick={(e) => { e.stopPropagation(); onViewSummary(book.id); }} leftSection={<IconPlay className="w-3 h-3" />}>Summary</Button>
                             ) : (
-                                <Button variant="outline" color="dark" className="border-2 border-black rounded-none h-8 p-0 text-[10px] font-black uppercase text-[var(--color-primary-text)]" onClick={(e) => { e.stopPropagation(); onGenerateSummary(book.id); }} loading={!!status}>{status ? status.stage : 'Analyze'}</Button>
+                                <Button variant="outline" color="dark" className="border-2 border-[var(--color-border-color)] rounded-none h-8 p-0 text-[10px] font-black uppercase text-[var(--color-primary-text)]" onClick={(e) => { e.stopPropagation(); onGenerateSummary(book.id); }} loading={!!status}>{status ? status.stage : 'Analyze'}</Button>
                             )}
                         </Group>
                     </Stack>
@@ -153,10 +153,15 @@ const BookCard: React.FC<{
 
 const Library: React.FC<LibraryProps> = ({ books, theme, onBookSelect, isLoading, onDelete, onGenerateSummary, generationStatuses, onViewSummary, viewMode }) => {
   return (
-    <Box className="py-4 md:py-8 animate-fade-in">
-        <header className="mb-10 border-b-4 border-black pb-6"><h2 className="text-2xl md:text-3xl font-black text-[var(--color-primary-text)] uppercase">{books.length} Books</h2></header>
+    <Box className="py-4 md:py-8 animate-fade-in pb-32">
+        <header className="mb-10 border-b-4 border-[var(--color-border-color)] pb-6 flex justify-between items-end">
+            <h2 className="text-2xl md:text-3xl font-black text-[var(--color-primary-text)] uppercase">{books.length} Books</h2>
+            <Box className="hidden sm:block px-3 py-1 bg-yellow-400 border-2 border-black shadow-[2px_2px_0_black] mb-1">
+                <Text className="text-[9px] font-black uppercase text-black">Local Storage Device Only</Text>
+            </Box>
+        </header>
         {isLoading && (
-            <Box className="bg-[var(--color-surface)] border-4 border-black p-20 flex flex-col items-center justify-center text-center shadow-[4px_4px_0_black] animate-pulse">
+            <Box className="bg-[var(--color-surface)] border-4 border-[var(--color-border-color)] p-20 flex flex-col items-center justify-center text-center shadow-[4px_4px_0_var(--color-border-color)] animate-pulse">
                 <IconSpinner className="w-12 h-12 text-[var(--color-primary)] mb-6" />
                 <Text className="text-[13px] font-black uppercase text-[var(--color-primary-text)]">Adding Book...</Text>
             </Box>

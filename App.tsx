@@ -37,8 +37,8 @@ export const ATMOSPHERES: { [key: string]: Theme } = {
           'background': '#fdf6e3', 
           'surface': '#f5efdc', 
           'primary-text': '#1a110a', 
-          'secondary-text': '#2a1a10', 
-          'muted-text': '#4a3324', 
+          'secondary-text': '#3a2a1a', 
+          'muted-text': '#5a4334', 
           'border-color': '#c1b496' 
         },
         font: FONTS[0], fontSize: 1.3, lineHeight: 1.6, texture: 'paper', readingMode: 'scroll'
@@ -49,11 +49,11 @@ export const ATMOSPHERES: { [key: string]: Theme } = {
           'primary': '#111111', 
           'secondary': '#222222', 
           'background': '#ffffff', 
-          'surface': '#f9f9f9', 
-          'primary-text': '#111111', 
-          'secondary-text': '#222222', 
-          'muted-text': '#444444', 
-          'border-color': '#cccccc' 
+          'surface': '#f3f3f3', 
+          'primary-text': '#000000', 
+          'secondary-text': '#333333', 
+          'muted-text': '#666666', 
+          'border-color': '#000000' 
         },
         font: FONTS[0], fontSize: 1.2, lineHeight: 1.9, texture: 'none', readingMode: 'scroll'
     },
@@ -63,11 +63,11 @@ export const ATMOSPHERES: { [key: string]: Theme } = {
           'primary': '#00d1ff', 
           'secondary': '#ffffff', 
           'background': '#0a0a0b', 
-          'surface': '#161618', 
-          'primary-text': '#f0f0f0', 
-          'secondary-text': '#e0e0e0', 
-          'muted-text': '#b0b0b0', 
-          'border-color': '#444444' 
+          'surface': '#1a1a1c', 
+          'primary-text': '#ffffff', 
+          'secondary-text': '#d1d1d1', 
+          'muted-text': '#999999', 
+          'border-color': '#333333' 
         },
         font: FONTS[2], fontSize: 1.15, lineHeight: 1.7, texture: 'none', readingMode: 'scroll'
     }
@@ -106,7 +106,7 @@ const App: React.FC = () => {
     try {
         const newBook = await parseEpub(file); newBook.lastOpened = Date.now();
         await db.saveBook(newBook); setLibrary(prev => [newBook, ...prev]);
-        setToast({ message: "Book added." });
+        setToast({ message: "Book added to local library." });
     } catch (err) { setToast({ message: "File error." }); } finally { setIsUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
   };
 
@@ -116,7 +116,6 @@ const App: React.FC = () => {
     
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        
         const summaryPrompt = `Generate a high-quality, opinionated audio summary of the book "${book.title}" by ${book.author}. 
         Strict requirements:
         1. Write a 12–15 minute spoken script (approximately 1,800–2,200 words).
@@ -129,21 +128,14 @@ const App: React.FC = () => {
         8. End with a concise synthesis of the most important takeaways or ultimate revelations.
         9. Output must be a single continuous script suitable for SSML-based speech synthesis.`;
 
-        const scriptRes = await ai.models.generateContent({ 
-            model: 'gemini-3-flash-preview', 
-            contents: summaryPrompt 
-        });
-        
+        const scriptRes = await ai.models.generateContent({ model: 'gemini-3-flash-preview', contents: summaryPrompt });
         const script = scriptRes.text || "";
         setGenerationStatuses(prev => ({ ...prev, [bookId]: { stage: 'Talking', progress: 0.5, currentAction: 'Synthesizing voice...' } }));
         
         const ttsRes = await ai.models.generateContent({ 
             model: "gemini-2.5-flash-preview-tts", 
             contents: [{ parts: [{ text: script }] }], 
-            config: { 
-                responseModalities: [Modality.AUDIO], 
-                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } } 
-            } 
+            config: { responseModalities: [Modality.AUDIO], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } } } 
         });
         
         const base64Audio = ttsRes.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
@@ -204,12 +196,15 @@ const App: React.FC = () => {
         <Box className="flex-1 flex flex-col h-full overflow-hidden relative">
             <header className="h-16 md:h-20 bg-[var(--color-surface)] z-[100] px-8 flex items-center justify-between border-b-4 border-black">
                 <div className="md:hidden"><Logo className="h-4 w-auto text-[var(--color-primary-text)]" /></div>
-                <div className="hidden md:flex items-center gap-10"><Text className="text-[10px] font-black uppercase tracking-widest text-[var(--color-muted-text)]">Theme: {theme.name}</Text></div>
+                <div className="hidden md:flex items-center gap-10">
+                    <Text className="text-[10px] font-black uppercase tracking-widest text-[var(--color-muted-text)]">Theme: {theme.name}</Text>
+                    {user && <Box className="bg-cyan-400 px-3 py-1 border-2 border-black shadow-[2px_2px_0_black]"><Text className="text-[9px] font-black uppercase text-black">Cloud Auth Active</Text></Box>}
+                </div>
                 <ActionIcon variant="subtle" color="gray" size="lg" onClick={() => setViewMode(v => v === 'grid' ? 'list' : 'grid')} className="border-2 border-black shadow-[2px_2px_0_black] bg-white">
                     {viewMode === 'grid' ? <IconLayoutList className="w-5 h-5 text-black" /> : <IconLayoutGrid className="w-5 h-5 text-black" />}
                 </ActionIcon>
             </header>
-            <main className="flex-1 overflow-y-auto no-scrollbar pb-40 md:pb-12">
+            <main className="flex-1 overflow-y-auto no-scrollbar pb-64 md:pb-24">
                 <Box className="max-w-7xl mx-auto px-6 py-6 h-full">
                     {activeTab === 'library' && <Library books={sortedLibrary} theme={theme} onBookSelect={(id) => setSelectedBook(library.find(b => b.id === id) || null)} isLoading={isUploading} error={null} onDelete={async (id) => { if(window.confirm("Delete book?")) { await db.deleteBook(id); setLibrary(prev => prev.filter(b => b.id !== id)); } }} onGenerateSummary={handleGenerateSummary} generationStatuses={generationStatuses} onViewSummary={(id) => setSummaryBook(library.find(b => b.id === id) || null)} viewMode={viewMode} />}
                     {activeTab === 'quotes' && <QuotesView theme={theme} quotes={quotes} library={library} onDelete={(id) => { db.deleteQuote(id).then(() => setQuotes(prev => prev.filter(q => q.id !== id))); }} onGoToQuote={(q) => setSelectedBook(library.find(b => b.id === q.bookId) || null)} />}
