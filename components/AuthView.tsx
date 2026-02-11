@@ -1,12 +1,81 @@
 
 import React, { useState } from 'react';
-import { IconClose, IconSpinner, Logo, IconGoogle, IconEye, IconEyeOff } from './icons';
+import { IconClose, IconSpinner, IconGoogle, IconEye, IconEyeOff } from './icons';
 import { supabase, isSupabaseConfigured } from '../supabase';
 
 interface AuthViewProps {
     onClose: () => void;
     onLogin: (user: any) => void;
 }
+
+const LoginRobot = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="200" height="200" className="mx-auto mb-4">
+      <defs>
+        <linearGradient id="bodyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#4FC3F7" stopOpacity={1} />
+          <stop offset="100%" stopColor="#0288D1" stopOpacity={1} />
+        </linearGradient>
+        <linearGradient id="metalGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#E0E0E0" stopOpacity={1} />
+          <stop offset="100%" stopColor="#9E9E9E" stopOpacity={1} />
+        </linearGradient>
+        <linearGradient id="screenGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#263238" stopOpacity={1} />
+          <stop offset="100%" stopColor="#37474F" stopOpacity={1} />
+        </linearGradient>
+        <radialGradient id="antennaGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#FFEB3B" stopOpacity={1} />
+          <stop offset="100%" stopColor="#FBC02D" stopOpacity={1} />
+        </radialGradient>
+        <linearGradient id="bookGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#FF7043" stopOpacity={1} />
+          <stop offset="100%" stopColor="#F4511E" stopOpacity={1} />
+        </linearGradient>
+      </defs>
+      <ellipse cx="256" cy="460" rx="120" ry="20" fill="#000000" opacity="0.15" />
+      <g>
+        <g transform="translate(0, 10)">
+          <path d="M210 380 L210 430 Q210 450 190 450 L180 450 Q160 450 160 430 L160 420" fill="none" stroke="#546E7A" strokeWidth="20" strokeLinecap="round" />
+          <path d="M302 380 L302 430 Q302 450 322 450 L332 450 Q352 450 352 430 L352 420" fill="none" stroke="#546E7A" strokeWidth="20" strokeLinecap="round" />
+          <path d="M150 430 Q150 455 185 455 L195 455 Q230 455 230 430 L230 420 L150 420 Z" fill="url(#metalGradient)" />
+          <path d="M292 430 Q292 455 327 455 L337 455 Q372 455 372 430 L372 420 L292 420 Z" fill="url(#metalGradient)" />
+        </g>
+        <path d="M160 280 Q120 280 120 330 Q120 360 150 360" fill="none" stroke="#546E7A" strokeWidth="24" strokeLinecap="round" />
+        <circle cx="160" cy="280" r="15" fill="#CFD8DC" />
+        <path d="M352 280 Q410 260 420 200" fill="none" stroke="#546E7A" strokeWidth="24" strokeLinecap="round" />
+        <circle cx="352" cy="280" r="15" fill="#CFD8DC" />
+        <g transform="translate(420, 200) rotate(-20)">
+          <circle cx="0" cy="0" r="20" fill="#CFD8DC" />
+          <path d="M-15 -10 L-25 -40 Q-30 -55 -15 -55 L-5 -55 Q10 -55 5 -40 L-5 -10 Z" fill="#CFD8DC" />
+          <path d="M15 -10 L25 -40 Q30 -55 15 -55 L5 -55 Q-10 -55 -5 -40 L5 -10 Z" fill="#CFD8DC" />
+        </g>
+        <rect x="160" y="240" width="192" height="160" rx="40" ry="40" fill="url(#bodyGradient)" />
+        <rect x="206" y="280" width="100" height="80" rx="10" ry="10" fill="#FFFFFF" opacity="0.8" />
+        <path d="M241 310 L271 310 L271 335 L241 335 Z" fill="#FF7043" />
+        <path d="M246 310 L246 300 Q246 290 256 290 Q266 290 266 300 L266 310" fill="none" stroke="#FF7043" strokeWidth="4" />
+        <circle cx="256" cy="322" r="3" fill="#FFFFFF" />
+        <rect x="236" y="220" width="40" height="30" fill="#78909C" />
+        <g transform="translate(256, 160) rotate(-5)">
+          <rect x="-5" y="-90" width="10" height="40" fill="#78909C" />
+          <circle cx="0" cy="-90" r="12" fill="url(#antennaGlow)" />
+          <rect x="-100" y="-60" width="200" height="140" rx="50" ry="50" fill="url(#bodyGradient)" />
+          <rect x="-80" y="-40" width="160" height="80" rx="30" ry="30" fill="url(#screenGradient)" />
+          <g>
+            <circle cx="-40" cy="-10" r="22" fill="#FFFFFF" />
+            <circle cx="-40" cy="-10" r="10" fill="#0277BD" />
+            <circle cx="40" cy="-10" r="26" fill="#FFFFFF" />
+            <circle cx="40" cy="-10" r="12" fill="#0277BD" />
+          </g>
+          <path d="M-20 20 Q0 30 20 20" fill="none" stroke="#FFFFFF" strokeWidth="4" strokeLinecap="round" />
+        </g>
+        <g transform="translate(150, 350) rotate(-10)">
+          <rect x="-10" y="-5" width="80" height="90" rx="5" fill="#D84315" />
+          <rect x="0" y="0" width="75" height="85" rx="4" fill="url(#bookGradient)" />
+          <rect x="5" y="5" width="65" height="75" rx="2" fill="#FFF3E0" />
+        </g>
+      </g>
+    </svg>
+);
 
 const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
     const [view, setView] = useState<'login' | 'signup'>('signup');
@@ -18,21 +87,18 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
 
     const handleGoogleLogin = async () => {
         if (!isSupabaseConfigured()) {
-            setError({ message: "Supabase API key is missing. Please check supabase.ts", isWarning: false });
+            setError({ message: "Configuration error. Please check Supabase setup.", isWarning: false });
             return;
         }
         setIsLoading(true);
-        setError(null);
         try {
             const { error: authError } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
-                options: {
-                    redirectTo: window.location.origin,
-                }
+                options: { redirectTo: window.location.origin }
             });
             if (authError) throw authError;
         } catch (err: any) {
-            setError({ message: err.message || "Google Login failed.", isWarning: false });
+            setError({ message: err.message || "Login failed.", isWarning: false });
             setIsLoading(false);
         }
     };
@@ -41,12 +107,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
         e.preventDefault();
         setError(null);
         setIsLoading(true);
-
         try {
-            if (!isSupabaseConfigured()) {
-                throw new Error("Supabase API key is not configured correctly in supabase.ts");
-            }
-
             if (view === 'login') {
                 const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
                 if (authError) throw authError;
@@ -55,63 +116,35 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
             } else {
                 const { data, error: authError } = await supabase.auth.signUp({ email, password });
                 if (authError) throw authError;
-                
                 if (data.user && data.session) {
                     onLogin(data.user);
                     onClose();
                 } else {
-                    setError({ message: "Welcome! Please check your email to confirm your account.", isWarning: true });
+                    setError({ message: "Success! Check your email to confirm your account.", isWarning: true });
                 }
             }
         } catch (err: any) {
-            setError({ message: err.message || "Authentication error occurred.", isWarning: false });
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleForgotPassword = async () => {
-        if (!email) {
-            setError({ message: "Please enter your email address first.", isWarning: true });
-            return;
-        }
-        setIsLoading(true);
-        try {
-            const { error } = await supabase.auth.resetPasswordForEmail(email);
-            if (error) throw error;
-            setError({ message: "Reset link sent! Check your inbox.", isWarning: true });
-        } catch (err: any) {
-            setError({ message: err.message, isWarning: false });
+            setError({ message: err.message || "Authentication error.", isWarning: false });
         } finally {
             setIsLoading(false);
         }
     };
 
     return (
-        <div className="fixed inset-0 z-[100] bg-[var(--color-background)] flex flex-col items-center justify-center p-6 animate-fade-in overflow-y-auto">
-            <button 
-                onClick={onClose} 
-                className="absolute top-6 right-6 p-2 text-[var(--color-secondary-text)] hover:bg-black/5 rounded-full transition-all"
-                aria-label="Close"
-            >
-                <IconClose className="w-6 h-6" />
+        <div className="fixed inset-0 z-[100] bg-white flex flex-col items-center p-6 animate-fade-in overflow-y-auto no-scrollbar">
+            <button onClick={onClose} className="absolute top-6 right-6 p-2 text-black hover:bg-black/10 transition-colors rounded-full z-[110]" aria-label="Close auth">
+                <IconClose className="w-8 h-8" />
             </button>
             
-            <div className="w-full max-w-sm flex flex-col items-center">
-                <header className="text-center mb-10">
-                    <div className="mb-6 flex justify-center scale-110">
-                        <Logo className="h-10 w-auto text-[var(--color-primary-text)]" />
-                    </div>
-                    <h1 className="text-2xl font-bold font-serif mb-2 text-[var(--color-primary-text)]">
-                        {view === 'login' ? 'Welcome Back' : 'Join Zizhi'}
-                    </h1>
-                    <p className="text-sm text-[var(--color-secondary-text)] opacity-80">
-                        Synchronize your library across devices.
-                    </p>
+            <div className="w-full max-w-sm flex flex-col items-center pt-12 pb-32">
+                <header className="text-center mb-8">
+                    <LoginRobot />
+                    <h1 className="text-3xl font-black mb-2 text-black uppercase tracking-tight">{view === 'login' ? 'Welcome Back' : 'Get Started'}</h1>
+                    <p className="text-sm text-black/60 font-black uppercase tracking-widest">Store your library in the cloud</p>
                 </header>
 
                 {error && (
-                    <div className={`w-full p-4 mb-6 text-sm rounded-xl border leading-relaxed text-center animate-fade-in ${error.isWarning ? 'bg-blue-50 border-blue-100 text-blue-700' : 'bg-red-50 border-red-100 text-red-600 font-bold'}`}>
+                    <div className={`w-full p-4 mb-8 text-sm border-4 text-center leading-relaxed ${error.isWarning ? 'bg-blue-50 border-blue-600 text-blue-800 font-black' : 'bg-red-50 border-red-600 text-red-800 font-black'}`}>
                         {error.message}
                     </div>
                 )}
@@ -119,70 +152,64 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
                 <div className="w-full space-y-6">
                     <button 
                         onClick={handleGoogleLogin} 
-                        disabled={isLoading}
-                        className="w-full flex items-center justify-center gap-3 py-3.5 bg-white border border-gray-200 text-gray-700 rounded-xl font-semibold shadow-sm hover:bg-gray-50 active:scale-[0.98] transition-all disabled:opacity-50"
+                        disabled={isLoading} 
+                        className="w-full flex items-center justify-center gap-4 py-4 bg-white border-4 border-black font-black uppercase text-[12px] shadow-[4px_4px_0_black] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_black] active:translate-y-1 active:shadow-none transition-all disabled:opacity-50 text-black"
                     >
-                        <IconGoogle className="w-5 h-5" />
+                        <IconGoogle className="w-6 h-6" />
                         <span>Continue with Google</span>
                     </button>
 
-                    <div className="relative flex items-center gap-4">
-                        <div className="flex-1 h-px bg-[var(--color-border-color)] opacity-60" />
-                        <span className="text-[10px] font-bold text-[var(--color-secondary-text)] uppercase tracking-widest opacity-40">Or use email</span>
-                        <div className="flex-1 h-px bg-[var(--color-border-color)] opacity-60" />
+                    <div className="relative flex items-center gap-4 py-4">
+                        <div className="flex-1 h-1 bg-black/10" />
+                        <span className="text-[10px] font-black uppercase text-black/40 px-2">Account Credentials</span>
+                        <div className="flex-1 h-1 bg-black/10" />
                     </div>
 
-                    <form onSubmit={handleEmailAuth} className="w-full space-y-3">
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-[var(--color-secondary-text)] uppercase tracking-wider ml-1">Email Address</label>
+                    <form onSubmit={handleEmailAuth} className="w-full space-y-6">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase text-black/80 ml-1 tracking-widest">Email Identity</label>
                             <input 
-                                type="email" required placeholder="name@example.com" value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3.5 px-4 outline-none focus:border-blue-500 focus:bg-white transition-all text-base text-slate-900 placeholder:text-slate-400 font-medium"
+                                type="email" 
+                                required 
+                                placeholder="name@domain.com" 
+                                value={email} 
+                                onChange={(e) => setEmail(e.target.value)} 
+                                className="w-full bg-white border-4 border-black p-4 outline-none font-black text-black placeholder:text-black/25 focus:shadow-[4px_4px_0_black] transition-all text-base" 
                             />
                         </div>
-                        <div className="space-y-1 relative">
-                            <label className="text-[10px] font-bold text-[var(--color-secondary-text)] uppercase tracking-wider ml-1">Password</label>
+                        
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase text-black/80 ml-1 tracking-widest">Secret Key</label>
                             <div className="relative">
                                 <input 
-                                    type={showPassword ? "text" : "password"} required placeholder="••••••••" value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3.5 px-4 outline-none focus:border-blue-500 focus:bg-white transition-all text-base text-slate-900 placeholder:text-slate-400 font-medium pr-12"
+                                    type={showPassword ? "text" : "password"} 
+                                    required 
+                                    placeholder="••••••••" 
+                                    value={password} 
+                                    onChange={(e) => setPassword(e.target.value)} 
+                                    className="w-full bg-white border-4 border-black p-4 outline-none font-black text-black placeholder:text-black/25 pr-14 focus:shadow-[4px_4px_0_black] transition-all text-base" 
                                 />
-                                <button 
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-slate-600"
-                                >
-                                    {showPassword ? <IconEyeOff className="w-5 h-5" /> : <IconEye className="w-5 h-5" />}
+                                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-black/60 hover:text-black transition-colors">
+                                    {showPassword ? <IconEyeOff className="w-6 h-6" /> : <IconEye className="w-6 h-6" />}
                                 </button>
                             </div>
                         </div>
-                        {view === 'login' && (
-                            <button 
-                                type="button" onClick={handleForgotPassword}
-                                className="text-xs text-[var(--color-primary)] font-bold hover:underline block text-right w-full"
-                            >
-                                Forgot password?
-                            </button>
-                        )}
+
                         <button 
                             disabled={isLoading} 
-                            className="w-full bg-[var(--color-primary)] text-white font-bold py-3.5 rounded-xl shadow-md hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50 mt-4 flex items-center justify-center gap-2"
+                            className="w-full bg-cyan-400 text-black border-4 border-black font-black uppercase py-5 shadow-[8px_8px_0_black] hover:translate-y-[-2px] hover:shadow-[10px_10px_0_black] active:translate-y-1 active:shadow-none transition-all mt-6 text-sm tracking-[0.2em]"
                         >
-                            {isLoading ? <IconSpinner className="w-5 h-5" /> : (view === 'login' ? 'Sign In' : 'Create Account')}
+                            {isLoading ? <IconSpinner className="w-8 h-8 mx-auto" /> : (view === 'login' ? 'Authenticate' : 'Register')}
                         </button>
                     </form>
                 </div>
 
-                <footer className="text-center mt-10">
-                    <p className="text-sm text-[var(--color-secondary-text)]">
-                        {view === 'login' ? "Don't have an account?" : "Already a member?"}
-                        <button 
-                            onClick={() => setView(view === 'login' ? 'signup' : 'login')} 
-                            className="ml-2 text-[var(--color-primary)] font-bold hover:underline"
-                        >
-                            {view === 'login' ? 'Sign up' : 'Log in'}
+                <footer className="text-center mt-12 w-full space-y-4">
+                    <button className="text-[10px] font-black uppercase tracking-widest text-black/40 hover:text-black transition-colors block mx-auto">Forgot Secret Key?</button>
+                    <p className="text-xs font-black text-black/60 uppercase tracking-widest">
+                        {view === 'login' ? "Identity unknown?" : "Registered user?"} 
+                        <button onClick={() => setView(view === 'login' ? 'signup' : 'login')} className="ml-2 text-pink-600 font-black underline decoration-4 underline-offset-4 hover:text-pink-700 transition-colors">
+                            {view === 'login' ? 'Create Hub Account' : 'Log Into Archive'}
                         </button>
                     </p>
                 </footer>

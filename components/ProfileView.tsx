@@ -1,9 +1,9 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Box, Group, Stack, Text, SimpleGrid, Image } from '@mantine/core';
+import { Box, Group, Stack, Text, SimpleGrid } from '@mantine/core';
 import type { Book, ReadingActivity } from '../types';
 import { GoogleGenAI } from "@google/genai";
-import { IconLibrary, IconSpinner } from './icons';
+import { IconSpinner } from './icons';
 
 interface ProfileViewProps {
   user: any;
@@ -20,12 +20,75 @@ interface Recommendation {
     coverUrl: string | null;
 }
 
-const StarshipIllustration = () => (
-    <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M60 20L80 50L60 100L40 50L60 20Z" fill="#00D1FF" stroke="black" strokeWidth="6"/>
-        <path d="M60 20L40 50H80L60 20Z" fill="#f0ff00" stroke="black" strokeWidth="6"/>
-        <circle cx="60" cy="55" r="8" fill="white" stroke="black" strokeWidth="4"/>
-        <path d="M40 70L20 90H100L80 70" stroke="black" strokeWidth="6"/>
+const StreakRobot = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="200" height="200" className="mx-auto">
+      <defs>
+        <linearGradient id="bodyGradientStreak" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#4FACFE" stopOpacity={1} />
+          <stop offset="100%" stopColor="#00F2FE" stopOpacity={1} />
+        </linearGradient>
+        <linearGradient id="flameGradient" x1="50%" y1="100%" x2="50%" y2="0%">
+          <stop offset="0%" stopColor="#FF416C" stopOpacity={1} />
+          <stop offset="50%" stopColor="#FF4B2B" stopOpacity={1} />
+          <stop offset="100%" stopColor="#FFC837" stopOpacity={1} />
+        </linearGradient>
+        <linearGradient id="faceGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#203A43" stopOpacity={1} />
+          <stop offset="100%" stopColor="#2C5364" stopOpacity={1} />
+        </linearGradient>
+      </defs>
+      <ellipse cx="256" cy="480" rx="140" ry="20" fill="#000000" opacity="0.15" />
+      <path d="M200 400 L200 450 A10 10 0 0 0 210 460 L230 460 A10 10 0 0 0 240 450 L240 400 Z" fill="#333" />
+      <path d="M272 400 L272 450 A10 10 0 0 0 282 460 L302 460 A10 10 0 0 0 312 450 L312 400 Z" fill="#333" />
+      <rect x="126" y="180" width="260" height="240" rx="60" ry="60" fill="url(#bodyGradientStreak)" stroke="#2b6cb0" strokeWidth="4" />
+      <rect x="156" y="210" width="200" height="120" rx="30" ry="30" fill="url(#faceGradient)" stroke="#1a2a33" strokeWidth="3" />
+      <g>
+        <circle cx="210" cy="260" r="25" fill="#fff" />
+        <circle cx="210" cy="260" r="10" fill="#333" />
+        <circle cx="300" cy="260" r="32" fill="#fff" />
+        <circle cx="300" cy="260" r="14" fill="#333" />
+      </g>
+      <path d="M230 300 Q256 320 282 300" fill="none" stroke="#fff" strokeWidth="5" strokeLinecap="round" />
+      <g>
+        <path d="M256 150 C 280 130, 320 100, 320 60 C 320 20, 280 0, 256 0 C 232 0, 192 20, 192 60 C 192 100, 232 130, 256 150 Z" fill="url(#flameGradient)">
+            <animate attributeName="opacity" values="0.8;1;0.8" dur="1s" repeatCount="indefinite" />
+        </path>
+      </g>
+    </svg>
+);
+
+const TimeRobot = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="200" height="200" className="mx-auto">
+      <defs>
+        <linearGradient id="bodyGradientTime" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#4facfe" stopOpacity={1} />
+          <stop offset="100%" stopColor="#00f2fe" stopOpacity={1} />
+        </linearGradient>
+        <linearGradient id="metalGradientProfile" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#e0e0e0" stopOpacity={1} />
+          <stop offset="100%" stopColor="#9e9e9e" stopOpacity={1} />
+        </linearGradient>
+        <linearGradient id="screenGradientProfile" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#434343" stopOpacity={1} />
+          <stop offset="100%" stopColor="#000000" stopOpacity={1} />
+        </linearGradient>
+      </defs>
+      <path d="M210,380 Q190,430 180,450" stroke="url(#metalGradientProfile)" strokeWidth="20" strokeLinecap="round" fill="none" />
+      <path d="M302,380 Q322,430 332,450" stroke="url(#metalGradientProfile)" strokeWidth="20" strokeLinecap="round" fill="none" />
+      <circle cx="256" cy="280" r="100" fill="url(#bodyGradientTime)" stroke="#fff" strokeWidth="4"/>
+      <circle cx="256" cy="280" r="80" fill="#f9f9f9" />
+      <g stroke="#333" strokeWidth="4" strokeLinecap="round">
+        <line x1="256" y1="210" x2="256" y2="220" />
+        <line x1="256" y1="340" x2="256" y2="350" />
+      </g>
+      <g transform="translate(256, 280)">
+        <circle cx="0" cy="0" r="6" fill="#ff5252" />
+        <path d="M0,0 L-20,-30" stroke="#333" strokeWidth="6" strokeLinecap="round" />
+        <path d="M0,0 L40,0" stroke="#333" strokeWidth="4" strokeLinecap="round" />
+      </g>
+      <rect x="176" y="60" width="160" height="120" rx="30" ry="30" fill="url(#bodyGradientTime)" stroke="#fff" strokeWidth="3"/>
+      <rect x="196" y="80" width="120" height="80" rx="15" ry="15" fill="url(#screenGradientProfile)" />
+      <path d="M236,140 Q256,150 276,140" stroke="#ccff00" strokeWidth="3" fill="none" strokeLinecap="round" />
     </svg>
 );
 
@@ -38,8 +101,20 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShow
         return (seconds / 3600).toFixed(1);
     }, [library]);
 
-    const booksCompleted = useMemo(() => {
-        return library.filter(b => b.progress >= 0.99).length;
+    const topGenres = useMemo(() => {
+        const counts: Record<string, number> = {};
+        library.forEach(b => {
+            if (b.genre) {
+                b.genre.split(',').forEach(g => {
+                    const clean = g.trim().toLowerCase();
+                    if (clean) counts[clean] = (counts[clean] || 0) + 1;
+                });
+            }
+        });
+        return Object.entries(counts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3)
+            .map(([name]) => name);
     }, [library]);
 
     useEffect(() => {
@@ -49,18 +124,14 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShow
             try {
                 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
                 const titles = library.map(b => b.title).join(', ');
-                
                 const response = await ai.models.generateContent({
                     model: 'gemini-3-flash-preview',
-                    contents: `Based on these books: ${titles}, suggest 3 book recommendations. 
-                    Return as a JSON array: [{"title": "", "author": "", "coverUrl": null}]`,
+                    contents: `Based on these books: ${titles}, suggest 3 book recommendations. Return as a JSON array: [{"title": "", "author": "", "coverUrl": null}]`,
                     config: { responseMimeType: 'application/json' }
                 });
-                
-                const recs = JSON.parse(response.text);
-                setRecommendations(recs);
+                setRecommendations(JSON.parse(response.text));
             } catch (e) {
-                console.error("Failed recommendations:", e);
+                console.error("Recs failed", e);
             } finally {
                 setIsLoadingRecs(false);
             }
@@ -72,90 +143,101 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShow
         return (
             <div className="p-6 h-full flex flex-col items-center justify-center text-center max-w-sm mx-auto animate-fade-in">
                 <Box className="p-12 bg-white border-8 border-black shadow-[16px_16px_0_black] w-full">
-                    <StarshipIllustration />
-                    <h2 className="text-3xl font-black mt-8 mb-6 uppercase tracking-tighter">Profile</h2>
-                    <p className="text-[12px] text-gray-400 mb-10 leading-relaxed font-bold uppercase tracking-widest opacity-60">Log in to view your reading statistics.</p>
-                    <button onClick={onShowAuth} className="w-full py-5 bg-yellow-400 text-black border-4 border-black font-black uppercase tracking-[0.2em] shadow-[8px_8px_0_black] active:translate-y-1 transition-all text-xs">Log In</button>
+                    <h2 className="text-3xl font-black mb-6 uppercase text-black">Private Library</h2>
+                    <p className="text-[12px] text-black/50 mb-10 font-bold uppercase tracking-widest leading-relaxed">Please sign in to view your reading journey.</p>
+                    <button onClick={onShowAuth} className="w-full py-5 bg-yellow-400 text-black border-4 border-black font-black uppercase shadow-[8px_8px_0_black] active:translate-y-1 transition-all text-xs">Log In</button>
                 </Box>
             </div>
         );
     }
 
     return (
-        <div className="space-y-12 animate-fade-in max-w-6xl mx-auto pb-40">
+        <div className="space-y-20 animate-fade-in max-w-5xl mx-auto pb-64 px-4 md:px-0">
             <header className="flex flex-col md:flex-row justify-between items-start md:items-end border-b-8 border-black pb-10">
-                <div>
-                    <h2 className="text-5xl md:text-6xl font-black uppercase tracking-tighter leading-none mb-2">Profile</h2>
-                    <p className="text-[11px] font-black uppercase tracking-[0.3em] text-cyan-500">{user.email}</p>
-                </div>
-                <button onClick={onSignOut} className="mt-8 md:mt-0 bg-white border-4 border-black px-10 py-5 text-[11px] font-black uppercase tracking-[0.3em] text-pink-500 shadow-[8px_8px_0_black] hover:translate-y-[-4px] transition-all">Log Out</button>
+                <Stack gap={0}>
+                    <Text className="text-[10px] font-black uppercase tracking-[0.5em] text-pink-500 mb-2">The Archive of</Text>
+                    <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tighter leading-none text-[var(--color-primary-text)]">{user.email.split('@')[0]}</h2>
+                </Stack>
+                <button onClick={onSignOut} className="mt-8 md:mt-0 bg-white border-4 border-black px-8 py-4 text-[11px] font-black uppercase tracking-[0.3em] shadow-[6px_6px_0_black] hover:translate-y-[-2px] transition-all text-black">Sign Out</button>
             </header>
 
-            <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="xl">
-                <Box className="p-8 bg-white border-8 border-black shadow-[12px_12px_0_black]">
-                    <Text className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-400 mb-6">Reading Time</Text>
-                    <div className="flex items-baseline gap-4">
-                        <Text className="text-7xl font-black text-black">{totalReadingTimeHours}</Text>
-                        <Text className="text-xl font-black uppercase text-black">Hrs</Text>
+            {/* Story Chapter 1: Time */}
+            <section className="flex flex-col md:flex-row items-center gap-12 bg-white border-8 border-black p-8 md:p-16 shadow-[20px_20px_0_black] relative overflow-hidden">
+                <div className="absolute top-4 left-4 text-[8px] font-black uppercase opacity-20 text-black">Chapter I: The Chronometer</div>
+                <div className="flex-1 space-y-6">
+                    <h3 className="text-5xl font-black uppercase tracking-tighter leading-tight italic text-black">Your time spent in other worlds.</h3>
+                    <p className="text-lg font-serif italic text-black/60 leading-relaxed">
+                        In this journey, you have dedicated <span className="text-cyan-600 font-bold underline">{totalReadingTimeHours} hours</span> to the art of reading. Each minute was a step through history, a glance into another's mind.
+                    </p>
+                    <div className="pt-6">
+                         <Box bg="black" p="xs" className="inline-block px-8 py-4">
+                             <Text className="text-4xl font-black text-white">{totalReadingTimeHours}h</Text>
+                         </Box>
                     </div>
-                </Box>
-                
-                <Box className="p-8 bg-yellow-400 border-8 border-black shadow-[12px_12px_0_black]">
-                    <Text className="text-[10px] font-black uppercase tracking-[0.4em] text-black/40 mb-6">Total Books</Text>
-                    <div className="flex items-baseline gap-4">
-                        <Text className="text-7xl font-black text-black">{library.length}</Text>
-                        <Text className="text-xl font-black uppercase text-black">Books</Text>
+                </div>
+                <div className="shrink-0">
+                    <TimeRobot />
+                </div>
+            </section>
+
+            {/* Story Chapter 2: Consistency */}
+            <section className="flex flex-col md:flex-row-reverse items-center gap-12 bg-yellow-400 border-8 border-black p-8 md:p-16 shadow-[20px_20px_0_black] relative overflow-hidden">
+                <div className="absolute top-4 right-4 text-[8px] font-black uppercase opacity-20 text-black">Chapter II: The Flame</div>
+                <div className="flex-1 space-y-6">
+                    <h3 className="text-5xl font-black uppercase tracking-tighter leading-tight italic text-black">A flame that never fades.</h3>
+                    <p className="text-lg font-serif italic text-black/90 leading-relaxed">
+                        Consistency is the heartbeat of a scholar. You've maintained a <span className="bg-white px-2 font-bold text-black">{streak} day streak</span>, keeping the torch of curiosity burning bright across <span className="font-bold underline text-black">{library.length} books</span>.
+                    </p>
+                    <div className="pt-6">
+                         <Box bg="white" p="xs" className="inline-block px-8 py-4 border-4 border-black shadow-[6px_6px_0_black]">
+                             <Text className="text-4xl font-black text-black">{streak} Days</Text>
+                         </Box>
+                    </div>
+                </div>
+                <div className="shrink-0">
+                    <StreakRobot />
+                </div>
+            </section>
+
+            {/* Story Chapter 3: Interests */}
+            <section className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                <Box className="p-10 bg-white border-8 border-black shadow-[16px_16px_0_black] relative overflow-hidden">
+                    <div className="absolute top-4 left-4 text-[8px] font-black uppercase opacity-20 text-black">Chapter III: The Map</div>
+                    <h3 className="text-3xl font-black uppercase tracking-tighter mb-8 italic text-black">The Path Traveled</h3>
+                    <Text className="text-base font-serif italic mb-6 leading-relaxed text-black/60">Your curiosity often leads you through these realms:</Text>
+                    <div className="flex flex-wrap gap-3">
+                        {topGenres.map(genre => (
+                            <Box key={genre} className="bg-pink-500 text-white px-4 py-2 border-4 border-black font-black uppercase text-[12px] shadow-[4px_4px_0_black]">
+                                {genre}
+                            </Box>
+                        ))}
+                        {topGenres.length === 0 && <Text className="opacity-40 italic text-black">Exploring new territories...</Text>}
                     </div>
                 </Box>
 
-                <Box className="p-8 bg-cyan-400 border-8 border-black shadow-[12px_12px_0_black]">
-                    <Text className="text-[10px] font-black uppercase tracking-[0.4em] text-black/40 mb-6">Day Streak</Text>
-                    <div className="flex items-baseline gap-4">
-                        <Text className="text-7xl font-black text-black">{streak}</Text>
-                        <Text className="text-xl font-black uppercase text-black">Days</Text>
-                    </div>
-                </Box>
-            </SimpleGrid>
-
-            <section className="grid grid-cols-1 lg:grid-cols-2 gap-12 pt-8">
-                <Box className="p-10 bg-white border-8 border-black shadow-[16px_16px_0_black]">
-                    <h3 className="text-3xl font-black uppercase tracking-tighter mb-8">Reading Stats</h3>
-                    <div className="space-y-6">
-                         {activity.slice(-5).map(a => (
-                             <Group key={a.date} justify="space-between" className="border-b-4 border-slate-100 pb-2">
-                                 <Text className="text-[14px] font-black uppercase text-black">{a.date}</Text>
-                                 <Text className="text-[14px] font-black text-pink-500">{Math.round(a.seconds / 60)} Minutes</Text>
-                             </Group>
-                         ))}
-                         {activity.length === 0 && <Text className="text-[14px] opacity-40 italic">Start reading to log your progress.</Text>}
-                    </div>
-                </Box>
-
-                <Box className="p-10 bg-pink-500 border-8 border-black shadow-[16px_16px_0_black] text-white">
-                    <h3 className="text-3xl font-black uppercase tracking-tighter mb-4">Recommended</h3>
-                    <Text className="text-[11px] font-black uppercase mb-8 tracking-[0.4em] opacity-80">Based on your library</Text>
+                <Box className="p-10 bg-black border-8 border-black shadow-[16px_16px_0_pink] text-white relative overflow-hidden">
+                    <div className="absolute top-4 right-4 text-[8px] font-black uppercase opacity-20">Chapter IV: The Horizon</div>
+                    <h3 className="text-3xl font-black uppercase tracking-tighter mb-4 italic">Next Horizons</h3>
+                    <Text className="text-[11px] font-black uppercase mb-8 tracking-[0.4em] opacity-60">The future of your journey</Text>
                     
                     {isLoadingRecs ? (
-                        <div className="flex flex-col items-center justify-center py-20 gap-4">
-                            <IconSpinner className="w-12 h-12 text-white" />
-                            <Text className="text-[12px] font-black uppercase tracking-[0.3em]">Finding books...</Text>
+                        <div className="flex flex-col items-center justify-center py-10 gap-4">
+                            <IconSpinner className="w-10 h-10 text-pink-500" />
+                            <Text className="text-[10px] font-black uppercase">Scanning the stars...</Text>
                         </div>
                     ) : (
-                        <div className="space-y-6">
+                        <div className="space-y-4">
                             {recommendations.map((rec, i) => (
-                                <Box key={i} className="bg-white border-4 border-black p-4 shadow-[6px_6px_0_black] flex gap-4 items-center">
-                                    <div className="w-12 h-16 bg-yellow-400 border-2 border-black flex items-center justify-center text-black font-black italic shrink-0">
+                                <Box key={i} className="bg-white border-4 border-black p-4 flex gap-4 items-center">
+                                    <div className="w-10 h-14 bg-cyan-400 border-2 border-black flex items-center justify-center text-black font-black shrink-0">
                                         {rec.title.charAt(0)}
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <Text className="text-[14px] font-black text-black uppercase truncate italic">{rec.title}</Text>
-                                        <Text className="text-[11px] font-black text-pink-500 uppercase mt-1 tracking-widest truncate">{rec.author}</Text>
+                                        <Text className="text-[13px] font-black text-black uppercase truncate italic">{rec.title}</Text>
+                                        <Text className="text-[10px] font-black text-pink-500 uppercase mt-1 truncate">{rec.author}</Text>
                                     </div>
                                 </Box>
                             ))}
-                            {recommendations.length === 0 && !isLoadingRecs && (
-                                <Text className="text-center opacity-40 italic py-10 font-black uppercase tracking-widest text-[12px]">No recommendations available.</Text>
-                            )}
                         </div>
                     )}
                 </Box>

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Box, SimpleGrid, Stack, Text, Image, Group, Progress, ActionIcon, Button } from '@mantine/core';
-import { IconClose, IconSpinner, IconLibrary } from './icons';
+import { IconClose, IconSpinner, IconPlay } from './icons';
 import type { GenerationStatus, Theme } from '../types';
 
 export interface BookCardData {
@@ -11,7 +11,6 @@ export interface BookCardData {
   coverImageUrl: string | null;
   progress: number;
   audioSummaryUrl?: string;
-  summaryScript?: string;
 }
 
 interface LibraryProps {
@@ -27,15 +26,78 @@ interface LibraryProps {
   viewMode: 'grid' | 'list';
 }
 
-const CartoonRobotIllustration = () => (
-    <svg width="240" height="240" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg" className="animate-bounce-slow">
-        <rect x="70" y="80" width="100" height="80" rx="12" fill="#00D1FF" stroke="black" strokeWidth="8" />
-        <rect x="85" y="105" width="20" height="20" rx="10" fill="white" stroke="black" strokeWidth="4" />
-        <rect x="135" y="105" width="20" height="20" rx="10" fill="white" stroke="black" strokeWidth="4" />
-        <path d="M100 145C110 150 130 150 140 145" stroke="black" strokeWidth="4" strokeLinecap="round" />
-        <rect x="110" y="60" width="20" height="20" fill="#FF007A" stroke="black" strokeWidth="4" />
-        <path d="M120 40V60" stroke="black" strokeWidth="6" strokeLinecap="round" />
-        <circle cx="120" cy="30" r="10" fill="#f0ff00" stroke="black" strokeWidth="4" />
+const EmptyLibraryGraphic = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="300" height="300" className="mx-auto mb-4">
+      <defs>
+        <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#f0f4f8" stopOpacity={1} />
+          <stop offset="100%" stopColor="#dfe6e9" stopOpacity={1} />
+        </linearGradient>
+        <linearGradient id="metalBody" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#63cdda" stopOpacity={1} />
+          <stop offset="100%" stopColor="#3dc1d3" stopOpacity={1} />
+        </linearGradient>
+        <radialGradient id="eyeGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#ffeaa7" stopOpacity={1} />
+          <stop offset="80%" stopColor="#fdcb6e" stopOpacity={1} />
+          <stop offset="100%" stopColor="#e17055" stopOpacity={1} />
+        </radialGradient>
+        <linearGradient id="bookCover" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#ff7675" stopOpacity={1} />
+          <stop offset="100%" stopColor="#d63031" stopOpacity={1} />
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="512" height="512" fill="url(#bgGrad)" />
+      <g opacity="0.4">
+        <rect x="40" y="80" width="120" height="300" rx="5" fill="#b2bec3" />
+        <rect x="50" y="90" width="100" height="280" fill="#dfe6e9" />
+        <line x1="50" y1="160" x2="150" y2="160" stroke="#b2bec3" strokeWidth="4" />
+        <line x1="50" y1="230" x2="150" y2="230" stroke="#b2bec3" strokeWidth="4" />
+        <line x1="50" y1="300" x2="150" y2="300" stroke="#b2bec3" strokeWidth="4" />
+        <rect x="350" y="80" width="120" height="300" rx="5" fill="#b2bec3" />
+        <rect x="360" y="90" width="100" height="280" fill="#dfe6e9" />
+        <line x1="360" y1="160" x2="460" y2="160" stroke="#b2bec3" strokeWidth="4" />
+        <line x1="360" y1="230" x2="460" y2="230" stroke="#b2bec3" strokeWidth="4" />
+        <line x1="360" y1="300" x2="460" y2="300" stroke="#b2bec3" strokeWidth="4" />
+      </g>
+      <ellipse cx="256" cy="430" rx="140" ry="30" fill="#636e72" opacity="0.2" />
+      <g transform="translate(0, 20)">
+        <path d="M200,380 Q180,420 160,420" stroke="#2d3436" strokeWidth="12" fill="none" strokeLinecap="round"/>
+        <path d="M312,380 Q332,420 352,420" stroke="#2d3436" strokeWidth="12" fill="none" strokeLinecap="round"/>
+        <ellipse cx="160" cy="425" rx="25" ry="15" fill="#2d3436" />
+        <ellipse cx="352" cy="425" rx="25" ry="15" fill="#2d3436" />
+        <rect x="186" y="280" width="140" height="120" rx="20" fill="url(#metalBody)" />
+        <rect x="216" y="310" width="80" height="60" rx="10" fill="#ffffff" opacity="0.3" />
+        <rect x="230" y="330" width="40" height="20" rx="2" stroke="#e17055" strokeWidth="2" fill="none"/>
+        <rect x="234" y="334" width="10" height="12" fill="#e17055" />
+        <rect x="241" y="260" width="30" height="25" fill="#2d3436" />
+        <rect x="176" y="150" width="160" height="110" rx="25" fill="url(#metalBody)" />
+        <path d="M256,150 L256,110" stroke="#2d3436" strokeWidth="4" />
+        <circle cx="256" cy="110" r="8" fill="#e17055" />
+        <g>
+          <circle cx="226" cy="200" r="30" fill="#2d3436" />
+          <circle cx="226" cy="200" r="24" fill="url(#eyeGlow)" />
+          <circle cx="234" cy="192" r="6" fill="#ffffff" opacity="0.8" />
+          <circle cx="296" cy="200" r="22" fill="#2d3436" />
+          <circle cx="296" cy="200" r="16" fill="url(#eyeGlow)" />
+          <circle cx="300" cy="196" r="4" fill="#ffffff" opacity="0.8" />
+        </g>
+        <circle cx="256" cy="240" r="6" fill="#2d3436" />
+        <path d="M186,300 Q140,320 160,360" stroke="#2d3436" strokeWidth="12" fill="none" strokeLinecap="round"/>
+        <path d="M326,300 Q372,320 352,360" stroke="#2d3436" strokeWidth="12" fill="none" strokeLinecap="round"/>
+        <circle cx="160" cy="360" r="12" fill="#2d3436" />
+        <circle cx="352" cy="360" r="12" fill="#2d3436" />
+        <g transform="translate(160, 340)">
+          <path d="M0,20 L192,20 L192,50 L0,50 Z" fill="#c0392b" />
+          <path d="M5,15 L187,15 L187,48 L5,45 Z" fill="#ffffff" />
+          <line x1="96" y1="15" x2="96" y2="55" stroke="#dfe6e9" strokeWidth="2" />
+        </g>
+      </g>
+      <path d="M400,80 Q400,200 256,130" stroke="#b2bec3" strokeWidth="1" fill="none" />
+      <g transform="translate(256, 130)">
+        <line x1="0" y1="0" x2="0" y2="-50" stroke="#b2bec3" strokeWidth="1" />
+        <circle cx="0" cy="0" r="6" fill="#2d3436" />
+      </g>
     </svg>
 );
 
@@ -44,72 +106,43 @@ const BookCard: React.FC<{
     theme: Theme;
     onSelect: (id: string) => void; 
     onDelete: (id: string) => void;
-    onViewSummary: (id: string) => void;
     onGenerateSummary: (id: string) => void;
-    generationStatus?: GenerationStatus;
+    onViewSummary: (id: string) => void;
+    status?: GenerationStatus;
     viewMode: 'grid' | 'list';
-}> = ({ book, theme, onSelect, onDelete, onViewSummary, onGenerateSummary, generationStatus, viewMode }) => {
+}> = ({ book, theme, onSelect, onDelete, onGenerateSummary, onViewSummary, status, viewMode }) => {
     const isList = viewMode === 'list';
-    const hasSummary = !!book.audioSummaryUrl;
-    const isGenerating = !!generationStatus;
     const progressPercent = Math.round((book.progress || 0) * 100);
 
     return (
-        <Box 
-            bg="var(--color-surface)"
-            className={`relative group border-4 border-[var(--color-border-color)] shadow-[6px_6px_0px_var(--color-border-color)] hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[8px_8px_0px_var(--color-border-color)] transition-all overflow-hidden`}
-        >
-            <Box className={`${isList ? 'flex flex-row h-52' : 'flex flex-col'}`}>
-                <Box 
-                    className={`relative cursor-pointer overflow-hidden ${isList ? 'w-36 flex-shrink-0 border-r-4 border-[var(--color-border-color)]' : 'aspect-[3/4] border-b-4 border-[var(--color-border-color)]'}`}
-                    onClick={() => onSelect(book.id)}
-                >
-                    {book.coverImageUrl ? (
-                        <Image src={book.coverImageUrl} className="w-full h-full object-cover" />
-                    ) : (
-                        <Box className="w-full h-full bg-slate-100 flex items-center justify-center font-black text-slate-400">NO COVER</Box>
-                    )}
+        <Box bg="var(--color-surface)" className="relative group border-4 border-black shadow-[4px_4px_0_black] hover:translate-x-[-1px] transition-all overflow-hidden">
+            <Box className={`${isList ? 'flex flex-row' : 'flex flex-col'}`}>
+                <Box className={`relative cursor-pointer overflow-hidden ${isList ? 'w-24 md:w-32 flex-shrink-0 border-r-4 border-black' : 'aspect-[3/4] border-b-4 border-black'}`} onClick={() => onSelect(book.id)}>
+                    {book.coverImageUrl ? <Image src={book.coverImageUrl} className="w-full h-full object-cover" /> : <Box className="w-full h-full bg-slate-100 flex items-center justify-center font-black text-slate-300">EPUB</Box>}
                 </Box>
-
                 <Stack p="md" gap="xs" className="flex-1 justify-between min-w-0">
                     <Stack gap={2}>
                         <Group justify="space-between" align="start" wrap="nowrap">
-                            <Text className="font-black text-[16px] leading-tight truncate text-[var(--color-primary-text)] uppercase" title={book.title}>{book.title}</Text>
-                            <ActionIcon variant="filled" color="red" size="sm" className="border-2 border-black shadow-[2px_2px_0_black]" onClick={(e) => { e.stopPropagation(); onDelete(book.id); }}>
+                            <Text className="font-black text-[14px] md:text-[16px] leading-tight truncate text-[var(--color-primary-text)]" title={book.title}>{book.title}</Text>
+                            <ActionIcon variant="filled" color="red" size="sm" className="border-2 border-black" onClick={(e) => { e.stopPropagation(); onDelete(book.id); }}>
                                 <IconClose className="w-4 h-4 text-white" />
                             </ActionIcon>
                         </Group>
                         <Text className="text-[10px] font-bold text-[var(--color-secondary-text)] truncate uppercase tracking-widest">{book.author}</Text>
                     </Stack>
-
-                    <Stack gap={6}>
+                    <Stack gap={4}>
                         <Group justify="space-between" align="center">
-                             <Text className="text-[9px] font-black uppercase text-[var(--color-muted-text)]">Reading Progress</Text>
-                             <Text className="text-[11px] font-black text-black">{progressPercent}%</Text>
+                             <Text className="text-[9px] font-black uppercase text-[var(--color-muted-text)]">Reading Track</Text>
+                             <Text className="text-[10px] font-black text-[var(--color-primary-text)]">{progressPercent}%</Text>
                         </Group>
-                        <Progress value={progressPercent} size="xl" radius={0} color="var(--color-primary-text)" className="border-2 border-[var(--color-border-color)] h-5 bg-transparent" />
-                        <Group gap={4} wrap="nowrap">
-                            <Button 
-                                variant="filled" 
-                                color="cyan" 
-                                className="flex-1 border-2 border-black rounded-none shadow-[2px_2px_0_#000] h-10 p-0 text-[11px] font-black uppercase text-black"
-                                onClick={() => onSelect(book.id)}
-                            >
-                                {book.progress > 0 ? 'Continue' : 'Start'}
-                            </Button>
-                            <Button 
-                                variant="filled" 
-                                color={hasSummary ? "pink" : "yellow"} 
-                                className="flex-1 border-2 border-black rounded-none shadow-[2px_2px_0_#000] h-10 p-0 text-[11px] font-black uppercase text-black flex items-center justify-center gap-2"
-                                onClick={(e) => { 
-                                    e.stopPropagation(); 
-                                    if (hasSummary) onViewSummary(book.id);
-                                    else onGenerateSummary(book.id);
-                                }}
-                                loading={isGenerating}
-                            >
-                                {isGenerating ? "Syncing" : (hasSummary ? "Listen" : "Summarize")}
-                            </Button>
+                        <Progress value={progressPercent} size="sm" radius={0} color="var(--color-primary-text)" className="border-2 border-[var(--color-border-color)] h-2 bg-transparent" />
+                        <Group gap="xs" mt={4} grow>
+                            <Button variant="filled" color="cyan" className="border-2 border-black rounded-none shadow-[2px_2px_0_#000] h-8 p-0 text-[10px] font-black uppercase text-black" onClick={() => onSelect(book.id)}>Open</Button>
+                            {book.audioSummaryUrl ? (
+                                <Button variant="filled" color="yellow" className="border-2 border-black rounded-none shadow-[2px_2px_0_#000] h-8 p-0 text-[10px] font-black uppercase text-black" onClick={(e) => { e.stopPropagation(); onViewSummary(book.id); }} leftSection={<IconPlay className="w-3 h-3" />}>Summary</Button>
+                            ) : (
+                                <Button variant="outline" color="dark" className="border-2 border-black rounded-none h-8 p-0 text-[10px] font-black uppercase text-[var(--color-primary-text)]" onClick={(e) => { e.stopPropagation(); onGenerateSummary(book.id); }} loading={!!status}>{status ? status.stage : 'Analyze'}</Button>
+                            )}
                         </Group>
                     </Stack>
                 </Stack>
@@ -118,56 +151,24 @@ const BookCard: React.FC<{
     );
 };
 
-const Library: React.FC<LibraryProps> = ({ books, theme, onBookSelect, isLoading, onDelete, onViewSummary, onGenerateSummary, generationStatuses, viewMode }) => {
+const Library: React.FC<LibraryProps> = ({ books, theme, onBookSelect, isLoading, onDelete, onGenerateSummary, generationStatuses, onViewSummary, viewMode }) => {
   return (
     <Box className="py-4 md:py-8 animate-fade-in">
-        <header className="mb-10 flex justify-between items-end border-b-4 border-[var(--color-border-color)] pb-6">
-            <div>
-                <Text className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--color-muted-text)] mb-1">Library</Text>
-                <h2 className="text-2xl md:text-4xl font-black text-[var(--color-primary-text)] uppercase">{books.length} Books</h2>
-            </div>
-        </header>
-
+        <header className="mb-10 border-b-4 border-black pb-6"><h2 className="text-2xl md:text-3xl font-black text-[var(--color-primary-text)] uppercase">{books.length} Books</h2></header>
         {isLoading && (
-            <Box className="bg-[var(--color-surface)] border-4 border-[var(--color-border-color)] p-20 flex flex-col items-center justify-center text-center shadow-[8px_8px_0_var(--color-border-color)] animate-pulse">
+            <Box className="bg-[var(--color-surface)] border-4 border-black p-20 flex flex-col items-center justify-center text-center shadow-[4px_4px_0_black] animate-pulse">
                 <IconSpinner className="w-12 h-12 text-[var(--color-primary)] mb-6" />
-                <Text className="text-[13px] font-black uppercase tracking-[0.2em] text-[var(--color-primary-text)]">Parsing EPUB...</Text>
+                <Text className="text-[13px] font-black uppercase text-[var(--color-primary-text)]">Adding Book...</Text>
             </Box>
         )}
-        
         {!isLoading && books.length === 0 && (
-            <Box className="py-24 flex flex-col items-center justify-center text-center">
-                <CartoonRobotIllustration />
-                <h2 className="text-3xl font-black mt-10 uppercase tracking-tighter">Your Library is Empty</h2>
-                <p className="text-[12px] font-bold opacity-60 mt-2 uppercase tracking-[0.1em] text-black">Upload a book to start reading.</p>
+            <Box className="py-12 flex flex-col items-center justify-center text-center">
+                <EmptyLibraryGraphic /><h2 className="text-2xl font-black mt-4 text-[var(--color-primary-text)]">Empty Library</h2><p className="text-[12px] font-bold opacity-60 mt-2 uppercase text-[var(--color-secondary-text)]">Upload a book to start.</p>
             </Box>
         )}
-
         <SimpleGrid cols={viewMode === 'list' ? 1 : { base: 2, sm: 2, md: 3, lg: 4, xl: 5 }} spacing="xl">
-            {books.map(book => (
-                <BookCard 
-                    key={book.id} 
-                    book={book} 
-                    theme={theme}
-                    onSelect={onBookSelect} 
-                    onDelete={onDelete} 
-                    onViewSummary={onViewSummary}
-                    onGenerateSummary={onGenerateSummary}
-                    generationStatus={generationStatuses[book.id]}
-                    viewMode={viewMode} 
-                />
-            ))}
+            {books.map(book => <BookCard key={book.id} book={book} theme={theme} onSelect={onBookSelect} onDelete={onDelete} onGenerateSummary={onGenerateSummary} onViewSummary={onViewSummary} status={generationStatuses[book.id]} viewMode={viewMode} />)}
         </SimpleGrid>
-        
-        <style>{`
-            @keyframes bounce-slow {
-                0%, 100% { transform: translateY(0); }
-                50% { transform: translateY(-20px); }
-            }
-            .animate-bounce-slow {
-                animation: bounce-slow 4s infinite ease-in-out;
-            }
-        `}</style>
     </Box>
   );
 };
