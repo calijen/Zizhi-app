@@ -106,8 +106,8 @@ const App: React.FC = () => {
     try {
         const newBook = await parseEpub(file); newBook.lastOpened = Date.now();
         await db.saveBook(newBook); setLibrary(prev => [newBook, ...prev]);
-        setToast({ message: "Book added." });
-    } catch (err) { setToast({ message: "File error." }); } finally { setIsUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
+        setToast({ message: "Book added to your library." });
+    } catch (err) { setToast({ message: "EPUB parsing failed." }); } finally { setIsUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
   };
 
   const handleGenerateSummary = async (bookId: string) => {
@@ -116,38 +116,49 @@ const App: React.FC = () => {
     
     try {
         const apiKey = process.env.API_KEY;
-        if (!apiKey || apiKey === 'undefined') {
-            throw new Error("API Key not found in deployment. Set API_KEY in Vercel.");
+        // Check for common missing key issues in deployed environments
+        if (!apiKey || apiKey === 'undefined' || apiKey === 'null') {
+            throw new Error("Missing AI Key. Ensure API_KEY is set in Vercel.");
         }
 
         const ai = new GoogleGenAI({ apiKey });
-        setGenerationStatuses(prev => ({ ...prev, [bookId]: { stage: 'Thinking', progress: 0.2, currentAction: 'Synthesizing...' } }));
+        setGenerationStatuses(prev => ({ ...prev, [bookId]: { stage: 'Thinking', progress: 0.2, currentAction: 'Distilling content...' } }));
 
-        const summaryPrompt = `Generate a high-quality summary script of the book "${book.title}" by ${book.author}. 
-        Format as a spoken script for an audio experience. Approximately 800 words. Focus on main themes and conclusions.`;
+        const summaryPrompt = `Synthesize a focused audio summary of the book "${book.title}" by ${book.author}. 
+        Write a continuous narrative script (no headers or markdown). 800 words approx. Clear, insightful, human tone.`;
 
-        // Use 2.5 flash as it is currently more reliable in most regions
-        const scriptRes = await ai.models.generateContent({ model: 'gemini-3-flash-preview', contents: summaryPrompt });
+        const scriptRes = await ai.models.generateContent({ 
+            model: 'gemini-3-flash-preview', 
+            contents: summaryPrompt 
+        });
         const script = scriptRes.text || "";
         
-        setGenerationStatuses(prev => ({ ...prev, [bookId]: { stage: 'Talking', progress: 0.5, currentAction: 'Encoding audio...' } }));
+        if (!script) throw new Error("Distillation failed: No script generated.");
+
+        setGenerationStatuses(prev => ({ ...prev, [bookId]: { stage: 'Talking', progress: 0.6, currentAction: 'Generating voice...' } }));
         
         const ttsRes = await ai.models.generateContent({ 
             model: "gemini-2.5-flash-preview-tts", 
             contents: [{ parts: [{ text: script }] }], 
-            config: { responseModalities: [Modality.AUDIO], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } } } 
+            config: { 
+                responseModalities: [Modality.AUDIO], 
+                speechConfig: { 
+                    voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } 
+                } 
+            } 
         });
         
         const base64Audio = ttsRes.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-        if (!base64Audio) throw new Error("Voice synthesis failed. Try again.");
+        if (!base64Audio) throw new Error("Synthesis failed: Audio data empty.");
         
         const updatedBook = { ...book, summaryScript: script, audioSummaryUrl: `data:audio/pcm;base64,${base64Audio}` };
         await db.saveBook(updatedBook); 
         setLibrary(prev => prev.map(b => b.id === bookId ? updatedBook : b));
-        setToast({ message: "Audio summary complete." });
+        setToast({ message: "Insight generated successfully." });
     } catch (err: any) { 
         console.error("Summary error:", err);
-        setToast({ message: err.message.includes('Key not found') ? "Config Error: No Gemini Key set in Vercel." : `AI Error: ${err.message}` }); 
+        const msg = err.message.includes('Key') ? "Key Error: Set API_KEY in Vercel settings and Redeploy." : `AI Error: ${err.message}`;
+        setToast({ message: msg }); 
     } finally { 
         setGenerationStatuses(prev => { const next = { ...prev }; delete next[bookId]; return next; }); 
     }
@@ -198,7 +209,7 @@ const App: React.FC = () => {
                 <div className="md:hidden"><Logo className="h-4 w-auto text-[var(--color-primary-text)]" /></div>
                 <div className="hidden md:flex items-center gap-10">
                     <Text className="text-[10px] font-black uppercase tracking-widest text-[var(--color-muted-text)]">Theme: {theme.name}</Text>
-                    {user && <Box className="bg-cyan-400 px-3 py-1 border-2 border-black shadow-[2px_2px_0_black]"><Text className="text-[9px] font-black uppercase text-black">Cloud Auth Active</Text></Box>}
+                    {user && <Box className="bg-cyan-400 px-3 py-1 border-2 border-black shadow-[2px_2px_0_black]"><Text className="text-[9px] font-black uppercase text-black">Cloud Sync Active</Text></Box>}
                 </div>
                 <ActionIcon variant="subtle" color="gray" size="lg" onClick={() => setViewMode(v => v === 'grid' ? 'list' : 'grid')} className="border-2 border-black shadow-[2px_2px_0_black] bg-white">
                     {viewMode === 'grid' ? <IconLayoutList className="w-5 h-5 text-black" /> : <IconLayoutGrid className="w-5 h-5 text-black" />}
@@ -219,7 +230,7 @@ const App: React.FC = () => {
             <Box className="relative -top-6"><input type="file" ref={fileInputRef} onChange={handleUpload} accept=".epub" className="hidden" /><ActionIcon size={72} className="bg-yellow-400 border-4 border-black shadow-[6px_6px_0_black] rounded-none" onClick={() => fileInputRef.current?.click()}>{isUploading ? <IconSpinner className="w-8 h-8 text-black" /> : <IconUpload className="w-8 h-8 text-black" />}</ActionIcon></Box>
             <NavItem tab="profile" icon={IconUser} label="Profile" /><NavItem tab="settings" icon={IconSettings} label="Settings" />
         </nav>
-        {selectedBook && <ReaderView book={selectedBook} theme={theme} onClose={() => setSelectedBook(null)} onUpdateProgress={async (bid, ci, st, ts, gp) => { const bidx = library.findIndex(b => b.id === bid); if (bidx === -1) return; const updated = { ...library[bidx], progress: gp, lastScrollTop: st, readingTime: (library[bidx].readingTime || 0) + ts, lastOpened: Date.now() }; await db.saveBook(updated); setLibrary(prev => prev.map(b => b.id === bid ? updated : b)); }} onSaveQuote={async (t, c) => { const nq: Quote = { id: crypto.randomUUID(), text: t, bookTitle: selectedBook.title, author: selectedBook.author, bookId: selectedBook.id, location: c, createdAt: Date.now() }; await db.saveQuote(nq); setQuotes(prev => [nq, ...prev]); setToast({ message: "Saved." }); }} onSearch={() => {}} />}
+        {selectedBook && <ReaderView book={selectedBook} theme={theme} onClose={() => setSelectedBook(null)} onUpdateProgress={async (bid, ci, st, ts, gp) => { const bidx = library.findIndex(b => b.id === bid); if (bidx === -1) return; const updated = { ...library[bidx], progress: gp, lastScrollTop: st, readingTime: (library[bidx].readingTime || 0) + ts, lastOpened: Date.now() }; await db.saveBook(updated); setLibrary(prev => prev.map(b => b.id === bid ? updated : b)); }} onSaveQuote={async (t, c) => { const nq: Quote = { id: crypto.randomUUID(), text: t, bookTitle: selectedBook.title, author: selectedBook.author, bookId: selectedBook.id, location: c, createdAt: Date.now() }; await db.saveQuote(nq); setQuotes(prev => [nq, ...prev]); setToast({ message: "Quote archived." }); }} onSearch={() => {}} />}
         {summaryBook && <SummaryView book={summaryBook} onClose={() => setSummaryBook(null)} />}
         {showAuth && <AuthView onClose={() => setShowAuth(false)} onLogin={(u) => setUser(u)} />}
         {toast && <Toast message={toast.message} action={toast.action} onClose={() => setToast(null)} />}

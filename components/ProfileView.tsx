@@ -20,6 +20,38 @@ interface Recommendation {
     coverUrl: string | null;
 }
 
+/**
+ * Utility to safely extract and parse JSON from an AI response string.
+ * Handles cases where the AI wraps JSON in markdown blocks.
+ */
+const safeJsonParse = (text: string) => {
+    try {
+        // Attempt 1: Direct parse
+        return JSON.parse(text);
+    } catch (e) {
+        // Attempt 2: Extract content between ```json and ```
+        const match = text.match(/```json\s*([\s\S]*?)\s*```/);
+        if (match && match[1]) {
+            try {
+                return JSON.parse(match[1]);
+            } catch (e2) {
+                console.error("Failed to parse extracted JSON block", e2);
+            }
+        }
+        // Attempt 3: Try to find any array/object looking structure
+        const firstBracket = text.indexOf('[');
+        const lastBracket = text.lastIndexOf(']');
+        if (firstBracket !== -1 && lastBracket !== -1) {
+            try {
+                return JSON.parse(text.substring(firstBracket, lastBracket + 1));
+            } catch (e3) {
+                console.error("Failed to parse bracketed content", e3);
+            }
+        }
+        throw new Error("Could not parse AI response as JSON");
+    }
+};
+
 const StreakRobot = () => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="200" height="200" className="mx-auto">
       <defs>
@@ -122,18 +154,21 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShow
         const getRecs = async () => {
             if (library.length === 0 || recommendations.length > 0) return;
             const apiKey = process.env.API_KEY;
-            if (!apiKey || apiKey === 'undefined') {
-                setError("API Key Missing");
+            
+            // Checking for common "missing key" indicators in a Vite/Vercel environment
+            if (!apiKey || apiKey === 'undefined' || apiKey === 'null') {
+                setError("AI Engine Offline: Ensure API_KEY is set in Vercel environment variables.");
                 return;
             }
 
             setIsLoadingRecs(true);
             try {
                 const ai = new GoogleGenAI({ apiKey });
-                const titles = library.map(b => b.title).join(', ');
+                // We limit the number of titles to avoid context bloat
+                const titles = library.slice(0, 5).map(b => b.title).join(', ');
                 const response = await ai.models.generateContent({
                     model: 'gemini-3-flash-preview',
-                    contents: `Based on these books in the user's library: ${titles}, suggest 3 book recommendations.`,
+                    contents: `User library contains: ${titles}. Recommend 3 books. Return valid JSON only.`,
                     config: { 
                         responseMimeType: 'application/json',
                         responseSchema: {
@@ -150,10 +185,12 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShow
                         }
                     }
                 });
-                setRecommendations(JSON.parse(response.text));
+                
+                const recs = safeJsonParse(response.text);
+                setRecommendations(recs);
             } catch (e: any) {
                 console.error("Recs failed", e);
-                setError(e.message);
+                setError(e.message || "Recommendation service unavailable.");
             } finally {
                 setIsLoadingRecs(false);
             }
@@ -245,9 +282,9 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShow
                             <Text className="text-[10px] font-black uppercase">Scanning the stars...</Text>
                         </div>
                     ) : error ? (
-                        <Box className="p-4 border-2 border-dashed border-white/20 text-center">
-                            <Text className="text-[10px] font-black uppercase text-pink-400 mb-2">Configuration Required</Text>
-                            <Text className="text-[9px] opacity-60 leading-relaxed uppercase">The AI Engine is not active. Please ensure your Gemini API Key is set in your Vercel project environment variables.</Text>
+                        <Box className="p-6 border-4 border-dashed border-white/20 text-center">
+                            <Text className="text-[11px] font-black uppercase text-pink-400 mb-3">AI Engine Offline</Text>
+                            <Text className="text-[10px] opacity-70 leading-relaxed uppercase tracking-wider">{error}</Text>
                         </Box>
                     ) : (
                         <div className="space-y-4">
@@ -262,6 +299,9 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShow
                                     </div>
                                 </Box>
                             ))}
+                            {recommendations.length === 0 && !isLoadingRecs && (
+                                <Text className="text-center opacity-40 italic py-10 uppercase text-[9px] tracking-widest">Add more books to unlock insights</Text>
+                            )}
                         </div>
                     )}
                 </Box>
