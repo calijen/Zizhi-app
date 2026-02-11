@@ -12,7 +12,6 @@ interface SettingsViewProps {
 }
 
 export default function SettingsView({ currentTheme, onThemeChange, themes, fonts }: SettingsViewProps) {
-  
   const updateTheme = useCallback((updates: Partial<Theme>) => {
     onThemeChange({ ...currentTheme, ...updates });
   }, [currentTheme, onThemeChange]);
@@ -46,7 +45,7 @@ export default function SettingsView({ currentTheme, onThemeChange, themes, font
                     >
                         <div className="w-full h-16 mb-4 border-4 border-black" style={{ backgroundColor: t.colors.background }} />
                         <Text className="text-[15px] font-black uppercase tracking-tight mb-2">{t.name}</Text>
-                        <Text className="text-[11px] font-bold text-[var(--color-secondary-text)] leading-relaxed">
+                        <Text className="text-[11px] font-bold text-[var(--color-secondary-text)] leading-relaxed line-clamp-2">
                             {t.id === 'warm' && 'Soft tones for extended daylight reading sessions.'}
                             {t.id === 'quiet' && 'Stark, minimal layout for deep focus and study.'}
                             {t.id === 'nocturne' && 'Reduced contrast palette for nighttime comfort.'}

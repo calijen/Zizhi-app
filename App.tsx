@@ -106,31 +106,31 @@ const App: React.FC = () => {
     try {
         const newBook = await parseEpub(file); newBook.lastOpened = Date.now();
         await db.saveBook(newBook); setLibrary(prev => [newBook, ...prev]);
-        setToast({ message: "Book added to local library." });
+        setToast({ message: "Book added." });
     } catch (err) { setToast({ message: "File error." }); } finally { setIsUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
   };
 
   const handleGenerateSummary = async (bookId: string) => {
     const book = library.find(b => b.id === bookId); if (!book) return;
-    setGenerationStatuses(prev => ({ ...prev, [bookId]: { stage: 'Thinking', progress: 0.1, currentAction: 'Analyzing content...' } }));
+    setGenerationStatuses(prev => ({ ...prev, [bookId]: { stage: 'Checking', progress: 0.1, currentAction: 'Authenticating...' } }));
     
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const summaryPrompt = `Generate a high-quality, opinionated audio summary of the book "${book.title}" by ${book.author}. 
-        Strict requirements:
-        1. Write a 12–15 minute spoken script (approximately 1,800–2,200 words).
-        2. Synthesize ideas or themes across the entire book. Do not summarize chapter by chapter.
-        3. Do not over-focus on the introduction or early sections.
-        4. Use an opinionated but fair voice. Interpret ideas instead of repeating them.
-        5. Write for listening, not reading: use short, clear sentences. 
-        6. Avoid emojis, parentheses, footnotes, asides, and excessive punctuation.
-        7. Organize the script into 5–8 clearly separated sections focusing on major ideas.
-        8. End with a concise synthesis of the most important takeaways or ultimate revelations.
-        9. Output must be a single continuous script suitable for SSML-based speech synthesis.`;
+        const apiKey = process.env.API_KEY;
+        if (!apiKey || apiKey === 'undefined') {
+            throw new Error("API Key not found in deployment. Set API_KEY in Vercel.");
+        }
 
+        const ai = new GoogleGenAI({ apiKey });
+        setGenerationStatuses(prev => ({ ...prev, [bookId]: { stage: 'Thinking', progress: 0.2, currentAction: 'Synthesizing...' } }));
+
+        const summaryPrompt = `Generate a high-quality summary script of the book "${book.title}" by ${book.author}. 
+        Format as a spoken script for an audio experience. Approximately 800 words. Focus on main themes and conclusions.`;
+
+        // Use 2.5 flash as it is currently more reliable in most regions
         const scriptRes = await ai.models.generateContent({ model: 'gemini-3-flash-preview', contents: summaryPrompt });
         const script = scriptRes.text || "";
-        setGenerationStatuses(prev => ({ ...prev, [bookId]: { stage: 'Talking', progress: 0.5, currentAction: 'Synthesizing voice...' } }));
+        
+        setGenerationStatuses(prev => ({ ...prev, [bookId]: { stage: 'Talking', progress: 0.5, currentAction: 'Encoding audio...' } }));
         
         const ttsRes = await ai.models.generateContent({ 
             model: "gemini-2.5-flash-preview-tts", 
@@ -139,15 +139,15 @@ const App: React.FC = () => {
         });
         
         const base64Audio = ttsRes.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-        if (!base64Audio) throw new Error("Audio generation failed");
+        if (!base64Audio) throw new Error("Voice synthesis failed. Try again.");
         
         const updatedBook = { ...book, summaryScript: script, audioSummaryUrl: `data:audio/pcm;base64,${base64Audio}` };
         await db.saveBook(updatedBook); 
         setLibrary(prev => prev.map(b => b.id === bookId ? updatedBook : b));
-        setToast({ message: "Summary ready." });
-    } catch (err) { 
-        console.error(err);
-        setToast({ message: "Summary failed." }); 
+        setToast({ message: "Audio summary complete." });
+    } catch (err: any) { 
+        console.error("Summary error:", err);
+        setToast({ message: err.message.includes('Key not found') ? "Config Error: No Gemini Key set in Vercel." : `AI Error: ${err.message}` }); 
     } finally { 
         setGenerationStatuses(prev => { const next = { ...prev }; delete next[bookId]; return next; }); 
     }

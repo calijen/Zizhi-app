@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Box, Group, Stack, Text, SimpleGrid } from '@mantine/core';
 import type { Book, ReadingActivity } from '../types';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { IconSpinner } from './icons';
 
 interface ProfileViewProps {
@@ -95,6 +95,7 @@ const TimeRobot = () => (
 const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShowAuth, activity, onSignOut }) => {
     const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
     const [isLoadingRecs, setIsLoadingRecs] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     
     const totalReadingTimeHours = useMemo(() => {
         const seconds = library.reduce((acc, book) => acc + (book.readingTime || 0), 0);
@@ -120,18 +121,39 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShow
     useEffect(() => {
         const getRecs = async () => {
             if (library.length === 0 || recommendations.length > 0) return;
+            const apiKey = process.env.API_KEY;
+            if (!apiKey || apiKey === 'undefined') {
+                setError("API Key Missing");
+                return;
+            }
+
             setIsLoadingRecs(true);
             try {
-                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+                const ai = new GoogleGenAI({ apiKey });
                 const titles = library.map(b => b.title).join(', ');
                 const response = await ai.models.generateContent({
                     model: 'gemini-3-flash-preview',
-                    contents: `Based on these books: ${titles}, suggest 3 book recommendations. Return as a JSON array: [{"title": "", "author": "", "coverUrl": null}]`,
-                    config: { responseMimeType: 'application/json' }
+                    contents: `Based on these books in the user's library: ${titles}, suggest 3 book recommendations.`,
+                    config: { 
+                        responseMimeType: 'application/json',
+                        responseSchema: {
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    title: { type: Type.STRING },
+                                    author: { type: Type.STRING },
+                                    coverUrl: { type: Type.NULL }
+                                },
+                                required: ["title", "author"]
+                            }
+                        }
+                    }
                 });
                 setRecommendations(JSON.parse(response.text));
-            } catch (e) {
+            } catch (e: any) {
                 console.error("Recs failed", e);
+                setError(e.message);
             } finally {
                 setIsLoadingRecs(false);
             }
@@ -222,6 +244,11 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShow
                             <IconSpinner className="w-10 h-10 text-pink-500" />
                             <Text className="text-[10px] font-black uppercase">Scanning the stars...</Text>
                         </div>
+                    ) : error ? (
+                        <Box className="p-4 border-2 border-dashed border-white/20 text-center">
+                            <Text className="text-[10px] font-black uppercase text-pink-400 mb-2">Configuration Required</Text>
+                            <Text className="text-[9px] opacity-60 leading-relaxed uppercase">The AI Engine is not active. Please ensure your Gemini API Key is set in your Vercel project environment variables.</Text>
+                        </Box>
                     ) : (
                         <div className="space-y-4">
                             {recommendations.map((rec, i) => (
