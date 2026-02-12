@@ -17,15 +17,15 @@
       "purpose": "any"
     },
     {
-      "src": "/logo.svg",
+      "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAMAAABlS4L/AAAAA1BMVEX///+nxBvIAAAALElEQVR4nO3BMQEAAADCoPVPbQwfoAAAAAAAAAAAAAAAAAAAAAAAAAAA4GfNTAABmH53PwAAAABJRU5ErkJggg==",
       "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "maskable"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "/logo.svg",
+      "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAMAAABlS4L/AAAAA1BMVEX///+nxBvIAAAALElEQVR4nO3BMQEAAADCoPVPbQwfoAAAAAAAAAAAAAAAAAAAAAAAAAAA4GfNTAABmH53PwAAAABJRU5ErkJggg==",
       "sizes": "512x512",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "maskable"
     }
   ],
