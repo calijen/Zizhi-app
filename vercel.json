@@ -1,8 +1,21 @@
+
 {
+  "cleanUrls": true,
+  "trailingSlash": false,
   "rewrites": [
+    { "source": "/logo.svg", "destination": "/logo.svg" },
+    { "source": "/manifest.json", "destination": "/manifest.json" },
+    { "source": "/sw.js", "destination": "/sw.js" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
+    {
+      "source": "/logo.svg",
+      "headers": [
+        { "key": "Content-Type", "value": "image/svg+xml" },
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
     {
       "source": "/sw.js",
       "headers": [
@@ -14,12 +27,6 @@
       "source": "/manifest.json",
       "headers": [
         { "key": "Content-Type", "value": "application/manifest+json" }
-      ]
-    },
-    {
-      "source": "/logo.svg",
-      "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
       ]
     },
     {

@@ -117,8 +117,8 @@ const App: React.FC = () => {
     try {
         const apiKey = process.env.API_KEY;
         // Check for common missing key issues in deployed environments
-        if (!apiKey || apiKey === 'undefined' || apiKey === 'null') {
-            throw new Error("Missing AI Key. Ensure API_KEY is set in Vercel.");
+        if (!apiKey || apiKey === 'undefined' || apiKey === 'null' || apiKey === '') {
+            throw new Error("Missing AI Key. Ensure API_KEY is set in Vercel project variables.");
         }
 
         const ai = new GoogleGenAI({ apiKey });
@@ -157,7 +157,7 @@ const App: React.FC = () => {
         setToast({ message: "Insight generated successfully." });
     } catch (err: any) { 
         console.error("Summary error:", err);
-        const msg = err.message.includes('Key') ? "Key Error: Set API_KEY in Vercel settings and Redeploy." : `AI Error: ${err.message}`;
+        const msg = err.message.includes('Key') ? "Configuration Error: No Gemini Key set in Vercel dashboard." : `AI Error: ${err.message}`;
         setToast({ message: msg }); 
     } finally { 
         setGenerationStatuses(prev => { const next = { ...prev }; delete next[bookId]; return next; }); 
