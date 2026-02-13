@@ -153,22 +153,17 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShow
     useEffect(() => {
         const getRecs = async () => {
             if (library.length === 0 || recommendations.length > 0) return;
-            const apiKey = process.env.API_KEY;
             
-            // Checking for common "missing key" indicators in a Vite/Vercel environment
-            if (!apiKey || apiKey === 'undefined' || apiKey === 'null') {
-                setError("AI Engine Offline: Ensure API_KEY is set in Vercel environment variables.");
-                return;
-            }
-
             setIsLoadingRecs(true);
+            setError(null);
+            
             try {
-                const ai = new GoogleGenAI({ apiKey });
+                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
                 // We limit the number of titles to avoid context bloat
                 const titles = library.slice(0, 5).map(b => b.title).join(', ');
                 const response = await ai.models.generateContent({
                     model: 'gemini-3-flash-preview',
-                    contents: `User library contains: ${titles}. Recommend 3 books. Return valid JSON only.`,
+                    contents: `User library contains: ${titles}. Based on these books, recommend 3 similar must-read titles. Return valid JSON only.`,
                     config: { 
                         responseMimeType: 'application/json',
                         responseSchema: {
@@ -190,7 +185,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShow
                 setRecommendations(recs);
             } catch (e: any) {
                 console.error("Recs failed", e);
-                setError(e.message || "Recommendation service unavailable.");
+                setError("Personalization engine currently unavailable. Please verify your connection.");
             } finally {
                 setIsLoadingRecs(false);
             }
@@ -283,7 +278,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShow
                         </div>
                     ) : error ? (
                         <Box className="p-6 border-4 border-dashed border-white/20 text-center">
-                            <Text className="text-[11px] font-black uppercase text-pink-400 mb-3">AI Engine Offline</Text>
+                            <Text className="text-[11px] font-black uppercase text-pink-400 mb-3">Service Notice</Text>
                             <Text className="text-[10px] opacity-70 leading-relaxed uppercase tracking-wider">{error}</Text>
                         </Box>
                     ) : (

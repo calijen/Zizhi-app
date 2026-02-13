@@ -115,13 +115,7 @@ const App: React.FC = () => {
     setGenerationStatuses(prev => ({ ...prev, [bookId]: { stage: 'Checking', progress: 0.1, currentAction: 'Authenticating...' } }));
     
     try {
-        const apiKey = process.env.API_KEY;
-        // Check for common missing key issues in deployed environments
-        if (!apiKey || apiKey === 'undefined' || apiKey === 'null' || apiKey === '') {
-            throw new Error("Missing AI Key. Ensure API_KEY is set in Vercel project variables.");
-        }
-
-        const ai = new GoogleGenAI({ apiKey });
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         setGenerationStatuses(prev => ({ ...prev, [bookId]: { stage: 'Thinking', progress: 0.2, currentAction: 'Distilling content...' } }));
 
         const summaryPrompt = `Synthesize a focused audio summary of the book "${book.title}" by ${book.author}. 
@@ -157,8 +151,7 @@ const App: React.FC = () => {
         setToast({ message: "Insight generated successfully." });
     } catch (err: any) { 
         console.error("Summary error:", err);
-        const msg = err.message.includes('Key') ? "Configuration Error: No Gemini Key set in Vercel dashboard." : `AI Error: ${err.message}`;
-        setToast({ message: msg }); 
+        setToast({ message: `AI Service Error: ${err.message || 'Check your internet connection and try again.'}` }); 
     } finally { 
         setGenerationStatuses(prev => { const next = { ...prev }; delete next[bookId]; return next; }); 
     }
