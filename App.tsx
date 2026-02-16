@@ -8,6 +8,7 @@ import AuthView from './components/AuthView';
 import ReaderView from './components/ReaderView';
 import SummaryView from './components/TrailerView';
 import ProfileView from './components/ProfileView';
+import LandingView from './components/LandingView';
 import Toast from './components/Toast';
 import { Logo, IconSettings, IconUser, IconLibrary, IconQuote, IconUpload, IconLayoutGrid, IconLayoutList, IconSpinner } from './components/icons';
 import * as db from './db';
@@ -78,6 +79,7 @@ const App: React.FC = () => {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [user, setUser] = useState<any>(null);
   const [showAuth, setShowAuth] = useState(false);
+  const [hasEntered, setHasEntered] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState<'library' | 'quotes' | 'profile' | 'settings'>('library');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
@@ -91,14 +93,33 @@ const App: React.FC = () => {
   const loadData = useCallback(async () => {
     try {
       const [localBooks, localQuotes] = await Promise.all([db.getBooks(), db.getQuotes()]);
-      setLibrary(localBooks); setQuotes(localQuotes);
+      setLibrary(localBooks); 
+      setQuotes(localQuotes);
+      
+      const savedHasEntered = localStorage.getItem('zizhi-entered');
+      if (localBooks.length > 0 || savedHasEntered === 'true') {
+        setHasEntered(true);
+      } else {
+        setHasEntered(false);
+      }
+
       const { data } = await supabase.auth.getUser();
       if (data.user) setUser(data.user);
     } catch (e) { console.error("Load failed", e); }
   }, []);
 
-  useEffect(() => { loadData(); const savedTheme = localStorage.getItem('zizhi-theme'); if (savedTheme) { try { setTheme(JSON.parse(savedTheme)); } catch(e) {} } }, [loadData]);
+  useEffect(() => { 
+    loadData(); 
+    const savedTheme = localStorage.getItem('zizhi-theme'); 
+    if (savedTheme) { try { setTheme(JSON.parse(savedTheme)); } catch(e) {} } 
+  }, [loadData]);
+  
   const sortedLibrary = useMemo(() => [...library].sort((a, b) => (b.lastOpened || 0) - (a.lastOpened || 0)), [library]);
+
+  const handleEnterApp = () => {
+    setHasEntered(true);
+    localStorage.setItem('zizhi-entered', 'true');
+  };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
@@ -184,50 +205,56 @@ const App: React.FC = () => {
     '--font-sans': theme.font.sans 
   } as React.CSSProperties;
 
+  if (hasEntered === null) return null;
+
   return (
     <MantineProvider theme={mantineTheme} defaultColorScheme={theme.id === 'nocturne' ? 'dark' : 'light'}>
-      <Box style={appStyles} className="relative h-[100dvh] w-full overflow-hidden transition-colors duration-300 flex flex-col md:flex-row text-[var(--color-primary-text)]" bg="var(--color-background)">
-        <aside className="hidden md:flex w-64 lg:w-72 bg-[var(--color-surface)] border-r-4 border-black flex-col z-[150]">
-            <div className="p-8 border-b-4 border-black"><Logo className="h-6 w-auto text-[var(--color-primary-text)]" /></div>
-            <nav className="flex-1 p-6 space-y-4">
-                <NavItem tab="library" icon={IconLibrary} label="Library" />
-                <NavItem tab="quotes" icon={IconQuote} label="Quotes" />
-                <NavItem tab="profile" icon={IconUser} label="Profile" />
-                <NavItem tab="settings" icon={IconSettings} label="Settings" />
-            </nav>
-            <div className="p-8 border-t-2 border-black opacity-30"><Text className="text-[10px] font-black uppercase text-[var(--color-primary-text)]">Zizhi v4.2</Text></div>
-        </aside>
-        <Box className="flex-1 flex flex-col h-full overflow-hidden relative">
-            <header className="h-16 md:h-20 bg-[var(--color-surface)] z-[100] px-8 flex items-center justify-between border-b-4 border-black">
-                <div className="md:hidden"><Logo className="h-4 w-auto text-[var(--color-primary-text)]" /></div>
-                <div className="hidden md:flex items-center gap-10">
-                    <Text className="text-[10px] font-black uppercase tracking-widest text-[var(--color-muted-text)]">Theme: {theme.name}</Text>
-                    {user && <Box className="bg-cyan-400 px-3 py-1 border-2 border-black shadow-[2px_2px_0_black]"><Text className="text-[9px] font-black uppercase text-black">Cloud Sync Active</Text></Box>}
-                </div>
-                <ActionIcon variant="subtle" color="gray" size="lg" onClick={() => setViewMode(v => v === 'grid' ? 'list' : 'grid')} className="border-2 border-black shadow-[2px_2px_0_black] bg-white">
-                    {viewMode === 'grid' ? <IconLayoutList className="w-5 h-5 text-black" /> : <IconLayoutGrid className="w-5 h-5 text-black" />}
-                </ActionIcon>
-            </header>
-            <main className="flex-1 overflow-y-auto no-scrollbar pb-64 md:pb-24">
-                <Box className="max-w-7xl mx-auto px-6 py-6 h-full">
-                    {activeTab === 'library' && <Library books={sortedLibrary} theme={theme} onBookSelect={(id) => setSelectedBook(library.find(b => b.id === id) || null)} isLoading={isUploading} error={null} onDelete={async (id) => { if(window.confirm("Delete book?")) { await db.deleteBook(id); setLibrary(prev => prev.filter(b => b.id !== id)); } }} onGenerateSummary={handleGenerateSummary} generationStatuses={generationStatuses} onViewSummary={(id) => setSummaryBook(library.find(b => b.id === id) || null)} viewMode={viewMode} />}
-                    {activeTab === 'quotes' && <QuotesView theme={theme} quotes={quotes} library={library} onDelete={(id) => { db.deleteQuote(id).then(() => setQuotes(prev => prev.filter(q => q.id !== id))); }} onGoToQuote={(q) => setSelectedBook(library.find(b => b.id === q.bookId) || null)} />}
-                    {activeTab === 'profile' && <ProfileView user={user} streak={0} library={library} onShowAuth={() => setShowAuth(true)} activity={[]} onSignOut={async () => { await supabase.auth.signOut(); setUser(null); }} />}
-                    {activeTab === 'settings' && <SettingsView currentTheme={theme} onThemeChange={(t) => { setTheme(t); localStorage.setItem('zizhi-theme', JSON.stringify(t)); }} themes={ATMOSPHERES} fonts={FONTS} textures={{}} />}
-                </Box>
-            </main>
-            <Box className="hidden md:block fixed bottom-12 right-12 z-[250]"><input type="file" ref={fileInputRef} onChange={handleUpload} accept=".epub" className="hidden" /><ActionIcon size={80} className="bg-yellow-400 border-4 border-black shadow-[8px_8px_0_black] hover:translate-y-[-2px] transition-all rounded-none" onClick={() => fileInputRef.current?.click()}>{isUploading ? <IconSpinner className="w-10 h-10 text-black" /> : <IconUpload className="w-10 h-10 text-black" />}</ActionIcon></Box>
+      {!hasEntered ? (
+        <LandingView onEnter={handleEnterApp} />
+      ) : (
+        <Box style={appStyles} className="relative h-[100dvh] w-full overflow-hidden transition-colors duration-300 flex flex-col md:flex-row text-[var(--color-primary-text)]" bg="var(--color-background)">
+          <aside className="hidden md:flex w-64 lg:w-72 bg-[var(--color-surface)] border-r-4 border-black flex-col z-[150]">
+              <div className="p-8 border-b-4 border-black"><Logo className="h-6 w-auto text-[var(--color-primary-text)]" /></div>
+              <nav className="flex-1 p-6 space-y-4">
+                  <NavItem tab="library" icon={IconLibrary} label="Library" />
+                  <NavItem tab="quotes" icon={IconQuote} label="Quotes" />
+                  <NavItem tab="profile" icon={IconUser} label="Profile" />
+                  <NavItem tab="settings" icon={IconSettings} label="Settings" />
+              </nav>
+              <div className="p-8 border-t-2 border-black opacity-30"><Text className="text-[10px] font-black uppercase text-[var(--color-primary-text)]">Zizhi v4.2</Text></div>
+          </aside>
+          <Box className="flex-1 flex flex-col h-full overflow-hidden relative">
+              <header className="h-16 md:h-20 bg-[var(--color-surface)] z-[100] px-8 flex items-center justify-between border-b-4 border-black">
+                  <div className="md:hidden"><Logo className="h-4 w-auto text-[var(--color-primary-text)]" /></div>
+                  <div className="hidden md:flex items-center gap-10">
+                      <Text className="text-[10px] font-black uppercase tracking-widest text-[var(--color-muted-text)]">Theme: {theme.name}</Text>
+                      {user && <Box className="bg-cyan-400 px-3 py-1 border-2 border-black shadow-[2px_2px_0_black]"><Text className="text-[9px] font-black uppercase text-black">Cloud Sync Active</Text></Box>}
+                  </div>
+                  <ActionIcon variant="subtle" color="gray" size="lg" onClick={() => setViewMode(v => v === 'grid' ? 'list' : 'grid')} className="border-2 border-black shadow-[2px_2px_0_black] bg-white">
+                      {viewMode === 'grid' ? <IconLayoutList className="w-5 h-5 text-black" /> : <IconLayoutGrid className="w-5 h-5 text-black" />}
+                  </ActionIcon>
+              </header>
+              <main className="flex-1 overflow-y-auto no-scrollbar pb-64 md:pb-24">
+                  <Box className="max-w-7xl mx-auto px-6 py-6 h-full">
+                      {activeTab === 'library' && <Library books={sortedLibrary} theme={theme} onBookSelect={(id) => setSelectedBook(library.find(b => b.id === id) || null)} isLoading={isUploading} error={null} onDelete={async (id) => { if(window.confirm("Delete book?")) { await db.deleteBook(id); setLibrary(prev => prev.filter(b => b.id !== id)); } }} onGenerateSummary={handleGenerateSummary} generationStatuses={generationStatuses} onViewSummary={(id) => setSummaryBook(library.find(b => b.id === id) || null)} viewMode={viewMode} />}
+                      {activeTab === 'quotes' && <QuotesView theme={theme} quotes={quotes} library={library} onDelete={(id) => { db.deleteQuote(id).then(() => setQuotes(prev => prev.filter(q => q.id !== id))); }} onGoToQuote={(q) => setSelectedBook(library.find(b => b.id === q.bookId) || null)} />}
+                      {activeTab === 'profile' && <ProfileView user={user} streak={0} library={library} onShowAuth={() => setShowAuth(true)} activity={[]} onSignOut={async () => { await supabase.auth.signOut(); setUser(null); }} />}
+                      {activeTab === 'settings' && <SettingsView currentTheme={theme} onThemeChange={(t) => { setTheme(t); localStorage.setItem('zizhi-theme', JSON.stringify(t)); }} themes={ATMOSPHERES} fonts={FONTS} textures={{}} />}
+                  </Box>
+              </main>
+              <Box className="hidden md:block fixed bottom-12 right-12 z-[250]"><input type="file" ref={fileInputRef} onChange={handleUpload} accept=".epub" className="hidden" /><ActionIcon size={80} className="bg-yellow-400 border-4 border-black shadow-[8px_8px_0_black] hover:translate-y-[-2px] transition-all rounded-none" onClick={() => fileInputRef.current?.click()}>{isUploading ? <IconSpinner className="w-10 h-10 text-black" /> : <IconUpload className="w-10 h-10 text-black" />}</ActionIcon></Box>
+          </Box>
+          <nav className="fixed bottom-0 left-0 right-0 bg-[var(--color-surface)] h-20 flex items-center justify-around z-[200] border-t-4 border-black md:hidden">
+              <NavItem tab="library" icon={IconLibrary} label="Library" /><NavItem tab="quotes" icon={IconQuote} label="Quotes" />
+              <Box className="relative -top-6"><input type="file" ref={fileInputRef} onChange={handleUpload} accept=".epub" className="hidden" /><ActionIcon size={72} className="bg-yellow-400 border-4 border-black shadow-[6px_6px_0_black] rounded-none" onClick={() => fileInputRef.current?.click()}>{isUploading ? <IconSpinner className="w-8 h-8 text-black" /> : <IconUpload className="w-8 h-8 text-black" />}</ActionIcon></Box>
+              <NavItem tab="profile" icon={IconUser} label="Profile" /><NavItem tab="settings" icon={IconSettings} label="Settings" />
+          </nav>
+          {selectedBook && <ReaderView book={selectedBook} theme={theme} onClose={() => setSelectedBook(null)} onUpdateProgress={async (bid, ci, st, ts, gp) => { const bidx = library.findIndex(b => b.id === bid); if (bidx === -1) return; const updated = { ...library[bidx], progress: gp, lastScrollTop: st, readingTime: (library[bidx].readingTime || 0) + ts, lastOpened: Date.now() }; await db.saveBook(updated); setLibrary(prev => prev.map(b => b.id === bid ? updated : b)); }} onSaveQuote={async (t, c) => { const nq: Quote = { id: crypto.randomUUID(), text: t, bookTitle: selectedBook.title, author: selectedBook.author, bookId: selectedBook.id, location: c, createdAt: Date.now() }; await db.saveQuote(nq); setQuotes(prev => [nq, ...prev]); setToast({ message: "Quote archived." }); }} onSearch={() => {}} />}
+          {summaryBook && <SummaryView book={summaryBook} onClose={() => setSummaryBook(null)} />}
+          {showAuth && <AuthView onClose={() => setShowAuth(false)} onLogin={(u) => setUser(u)} />}
+          {toast && <Toast message={toast.message} action={toast.action} onClose={() => setToast(null)} />}
         </Box>
-        <nav className="fixed bottom-0 left-0 right-0 bg-[var(--color-surface)] h-20 flex items-center justify-around z-[200] border-t-4 border-black md:hidden">
-            <NavItem tab="library" icon={IconLibrary} label="Library" /><NavItem tab="quotes" icon={IconQuote} label="Quotes" />
-            <Box className="relative -top-6"><input type="file" ref={fileInputRef} onChange={handleUpload} accept=".epub" className="hidden" /><ActionIcon size={72} className="bg-yellow-400 border-4 border-black shadow-[6px_6px_0_black] rounded-none" onClick={() => fileInputRef.current?.click()}>{isUploading ? <IconSpinner className="w-8 h-8 text-black" /> : <IconUpload className="w-8 h-8 text-black" />}</ActionIcon></Box>
-            <NavItem tab="profile" icon={IconUser} label="Profile" /><NavItem tab="settings" icon={IconSettings} label="Settings" />
-        </nav>
-        {selectedBook && <ReaderView book={selectedBook} theme={theme} onClose={() => setSelectedBook(null)} onUpdateProgress={async (bid, ci, st, ts, gp) => { const bidx = library.findIndex(b => b.id === bid); if (bidx === -1) return; const updated = { ...library[bidx], progress: gp, lastScrollTop: st, readingTime: (library[bidx].readingTime || 0) + ts, lastOpened: Date.now() }; await db.saveBook(updated); setLibrary(prev => prev.map(b => b.id === bid ? updated : b)); }} onSaveQuote={async (t, c) => { const nq: Quote = { id: crypto.randomUUID(), text: t, bookTitle: selectedBook.title, author: selectedBook.author, bookId: selectedBook.id, location: c, createdAt: Date.now() }; await db.saveQuote(nq); setQuotes(prev => [nq, ...prev]); setToast({ message: "Quote archived." }); }} onSearch={() => {}} />}
-        {summaryBook && <SummaryView book={summaryBook} onClose={() => setSummaryBook(null)} />}
-        {showAuth && <AuthView onClose={() => setShowAuth(false)} onLogin={(u) => setUser(u)} />}
-        {toast && <Toast message={toast.message} action={toast.action} onClose={() => setToast(null)} />}
-      </Box>
+      )}
     </MantineProvider>
   );
 };
