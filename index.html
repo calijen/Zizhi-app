@@ -3,8 +3,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
-    <link rel="manifest" href="/manifest.json" />
     
     <!-- PWA & Mobile Optimization -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -18,7 +20,6 @@
     <title>Zizhi — Premium Reader</title>
     
     <!-- External Dependencies -->
-    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Lora:ital,wght@0,400;0,700;1,400;1,700&family=EB+Garamond:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     
@@ -56,24 +57,10 @@
       }
     </style>
 
-    <script type="importmap">
-    {
-      "imports": {
-        "react": "https://esm.sh/react@18.3.1",
-        "react-dom": "https://esm.sh/react-dom@18.3.1",
-        "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
-        "@mantine/core": "https://esm.sh/@mantine/core@7.16.2?external=react,react-dom",
-        "@mantine/hooks": "https://esm.sh/@mantine/hooks@7.16.2?external=react,react-dom",
-        "@google/genai": "https://esm.sh/@google/genai@1.40.0",
-        "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.45.4",
-        "react-dom/": "https://esm.sh/react-dom@18.3.1/",
-        "react/": "https://esm.sh/react@18.3.1/"
-      }
-    }
-    </script>
-  </head>
+    <link rel="stylesheet" href="/index.css">
+</head>
   <body>
     <div id="root"></div>
-    <script type="module" src="index.tsx"></script>
+    <script type="module" src="/main.tsx?v=124"></script>
   </body>
 </html>

@@ -113,9 +113,9 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
             
             <Transition mounted={isDesktopTocPersistent} transition="slide-right" duration={300}>
                 {(styles) => (
-                    <Box style={styles} className="hidden xl:flex w-80 bg-white border-r-4 border-black flex-col h-full z-[1100]">
+                    <Box style={styles} className="hidden xl:flex w-80 bg-[var(--bg-color)] border-r-4 border-black flex-col h-full z-[1100]">
                         <div className="p-10 border-b-4 border-black">
-                            <Text className="text-[12px] font-black uppercase tracking-widest text-black/50">Chapters</Text>
+                            <Text className="text-[12px] font-black uppercase tracking-widest text-[var(--sec-text)]">Chapters</Text>
                         </div>
                         <ScrollArea className="flex-1 p-6">
                             <Stack gap={4}>
@@ -125,7 +125,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
                                         style={{ borderRadius: '0px' }}
                                         onClick={() => navigateToChapter(idx)}
                                     >
-                                        <Text className="text-[11px] font-black leading-relaxed line-clamp-2" style={{ color: 'black' }}>{item.label}</Text>
+                                        <Text className="text-[11px] font-black leading-relaxed line-clamp-2" style={{ color: 'var(--text-color)' }}>{item.label}</Text>
                                     </Box>
                                 ))}
                             </Stack>
@@ -135,11 +135,11 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
             </Transition>
 
             <Box className="flex-1 flex flex-col h-full relative">
-                <header className="h-16 md:h-20 bg-white border-b-4 border-black flex items-center justify-between px-6 md:px-8 z-[1200] shadow-[0_4px_0_rgba(0,0,0,0.05)]">
-                    <ActionIcon variant="filled" color="cyan" size="lg" onClick={onClose} className="border-2 border-black rounded-none shadow-[3px_3px_0_black] bg-white"><IconChevronLeft className="text-black w-5 h-5" /></ActionIcon>
+                <header className="h-16 md:h-20 bg-[var(--bg-color)] border-b-4 border-black flex items-center justify-between px-6 md:px-8 z-[1200] shadow-[0_4px_0_rgba(0,0,0,0.05)]">
+                    <ActionIcon variant="filled" color="cyan" size="lg" onClick={onClose} className="border-2 border-black rounded-none shadow-[3px_3px_0_black] bg-[var(--bg-color)]"><IconChevronLeft className="text-[var(--text-color)] w-5 h-5" /></ActionIcon>
                     
                     <Group gap="xs" className="flex items-center">
-                        <Text className="text-[11px] md:text-[13px] font-black uppercase tracking-widest text-black">
+                        <Text className="text-[11px] md:text-[13px] font-black uppercase tracking-widest text-[var(--text-color)]">
                             {Math.round(scrollProgress * 100)}% Progress
                         </Text>
                         <Box className="w-16 h-2 border-2 border-black rounded-none hidden sm:block relative bg-black/5 overflow-hidden">
@@ -148,7 +148,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
                     </Group>
 
                     {!isDesktopTocPersistent && (
-                        <ActionIcon variant="filled" color="yellow" size="lg" onClick={() => setShowToc(true)} className="border-2 border-black rounded-none shadow-[3px_3px_0_black] bg-white"><IconMenu className="text-black w-5 h-5" /></ActionIcon>
+                        <ActionIcon variant="filled" color="yellow" size="lg" onClick={() => setShowToc(true)} className="border-2 border-black rounded-none shadow-[3px_3px_0_black] bg-[var(--bg-color)]"><IconMenu className="text-[var(--text-color)] w-5 h-5" /></ActionIcon>
                     )}
                     {isDesktopTocPersistent && <div className="w-10"></div>}
                 </header>
@@ -182,10 +182,10 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
                 {(styles) => (
                     <Box style={styles} className="fixed inset-0 z-[1500] flex">
                         <Box className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowToc(false)} />
-                        <Box className="relative w-72 bg-white h-full border-r-4 border-black p-8 flex flex-col gap-6 shadow-[8px_0_0_black]">
+                        <Box className="relative w-72 bg-[var(--bg-color)] h-full border-r-4 border-black p-8 flex flex-col gap-6 shadow-[8px_0_0_black]">
                             <Group justify="space-between">
-                                <Text className="text-[14px] font-black uppercase text-black">Chapters</Text>
-                                <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => setShowToc(false)}><IconClose className="text-black" /></ActionIcon>
+                                <Text className="text-[14px] font-black uppercase text-[var(--text-color)]">Chapters</Text>
+                                <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => setShowToc(false)}><IconClose className="text-[var(--text-color)]" /></ActionIcon>
                             </Group>
                             <ScrollArea className="flex-1">
                                 <Stack gap={4}>
@@ -194,7 +194,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
                                             className={`p-4 cursor-pointer border-2 transition-all ${idx === currentChapterIndex ? 'bg-cyan-400 border-black shadow-[3px_3px_0_black]' : 'border-transparent'}`}
                                             onClick={() => navigateToChapter(idx)}
                                         >
-                                            <Text className="text-[11px] font-bold text-black line-clamp-2">{item.label}</Text>
+                                            <Text className="text-[11px] font-bold text-[var(--text-color)] line-clamp-2">{item.label}</Text>
                                         </Box>
                                     ))}
                                 </Stack>

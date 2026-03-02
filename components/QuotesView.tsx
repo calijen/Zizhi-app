@@ -79,7 +79,7 @@ const QuoteCard: React.FC<{ quote: Quote; onDelete: (id: string) => void; onGoTo
     const isLong = words.length > 20;
     const displayText = expanded || !isLong ? quote.text : words.slice(0, 20).join(' ') + '...';
     return (
-        <div className="p-5 bg-white border-4 border-black group relative shadow-[4px_4px_0_black] hover:translate-x-[-1px] transition-all flex flex-col h-auto">
+        <div className="p-5 bg-[var(--color-surface)] border-4 border-black group relative shadow-[4px_4px_0_black] hover:translate-x-[-1px] transition-all flex flex-col h-auto">
             <div className="flex justify-between items-start mb-3">
                 <Text className="text-[9px] font-black uppercase text-pink-500 truncate max-w-[140px]">{quote.author}</Text>
                 <Group gap={6}>
@@ -87,9 +87,9 @@ const QuoteCard: React.FC<{ quote: Quote; onDelete: (id: string) => void; onGoTo
                     <ActionIcon variant="filled" color="red" size="xs" className="border-2 border-black rounded-none shadow-[1px_1px_0_black]" onClick={() => onDelete(quote.id)}><IconTrash className="w-3 h-3 text-black" /></ActionIcon>
                 </Group>
             </div>
-            <p className="text-lg font-serif leading-tight text-black cursor-pointer hover:opacity-80 transition-opacity mb-2" onClick={() => onGoToQuote(quote)}>“{displayText}”</p>
+            <p className="text-lg font-serif leading-tight text-[var(--color-primary-text)] cursor-pointer hover:opacity-80 transition-opacity mb-2" onClick={() => onGoToQuote(quote)}>“{displayText}”</p>
             {isLong && <button className="text-[9px] font-black uppercase text-cyan-600 hover:underline inline-block mb-3 self-start" onClick={() => setExpanded(!expanded)}>{expanded ? 'Less' : 'More'}</button>}
-            <div className="mt-auto pt-2 border-t border-black/10"><Text className="text-[8px] font-black text-black/40 uppercase truncate">{quote.bookTitle}</Text></div>
+            <div className="mt-auto pt-2 border-t border-black/10"><Text className="text-[8px] font-black text-[var(--color-muted-text)] uppercase truncate">{quote.bookTitle}</Text></div>
         </div>
     );
 };
@@ -101,10 +101,10 @@ const QuotesView: React.FC<QuotesViewProps> = ({ quotes, library = [], theme, on
   const activeBookCover = useMemo(() => activeShare ? (library.find(b => b.id === activeShare.bookId)?.coverImageUrl || null) : null, [activeShare, library]);
   return (
     <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-10 pb-40 animate-fade-in">
-      <header className="border-b-4 border-black pb-6"><h2 className="text-3xl font-black text-black uppercase">Quotes</h2></header>
-      <div className="relative"><IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-black opacity-40" /><input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-white border-4 border-black p-4 pl-12 text-[14px] font-black text-black outline-none shadow-[4px_4px_0_black] focus:translate-x-[-1px] transition-all" /></div>
+      <header className="border-b-4 border-black pb-6"><h2 className="text-3xl font-black text-[var(--color-primary-text)] uppercase">Quotes</h2></header>
+      <div className="relative"><IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--color-muted-text)]" /><input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-[var(--color-surface)] border-4 border-black p-4 pl-12 text-[14px] font-black text-[var(--color-primary-text)] outline-none shadow-[4px_4px_0_black] focus:translate-x-[-1px] transition-all" /></div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 auto-rows-min">
-        {filteredQuotes.length === 0 ? (<div className="col-span-full py-12 flex flex-col items-center justify-center text-center"><EmptyQuotesGraphic /><h2 className="text-2xl font-black mt-4 text-black uppercase">No Quotes</h2><p className="text-[12px] font-black opacity-40 uppercase">Save text in a book to see it here.</p></div>) : (filteredQuotes.map(quote => <QuoteCard key={quote.id} quote={quote} onDelete={onDelete} onGoToQuote={onGoToQuote} onShare={setActiveShare} />))}
+        {filteredQuotes.length === 0 ? (<div className="col-span-full py-12 flex flex-col items-center justify-center text-center"><EmptyQuotesGraphic /><h2 className="text-2xl font-black mt-4 text-[var(--color-primary-text)] uppercase">No Quotes</h2><p className="text-[12px] font-black text-[var(--color-muted-text)] uppercase">Save text in a book to see it here.</p></div>) : (filteredQuotes.map(quote => <QuoteCard key={quote.id} quote={quote} onDelete={onDelete} onGoToQuote={onGoToQuote} onShare={setActiveShare} />))}
       </div>
        {activeShare && <ShareDialog text={activeShare.text} bookTitle={activeShare.bookTitle} author={activeShare.author} coverImageUrl={activeBookCover} theme={theme} onClose={() => setActiveShare(null)} />}
     </div>

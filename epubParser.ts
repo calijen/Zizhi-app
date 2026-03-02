@@ -45,11 +45,11 @@ const resolveImages = async (html: string, zip: any, chapterPath: string): Promi
         
         if (imgFile) {
             const blob = await imgFile.async('blob');
-            const url = URL.createObjectURL(blob);
+            const dataUrl = await blobToBase64(blob);
             if (img.tagName.toLowerCase() === 'image') {
-                img.setAttribute('xlink:href', url);
+                img.setAttribute('xlink:href', dataUrl);
             } else {
-                img.setAttribute('src', url);
+                img.setAttribute('src', dataUrl);
             }
         }
     }

@@ -224,14 +224,14 @@ const App: React.FC = () => {
               <div className="p-8 border-t-2 border-black opacity-30"><Text className="text-[10px] font-black uppercase text-[var(--color-primary-text)]">Zizhi v4.2</Text></div>
           </aside>
           <Box className="flex-1 flex flex-col h-full overflow-hidden relative">
-              <header className="h-16 md:h-20 bg-[var(--color-surface)] z-[100] px-8 flex items-center justify-between border-b-4 border-black">
+              <header className="h-16 md:h-20 bg-red-500 z-[100] px-8 flex items-center justify-between border-b-4 border-black">
                   <div className="md:hidden"><Logo className="h-4 w-auto text-[var(--color-primary-text)]" /></div>
                   <div className="hidden md:flex items-center gap-10">
-                      <Text className="text-[10px] font-black uppercase tracking-widest text-[var(--color-muted-text)]">Theme: {theme.name}</Text>
+                      <Text className="text-[10px] font-black uppercase tracking-widest text-[var(--color-muted-text)]">Theme: {theme.name} v5.0</Text>
                       {user && <Box className="bg-cyan-400 px-3 py-1 border-2 border-black shadow-[2px_2px_0_black]"><Text className="text-[9px] font-black uppercase text-black">Cloud Sync Active</Text></Box>}
                   </div>
-                  <ActionIcon variant="subtle" color="gray" size="lg" onClick={() => setViewMode(v => v === 'grid' ? 'list' : 'grid')} className="border-2 border-black shadow-[2px_2px_0_black] bg-white">
-                      {viewMode === 'grid' ? <IconLayoutList className="w-5 h-5 text-black" /> : <IconLayoutGrid className="w-5 h-5 text-black" />}
+                  <ActionIcon variant="subtle" color="gray" size="lg" onClick={() => setViewMode(v => v === 'grid' ? 'list' : 'grid')} className="border-2 border-black shadow-[2px_2px_0_black] bg-[var(--color-background)]">
+                      {viewMode === 'grid' ? <IconLayoutList className="w-5 h-5 text-[var(--color-primary-text)]" /> : <IconLayoutGrid className="w-5 h-5 text-[var(--color-primary-text)]" />}
                   </ActionIcon>
               </header>
               <main className="flex-1 overflow-y-auto no-scrollbar pb-64 md:pb-24">
