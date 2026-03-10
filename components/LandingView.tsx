@@ -82,21 +82,21 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
       </nav>
 
       <main>
-        <section className="py-16 md:py-24 border-b-4 border-black">
+        <section className="py-16 md:py-32 border-b-4 border-black">
           <Container size="lg">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-              <Stack gap="xl">
+            <Stack gap={64} align="center" className="text-center">
+              <Stack gap="xl" align="center">
                 <Box className="bg-pink-500 border-4 border-black inline-block px-4 py-1 shadow-[4px_4px_0_black] w-fit">
                   <Text className="text-[10px] font-black uppercase text-white tracking-[0.3em]">Retention First</Text>
                 </Box>
-                <h1 className="text-6xl md:text-8xl font-black uppercase leading-[0.85] tracking-tighter italic">
+                <h1 className="text-6xl md:text-9xl font-black uppercase leading-[0.85] tracking-tighter italic">
                   Turn books <br />
                   into <span className="text-cyan-500">ideas.</span>
                 </h1>
-                <p className="text-xl font-serif italic text-black/70 leading-relaxed max-w-xl">
+                <p className="text-xl md:text-2xl font-serif italic text-black/70 leading-relaxed max-w-2xl">
                   Zizhi turns everything you read into something you actually remember.
                 </p>
-                <Group gap="lg" pt="xl">
+                <Group gap="lg" pt="xl" justify="center">
                   <button 
                     onClick={onEnter}
                     className="px-10 py-5 bg-yellow-400 border-4 border-black shadow-[8px_8px_0_black] hover:translate-y-1 hover:shadow-none transition-all text-lg font-black uppercase tracking-widest"
@@ -111,8 +111,10 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
                   </button>
                 </Group>
               </Stack>
-              <SplitScreenVisual />
-            </div>
+              <Box className="w-full max-w-5xl mx-auto">
+                <SplitScreenVisual />
+              </Box>
+            </Stack>
           </Container>
         </section>
 
