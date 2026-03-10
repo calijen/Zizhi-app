@@ -1,7 +1,7 @@
 
 import React, { useCallback } from 'react';
-import { Stack, Text, Group, Slider, ColorInput, SimpleGrid, Box } from '@mantine/core';
-import type { Theme, ThemeColors, ThemeFont } from '../types';
+import { Stack, Text, Group, Slider, SimpleGrid } from '@mantine/core';
+import type { Theme, ThemeFont } from '../types';
 
 interface SettingsViewProps {
   currentTheme: Theme;
@@ -16,18 +16,10 @@ export default function SettingsView({ currentTheme, onThemeChange, themes, font
     onThemeChange({ ...currentTheme, ...updates });
   }, [currentTheme, onThemeChange]);
 
-  const updateColor = (key: keyof ThemeColors, value: string) => {
-    onThemeChange({ 
-      ...currentTheme, 
-      id: 'custom', 
-      colors: { ...currentTheme.colors, [key]: value } 
-    });
-  };
-
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-16 pb-56 animate-fade-in relative text-[var(--color-primary-text)]">
         <header className="border-b-8 border-[var(--color-border-color)] pb-8">
-            <h2 className="text-4xl font-black uppercase tracking-tighter italic">Library Configuration</h2>
+            <h2 className="text-4xl font-black uppercase tracking-tighter italic">Library Settings</h2>
             <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[var(--color-secondary-text)] mt-2">Personalize your reading experience</p>
         </header>
 
