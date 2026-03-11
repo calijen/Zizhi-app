@@ -177,8 +177,8 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-[2000] bg-[var(--color-background)] text-[var(--color-primary-text)] flex flex-col animate-fade-in select-none overflow-hidden">
-        <header className="p-8 flex items-center justify-between z-20 relative bg-[var(--color-surface)] border-b-4 border-black shadow-[0_4px_0_#000]">
-            <button onClick={onClose} className="p-3 bg-cyan-400 border-2 border-black shadow-[2px_2px_0_#000] transition-all"><IconClose className="w-6 h-6 text-black" /></button>
+        <header className="p-8 flex items-center justify-between z-20 relative bg-[var(--color-surface)] border-b-4 border-black shadow-[0_4px_0_#000] rounded-none">
+            <button onClick={onClose} className="p-3 bg-cyan-400 border-2 border-black shadow-[2px_2px_0_#000] transition-all rounded-none"><IconClose className="w-6 h-6 text-black" /></button>
             <div className="text-center">
                 <p className="text-[10px] font-black uppercase tracking-[0.5em] text-pink-500">Insights</p>
                 <p className="text-xs font-black truncate max-w-[200px] uppercase mt-1 text-[var(--color-primary-text)]">{book.title}</p>
@@ -188,7 +188,7 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
                 const next = speeds[(speeds.indexOf(playbackRate) + 1) % speeds.length];
                 setPlaybackRate(next);
                 if (sourceNodeRef.current) sourceNodeRef.current.playbackRate.value = next;
-            }} className="w-12 h-12 bg-yellow-300 border-2 border-black flex items-center justify-center text-[12px] font-black shadow-[2px_2px_0_#000] text-black">
+            }} className="w-12 h-12 bg-yellow-300 border-2 border-black flex items-center justify-center text-[12px] font-black shadow-[2px_2px_0_#000] text-black rounded-none">
                 {playbackRate}X
             </button>
         </header>
@@ -201,19 +201,19 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
                 </div>
             ) : !userInteracted ? (
                  <div className="flex-1 flex flex-col items-center justify-center text-center space-y-8">
-                     <Box className="w-48 aspect-square border-4 border-black shadow-[10px_10px_0_#000] overflow-hidden">
+                     <Box className="w-48 aspect-square border-4 border-black shadow-[10px_10px_0_#000] overflow-hidden rounded-none">
                         <img src={book.coverImageUrl || ''} className="w-full h-full object-cover" />
                      </Box>
                      <button 
                         onClick={() => { setUserInteracted(true); playAt(0); }}
-                        className="px-12 py-6 bg-pink-500 text-white font-black border-4 border-black shadow-[8px_8px_0_#000] active:translate-y-1 active:shadow-none transition-all uppercase tracking-widest text-xl"
+                        className="px-12 py-6 bg-pink-500 text-white font-black border-4 border-black shadow-[8px_8px_0_#000] active:translate-y-1 active:shadow-none transition-all uppercase tracking-widest text-xl rounded-none"
                      >
                          Start Insight
                      </button>
                  </div>
             ) : (
                 <>
-                    <div className="w-48 md:w-full md:max-w-[400px] aspect-square shadow-[10px_10px_0_#000] border-4 border-black overflow-hidden bg-[var(--color-surface)]">
+                    <div className="w-48 md:w-full md:max-w-[400px] aspect-square shadow-[10px_10px_0_#000] border-4 border-black overflow-hidden bg-[var(--color-surface)] rounded-none">
                         {book.coverImageUrl && <img src={book.coverImageUrl} className="w-full h-full object-cover" />}
                     </div>
 
@@ -225,7 +225,7 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
                                         key={index} 
                                         ref={index === activePhraseIndex ? activePhraseRef : null} 
                                         onClick={() => playAt(item.start)}
-                                        className={`transition-all duration-500 font-black uppercase tracking-tighter cursor-pointer ${index === activePhraseIndex ? 'bg-yellow-300 text-black px-4 py-2 border-l-8 border-black shadow-[6px_6px_0_#000] scale-105' : 'text-[var(--color-muted-text)] scale-95 hover:text-[var(--color-primary-text)]'}`}
+                                        className={`transition-all duration-500 font-black uppercase tracking-tighter cursor-pointer rounded-none ${index === activePhraseIndex ? 'bg-yellow-300 text-black px-4 py-2 border-l-8 border-black shadow-[6px_6px_0_#000] scale-105' : 'text-[var(--color-muted-text)] scale-95 hover:text-[var(--color-primary-text)]'}`}
                                     >
                                         {item.text}
                                     </p>
@@ -237,9 +237,9 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
             )}
         </main>
 
-        <footer className="p-10 bg-[var(--color-surface)] border-t-4 border-black relative z-20 shadow-[0_-4px_0_#000]">
+        <footer className="p-10 bg-[var(--color-surface)] border-t-4 border-black relative z-20 shadow-[0_-4px_0_#000] rounded-none">
             <div className="max-w-4xl mx-auto w-full space-y-4">
-                <div className="h-6 bg-black/10 border-4 border-black relative overflow-hidden">
+                <div className="h-6 bg-black/10 border-4 border-black relative overflow-hidden rounded-none">
                    <div className="absolute inset-y-0 left-0 bg-cyan-400" style={{ width: `${(currentTime / (duration || 1)) * 100}%` }} />
                    <input type="range" min="0" max={duration || 100} step="0.1" value={currentTime} onChange={handleSeek} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
                 </div>
@@ -249,15 +249,15 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
                 </div>
             </div>
             <div className="flex items-center justify-center gap-12 mt-6">
-                <button onClick={() => playAt(Math.max(0, currentTime - 10))} className="bg-[var(--color-background)] border-2 border-black p-3 shadow-[2px_2px_0_#000] text-[var(--color-primary-text)]"><IconRewind className="w-8 h-8" /></button>
+                <button onClick={() => playAt(Math.max(0, currentTime - 10))} className="bg-[var(--color-background)] border-2 border-black p-3 shadow-[2px_2px_0_#000] text-[var(--color-primary-text)] rounded-none"><IconRewind className="w-8 h-8" /></button>
                 <button 
                     onClick={handlePlayPause} 
                     disabled={!isReady}
-                    className="w-24 h-24 bg-pink-500 border-4 border-black shadow-[6px_6px_0_#000] flex flex-col items-center justify-center transition-all disabled:opacity-50"
+                    className="w-24 h-24 bg-pink-500 border-4 border-black shadow-[6px_6px_0_#000] flex flex-col items-center justify-center transition-all disabled:opacity-50 rounded-none"
                 >
                     {isPlaying ? <IconPause className="w-8 h-8 text-white" /> : <IconPlay className="w-8 h-8 pl-1 text-white" />}
                 </button>
-                <button onClick={() => playAt(Math.min(duration, currentTime + 10))} className="bg-[var(--color-background)] border-2 border-black p-3 shadow-[2px_2px_0_#000] text-[var(--color-primary-text)]"><IconForward className="w-8 h-8" /></button>
+                <button onClick={() => playAt(Math.min(duration, currentTime + 10))} className="bg-[var(--color-background)] border-2 border-black p-3 shadow-[2px_2px_0_#000] text-[var(--color-primary-text)] rounded-none"><IconForward className="w-8 h-8" /></button>
             </div>
         </footer>
     </div>

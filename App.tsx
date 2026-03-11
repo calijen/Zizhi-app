@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { MantineProvider, createTheme, Box, Stack, Group, Text, ActionIcon } from '@mantine/core';
-import Library from './components/FileUpload';
+import { FC, useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Box, Stack, Group, Text, ActionIcon, Button, Tabs, Badge, Avatar, SimpleGrid, Progress, useMantineColorScheme } from '@mantine/core';
+import LibraryView from './components/FileUpload';
 import QuotesView from './components/QuotesView';
 import SettingsView from './components/SettingsView';
 import AuthView from './components/AuthView';
@@ -10,18 +10,13 @@ import SummaryView from './components/TrailerView';
 import ProfileView from './components/ProfileView';
 import LandingView from './components/LandingView';
 import Toast from './components/Toast';
+import ErrorBoundary from './components/ErrorBoundary';
 import { Logo, IconSettings, IconUser, IconLibrary, IconQuote, IconUpload, IconLayoutGrid, IconLayoutList, IconSpinner } from './components/icons';
 import * as db from './db';
 import { supabase } from './supabase';
 import type { Book, Quote, Theme, ThemeFont, GenerationStatus } from './types';
 import { parseEpub } from './epubParser';
 import { GoogleGenAI, Modality } from "@google/genai";
-
-const mantineTheme = createTheme({
-  primaryColor: 'cyan',
-  fontFamily: 'Inter, sans-serif',
-  headings: { fontFamily: 'Inter, sans-serif', fontWeight: '900' },
-});
 
 const FONTS: ThemeFont[] = [
     { name: 'Print Serif', sans: 'Inter', serif: 'EB Garamond' },
@@ -74,7 +69,23 @@ export const ATMOSPHERES: { [key: string]: Theme } = {
     }
 };
 
-const App: React.FC = () => {
+const NavItem = ({ tab, activeTab, icon: Icon, label, onSelect }: { tab: 'library' | 'quotes' | 'profile' | 'settings'; activeTab: string; icon: any; label: string; onSelect: (tab: any) => void }) => {
+    const isActive = activeTab === tab;
+    return (
+        <Stack gap={4} align="center" className={`cursor-pointer transition-all duration-200 group ${isActive ? 'text-[var(--color-primary-text)]' : 'text-[var(--color-muted-text)] hover:text-[var(--color-primary-text)]'}`} onClick={() => onSelect(tab)}>
+            <Box className={`relative flex items-center justify-center w-10 h-10 md:w-full md:px-6 md:py-6 transition-all border-2 rounded-none ${isActive ? 'bg-[var(--color-primary)] border-black md:translate-x-1 shadow-[4px_4px_0px_black]' : 'border-transparent'}`}>
+                <Group gap="md" wrap="nowrap" className="w-full justify-center md:justify-start">
+                    <Icon className={`w-5 h-5 transition-transform ${isActive ? 'scale-110 text-white' : ''}`} />
+                    <Text className={`hidden md:block text-[13px] font-black uppercase tracking-widest ${isActive ? 'text-white' : ''}`}>{label}</Text>
+                </Group>
+            </Box>
+            <Text className="md:hidden text-[9px] font-black uppercase tracking-wider">{label}</Text>
+        </Stack>
+    );
+};
+
+const App: FC = () => {
+  const { setColorScheme } = useMantineColorScheme();
   const [library, setLibrary] = useState<Book[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [user, setUser] = useState<any>(null);
@@ -88,6 +99,7 @@ const App: React.FC = () => {
   const [theme, setTheme] = useState<Theme>(ATMOSPHERES.warm);
   const [isUploading, setIsUploading] = useState(false);
   const [generationStatuses, setGenerationStatuses] = useState<Record<string, GenerationStatus>>({});
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadData = useCallback(async () => {
@@ -111,8 +123,14 @@ const App: React.FC = () => {
   useEffect(() => { 
     loadData(); 
     const savedTheme = localStorage.getItem('zizhi-theme'); 
-    if (savedTheme) { try { setTheme(JSON.parse(savedTheme)); } catch(e) {} } 
-  }, [loadData]);
+    if (savedTheme) { 
+      try { 
+        const parsed = JSON.parse(savedTheme);
+        setTheme(parsed); 
+        setColorScheme(parsed.id === 'nocturne' ? 'dark' : 'light');
+      } catch(e) {} 
+    } 
+  }, [loadData, setColorScheme]);
   
   const sortedLibrary = useMemo(() => [...library].sort((a, b) => (b.lastOpened || 0) - (a.lastOpened || 0)), [library]);
 
@@ -178,19 +196,15 @@ const App: React.FC = () => {
     }
   };
 
-  const NavItem = ({ tab, icon: Icon, label }: { tab: typeof activeTab; icon: any; label: string }) => {
-    const isActive = activeTab === tab;
-    return (
-        <Stack gap={4} align="center" className={`cursor-pointer transition-all duration-200 group w-full md:w-auto ${isActive ? 'text-[var(--color-primary-text)]' : 'text-[var(--color-muted-text)] hover:text-[var(--color-primary-text)]'}`} onClick={() => setActiveTab(tab)}>
-            <Box className={`relative flex items-center justify-center w-10 h-10 md:w-full md:px-6 md:py-6 transition-all border-2 ${isActive ? 'bg-[var(--color-primary)] border-black md:translate-x-1 shadow-[4px_4px_0px_black]' : 'border-transparent'}`}>
-                <Group gap="md" wrap="nowrap" className="w-full justify-center md:justify-start">
-                    <Icon className={`w-5 h-5 transition-transform ${isActive ? 'scale-110 text-white' : ''}`} />
-                    <Text className={`hidden md:block text-[13px] font-black uppercase tracking-widest ${isActive ? 'text-white' : ''}`}>{label}</Text>
-                </Group>
-            </Box>
-            <Text className="md:hidden text-[10px] font-black uppercase tracking-widest">{label}</Text>
-        </Stack>
-    );
+  const handleDeleteBook = async (id: string) => {
+    try {
+        await db.deleteBook(id);
+        setLibrary(prev => prev.filter(b => b.id !== id));
+        setToast({ message: "Book removed." });
+    } catch (e) {
+        setToast({ message: "Failed to delete book." });
+    }
+    setDeleteConfirm(null);
   };
 
   const appStyles = { 
@@ -208,7 +222,7 @@ const App: React.FC = () => {
   if (hasEntered === null) return null;
 
   return (
-    <MantineProvider theme={mantineTheme} defaultColorScheme={theme.id === 'nocturne' ? 'dark' : 'light'}>
+    <>
       {!hasEntered ? (
         <LandingView onEnter={handleEnterApp} />
       ) : (
@@ -216,10 +230,10 @@ const App: React.FC = () => {
           <aside className="hidden md:flex w-64 lg:w-72 bg-[var(--color-surface)] border-r-4 border-black flex-col z-[150]">
               <div className="p-8 border-b-4 border-black"><Logo className="h-6 w-auto text-[var(--color-primary-text)]" /></div>
               <nav className="flex-1 p-6 space-y-4">
-                  <NavItem tab="library" icon={IconLibrary} label="Library" />
-                  <NavItem tab="quotes" icon={IconQuote} label="Quotes" />
-                  <NavItem tab="profile" icon={IconUser} label="Profile" />
-                  <NavItem tab="settings" icon={IconSettings} label="Settings" />
+                  <NavItem tab="library" activeTab={activeTab} onSelect={setActiveTab} icon={IconLibrary} label="Library" />
+                  <NavItem tab="quotes" activeTab={activeTab} onSelect={setActiveTab} icon={IconQuote} label="Quotes" />
+                  <NavItem tab="profile" activeTab={activeTab} onSelect={setActiveTab} icon={IconUser} label="Profile" />
+                  <NavItem tab="settings" activeTab={activeTab} onSelect={setActiveTab} icon={IconSettings} label="Settings" />
               </nav>
               <div className="p-8 border-t-2 border-black opacity-30"><Text className="text-[10px] font-black uppercase text-[var(--color-primary-text)]">Zizhi v4.2</Text></div>
           </aside>
@@ -227,35 +241,63 @@ const App: React.FC = () => {
               <header className="h-16 md:h-20 bg-[var(--color-surface)] z-[100] px-8 flex items-center justify-between border-b-4 border-black">
                   <div className="md:hidden"><Logo className="h-4 w-auto text-[var(--color-primary-text)]" /></div>
                   <div className="hidden md:flex items-center gap-10">
-                      <Text className="text-[10px] font-black uppercase tracking-widest text-[var(--color-muted-text)]">Theme: {theme.name}</Text>
+                      <Text className="text-[10px] font-black uppercase tracking-widest text-[var(--color-muted-text)]">Theme: {theme.name} v5.0</Text>
                       {user && <Box className="bg-cyan-400 px-3 py-1 border-2 border-black shadow-[2px_2px_0_black]"><Text className="text-[9px] font-black uppercase text-black">Cloud Sync Active</Text></Box>}
                   </div>
-                  <ActionIcon variant="subtle" color="gray" size="lg" onClick={() => setViewMode(v => v === 'grid' ? 'list' : 'grid')} className="border-2 border-black shadow-[2px_2px_0_black] bg-[var(--color-background)]">
+                  <ActionIcon variant="subtle" color="gray" size="lg" onClick={() => setViewMode(v => v === 'grid' ? 'list' : 'grid')} className="border-2 border-black shadow-[2px_2px_0_black] bg-[var(--color-background)] rounded-none">
                       {viewMode === 'grid' ? <IconLayoutList className="w-5 h-5 text-[var(--color-primary-text)]" /> : <IconLayoutGrid className="w-5 h-5 text-[var(--color-primary-text)]" />}
                   </ActionIcon>
               </header>
               <main className="flex-1 overflow-y-auto no-scrollbar pb-64 md:pb-24">
                   <Box className="max-w-7xl mx-auto px-6 py-6 h-full">
-                      {activeTab === 'library' && <Library books={sortedLibrary} theme={theme} onBookSelect={(id) => setSelectedBook(library.find(b => b.id === id) || null)} isLoading={isUploading} error={null} onDelete={async (id) => { if(window.confirm("Delete book?")) { await db.deleteBook(id); setLibrary(prev => prev.filter(b => b.id !== id)); } }} onGenerateSummary={handleGenerateSummary} generationStatuses={generationStatuses} onViewSummary={(id) => setSummaryBook(library.find(b => b.id === id) || null)} viewMode={viewMode} />}
+                      {activeTab === 'library' && (
+                        <LibraryView 
+                          books={sortedLibrary} 
+                          theme={theme} 
+                          onBookSelect={(id) => setSelectedBook(library.find(b => b.id === id) || null)} 
+                          isLoading={isUploading} 
+                          error={null} 
+                          onDelete={(id) => setDeleteConfirm(id)} 
+                          onGenerateSummary={handleGenerateSummary} 
+                          generationStatuses={generationStatuses} 
+                          onViewSummary={(id) => setSummaryBook(library.find(b => b.id === id) || null)} 
+                          viewMode={viewMode} 
+                        />
+                      )}
                       {activeTab === 'quotes' && <QuotesView theme={theme} quotes={quotes} library={library} onDelete={(id) => { db.deleteQuote(id).then(() => setQuotes(prev => prev.filter(q => q.id !== id))); }} onGoToQuote={(q) => setSelectedBook(library.find(b => b.id === q.bookId) || null)} />}
                       {activeTab === 'profile' && <ProfileView user={user} streak={0} library={library} onShowAuth={() => setShowAuth(true)} activity={[]} onSignOut={async () => { await supabase.auth.signOut(); setUser(null); }} />}
-                      {activeTab === 'settings' && <SettingsView currentTheme={theme} onThemeChange={(t) => { setTheme(t); localStorage.setItem('zizhi-theme', JSON.stringify(t)); }} themes={ATMOSPHERES} fonts={FONTS} textures={{}} />}
+                      {activeTab === 'settings' && <SettingsView currentTheme={theme} onThemeChange={(t) => { setTheme(t); setColorScheme(t.id === 'nocturne' ? 'dark' : 'light'); localStorage.setItem('zizhi-theme', JSON.stringify(t)); }} themes={ATMOSPHERES} fonts={FONTS} textures={{}} />}
                   </Box>
               </main>
               <Box className="hidden md:block fixed bottom-12 right-12 z-[250]"><input type="file" ref={fileInputRef} onChange={handleUpload} accept=".epub" className="hidden" /><ActionIcon size={80} className="bg-yellow-400 border-4 border-black shadow-[8px_8px_0_black] hover:translate-y-[-2px] transition-all rounded-none" onClick={() => fileInputRef.current?.click()}>{isUploading ? <IconSpinner className="w-10 h-10 text-black" /> : <IconUpload className="w-10 h-10 text-black" />}</ActionIcon></Box>
           </Box>
           <nav className="fixed bottom-0 left-0 right-0 bg-[var(--color-surface)] h-20 flex items-center justify-around z-[200] border-t-4 border-black md:hidden">
-              <NavItem tab="library" icon={IconLibrary} label="Library" /><NavItem tab="quotes" icon={IconQuote} label="Quotes" />
+              <NavItem tab="library" activeTab={activeTab} onSelect={setActiveTab} icon={IconLibrary} label="Library" />
+              <NavItem tab="quotes" activeTab={activeTab} onSelect={setActiveTab} icon={IconQuote} label="Quotes" />
               <Box className="relative -top-6"><input type="file" ref={fileInputRef} onChange={handleUpload} accept=".epub" className="hidden" /><ActionIcon size={72} className="bg-yellow-400 border-4 border-black shadow-[6px_6px_0_black] rounded-none" onClick={() => fileInputRef.current?.click()}>{isUploading ? <IconSpinner className="w-8 h-8 text-black" /> : <IconUpload className="w-8 h-8 text-black" />}</ActionIcon></Box>
-              <NavItem tab="profile" icon={IconUser} label="Profile" /><NavItem tab="settings" icon={IconSettings} label="Settings" />
+              <NavItem tab="profile" activeTab={activeTab} onSelect={setActiveTab} icon={IconUser} label="Profile" />
+              <NavItem tab="settings" activeTab={activeTab} onSelect={setActiveTab} icon={IconSettings} label="Settings" />
           </nav>
           {selectedBook && <ReaderView book={selectedBook} theme={theme} onClose={() => setSelectedBook(null)} onUpdateProgress={async (bid, ci, st, ts, gp) => { const bidx = library.findIndex(b => b.id === bid); if (bidx === -1) return; const updated = { ...library[bidx], progress: gp, lastScrollTop: st, readingTime: (library[bidx].readingTime || 0) + ts, lastOpened: Date.now() }; await db.saveBook(updated); setLibrary(prev => prev.map(b => b.id === bid ? updated : b)); }} onSaveQuote={async (t, c) => { const nq: Quote = { id: crypto.randomUUID(), text: t, bookTitle: selectedBook.title, author: selectedBook.author, bookId: selectedBook.id, location: c, createdAt: Date.now() }; await db.saveQuote(nq); setQuotes(prev => [nq, ...prev]); setToast({ message: "Quote archived." }); }} onSearch={() => {}} />}
           {summaryBook && <SummaryView book={summaryBook} onClose={() => setSummaryBook(null)} />}
           {showAuth && <AuthView onClose={() => setShowAuth(false)} onLogin={(u) => setUser(u)} />}
           {toast && <Toast message={toast.message} action={toast.action} onClose={() => setToast(null)} />}
+
+          {deleteConfirm && (
+            <Box className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[3000] flex items-center justify-center p-6">
+                <Box className="bg-white border-4 border-black p-8 shadow-[12px_12px_0_black] max-w-sm w-full">
+                    <h3 className="text-xl font-black uppercase mb-4">Delete Book?</h3>
+                    <Text className="text-sm font-bold mb-8 opacity-70">This will remove the book and all associated highlights from this device.</Text>
+                    <Group grow gap="md">
+                        <Button variant="outline" color="dark" className="rounded-none border-2 border-black font-black uppercase" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
+                        <Button variant="filled" color="red" className="rounded-none border-2 border-black font-black uppercase shadow-[4px_4px_0_black]" onClick={() => handleDeleteBook(deleteConfirm)}>Delete</Button>
+                    </Group>
+                </Box>
+            </Box>
+          )}
         </Box>
       )}
-    </MantineProvider>
+    </>
   );
 };
 

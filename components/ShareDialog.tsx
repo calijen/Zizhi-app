@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState, useRef, useEffect } from 'react';
+import { FC, useMemo, useState, useRef, useEffect } from 'react';
 import { IconClose, IconDownload, IconShare, IconCopy } from './icons';
 import type { Theme } from '../types';
 
@@ -13,13 +13,15 @@ interface ShareDialogProps {
 }
 
 const PRESETS = [
-    { name: 'Sky', bg: '#7096c1', text: '#ffffff' },
-    { name: 'Midnight', bg: '#0b162a', text: '#ffffff' },
-    { name: 'Vapor', bg: '#d0e3f5', text: '#0b162a' },
-    { name: 'Ocean', bg: '#1e3a5f', text: '#ffffff' },
-    { name: 'Cloud', bg: '#ffffff', text: '#0b162a' },
-    { name: 'Ink', bg: '#1a1a1a', text: '#ffffff' },
+    { name: 'Brutal Cyan', bg: '#22d3ee', text: '#000000', accent: '#000000' },
+    { name: 'Brutal Yellow', bg: '#facc15', text: '#000000', accent: '#000000' },
+    { name: 'Brutal Pink', bg: '#ec4899', text: '#000000', accent: '#000000' },
+    { name: 'Midnight', bg: '#0b162a', text: '#ffffff', accent: '#22d3ee' },
+    { name: 'Ink', bg: '#1a1a1a', text: '#ffffff', accent: '#facc15' },
+    { name: 'Cloud', bg: '#ffffff', text: '#000000', accent: '#000000' },
 ];
+
+const MAX_IMAGE_CHARS = 450;
 
 const SocialIcon = ({ type }: { type: string }) => {
     switch (type) {
@@ -36,7 +38,7 @@ const SocialIcon = ({ type }: { type: string }) => {
     }
 };
 
-const ShareDialog: React.FC<ShareDialogProps> = ({ text, bookTitle, author, coverImageUrl, theme, onClose }) => {
+const ShareDialog: FC<ShareDialogProps> = ({ text, bookTitle, author, coverImageUrl, theme, onClose }) => {
     const [step, setStep] = useState<'choice' | 'image' | 'social'>('choice');
     const [selectedPreset, setSelectedPreset] = useState(PRESETS[0]);
     const [layout, setLayout] = useState<'pretty' | 'classic'>('pretty');
@@ -61,12 +63,27 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ text, bookTitle, author, cove
         ctx.fillStyle = selectedPreset.bg;
         ctx.fillRect(0, 0, w, h);
 
-        const padding = 40;
+        // Brutalist Border
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 12;
+        ctx.strokeRect(6, 6, w - 12, h - 12);
+
+        const padding = 60;
         const contentW = w - padding * 2;
         
+        const truncate = (str: string, maxW: number, font: string) => {
+            ctx.font = font;
+            if (ctx.measureText(str).width <= maxW) return str;
+            let current = str;
+            while (ctx.measureText(current + '...').width > maxW && current.length > 0) {
+                current = current.slice(0, -1);
+            }
+            return current + '...';
+        };
+
         if (layout === 'pretty') {
-            const coverW = 180;
-            const coverH = 260;
+            const coverW = 160;
+            const coverH = 240;
             const textW = contentW - coverW - 40;
 
             if (coverImageUrl) {
@@ -74,9 +91,14 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ text, bookTitle, author, cove
                 img.crossOrigin = "anonymous";
                 img.onload = () => {
                     ctx.save();
-                    ctx.shadowColor = 'rgba(0,0,0,0.4)';
-                    ctx.shadowBlur = 30;
+                    // Brutalist Shadow for cover
+                    ctx.fillStyle = '#000000';
+                    ctx.fillRect(w - padding - coverW + 8, (h - coverH) / 2 + 8, coverW, coverH);
+                    
+                    ctx.strokeStyle = '#000000';
+                    ctx.lineWidth = 4;
                     ctx.drawImage(img, w - padding - coverW, (h - coverH) / 2, coverW, coverH);
+                    ctx.strokeRect(w - padding - coverW, (h - coverH) / 2, coverW, coverH);
                     ctx.restore();
                     setPreviewUrl(canvas.toDataURL());
                 };
@@ -84,36 +106,46 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ text, bookTitle, author, cove
             } else {
                 ctx.fillStyle = 'rgba(0,0,0,0.1)';
                 ctx.fillRect(w - padding - coverW, (h - coverH) / 2, coverW, coverH);
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(w - padding - coverW, (h - coverH) / 2, coverW, coverH);
             }
 
             ctx.fillStyle = selectedPreset.text;
-            ctx.font = `italic 700 22px 'Lora', serif`;
+            ctx.font = `italic 900 24px 'Inter', sans-serif`;
             const lines = wrapText(ctx, `“${text}”`, textW);
-            lines.slice(0, 8).forEach((line, i) => {
-                ctx.fillText(line, padding + 10, padding + 60 + (i * 32));
+            lines.slice(0, 10).forEach((line, i) => {
+                ctx.fillText(line, padding, padding + 40 + (i * 34));
             });
 
-            ctx.font = `900 12px 'Inter', sans-serif`;
-            ctx.fillText(bookTitle.toUpperCase(), padding + 10, h - padding - 20);
-            ctx.font = `400 10px 'Inter', sans-serif`;
-            ctx.globalAlpha = 0.6;
-            ctx.fillText(author.toUpperCase(), padding + 10, h - padding - 5);
+            const footerY = h - padding;
+            ctx.font = `900 14px 'Inter', sans-serif`;
+            const displayTitle = truncate(bookTitle.toUpperCase(), textW, ctx.font);
+            ctx.fillText(displayTitle, padding, footerY - 20);
+            
+            ctx.font = `700 11px 'Inter', sans-serif`;
+            ctx.globalAlpha = 0.7;
+            const displayAuthor = truncate(author.toUpperCase(), textW, ctx.font);
+            ctx.fillText(displayAuthor, padding, footerY);
             ctx.globalAlpha = 1;
 
-            ctx.fillStyle = selectedPreset.text;
-            ctx.fillRect(padding - 5, padding + 60, 4, 100);
+            // Accent line
+            ctx.fillStyle = selectedPreset.accent || '#000000';
+            ctx.fillRect(padding - 15, padding + 15, 6, 120);
         } else {
             ctx.textAlign = 'center';
             ctx.fillStyle = selectedPreset.text;
-            ctx.font = `italic 700 26px 'Lora', serif`;
+            ctx.font = `italic 900 28px 'Inter', sans-serif`;
             const lines = wrapText(ctx, `“${text}”`, contentW);
-            const startY = (h / 2) - (lines.length * 36 / 2);
+            const startY = (h / 2) - (lines.length * 40 / 2);
             lines.forEach((line, i) => {
-                ctx.fillText(line, w / 2, startY + (i * 40));
+                ctx.fillText(line, w / 2, startY + (i * 42));
             });
             
-            ctx.font = `900 12px 'Inter', sans-serif`;
-            ctx.fillText(`— ${author}, ${bookTitle} —`.toUpperCase(), w / 2, h - padding);
+            ctx.font = `900 14px 'Inter', sans-serif`;
+            const footerText = `— ${author}, ${bookTitle} —`.toUpperCase();
+            const displayFooter = truncate(footerText, contentW, ctx.font);
+            ctx.fillText(displayFooter, w / 2, h - padding);
         }
 
         setPreviewUrl(canvas.toDataURL());
@@ -153,11 +185,36 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ text, bookTitle, author, cove
     };
 
     const socialPlatforms = [
-        { name: 'WhatsApp', color: '#25D366' },
-        { name: 'Twitter', color: '#000000' },
-        { name: 'Substack', color: '#FF6719' },
-        { name: 'Facebook', color: '#1877F2' }
+        { 
+            name: 'WhatsApp', 
+            color: '#25D366',
+            getShareUrl: (t: string, a: string, b: string) => `https://wa.me/?text=${encodeURIComponent(`“${t}” — ${a}, from ${b}`)}`
+        },
+        { 
+            name: 'Twitter', 
+            color: '#000000',
+            getShareUrl: (t: string, a: string, b: string) => `https://twitter.com/intent/tweet?text=${encodeURIComponent(`“${t}” — ${a}, from ${b}`)}`
+        },
+        { 
+            name: 'Facebook', 
+            color: '#1877F2',
+            getShareUrl: (t: string, a: string, b: string) => `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}&quote=${encodeURIComponent(`“${t}” — ${a}, from ${b}`)}`
+        },
+        { 
+            name: 'Substack', 
+            color: '#FF6719',
+            getShareUrl: null // Substack doesn't have a direct share intent for external text
+        }
     ];
+
+    const handleSocialShare = (platform: typeof socialPlatforms[0]) => {
+        if (platform.getShareUrl) {
+            window.open(platform.getShareUrl(text, author, bookTitle), '_blank');
+        } else {
+            copyToClipboard();
+            alert(`Link copied! You can now paste this into your ${platform.name} post.`);
+        }
+    };
 
     return (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-fade-in">
@@ -213,7 +270,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ text, bookTitle, author, cove
                             {socialPlatforms.map(platform => (
                                 <button 
                                     key={platform.name}
-                                    onClick={copyToClipboard}
+                                    onClick={() => handleSocialShare(platform)}
                                     className="p-5 border-4 border-black font-black uppercase text-[11px] flex items-center justify-between hover:bg-slate-100 active:translate-y-1 transition-all shadow-[2px_2px_0_black]"
                                     style={{ color: 'black' }}
                                 >
@@ -242,7 +299,22 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ text, bookTitle, author, cove
                             <div className="w-12"></div>
                         </div>
 
-                        <div className="p-6 bg-slate-200 border-b-4 border-black flex items-center justify-center min-h-[300px]">
+                        <div className="p-6 bg-slate-200 border-b-4 border-black flex flex-col items-center justify-center min-h-[300px] relative">
+                            {text.length > MAX_IMAGE_CHARS && (
+                                <div className="absolute inset-0 z-10 bg-red-500/90 flex flex-col items-center justify-center p-8 text-center space-y-4">
+                                    <h4 className="text-2xl font-black uppercase text-white italic tracking-tighter">Text Too Long</h4>
+                                    <p className="text-white font-bold text-sm leading-tight uppercase">
+                                        Visual frames are limited to {MAX_IMAGE_CHARS} characters for optimal impact. 
+                                        Your selection is {text.length} characters.
+                                    </p>
+                                    <button 
+                                        onClick={() => setStep('choice')}
+                                        className="px-6 py-3 bg-black text-white border-4 border-black font-black uppercase text-xs shadow-[4px_4px_0_white] hover:translate-y-1 hover:shadow-none transition-all"
+                                    >
+                                        Go Back & Copy Text Instead
+                                    </button>
+                                </div>
+                            )}
                             <canvas ref={canvasRef} className="hidden" />
                             {previewUrl && (
                                 <img src={previewUrl} className="w-full h-auto border-4 border-black shadow-[10px_10px_0_black] bg-white" alt="Preview" />
@@ -266,12 +338,14 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ text, bookTitle, author, cove
                                 <button 
                                     onClick={() => setLayout(l => l === 'pretty' ? 'classic' : 'pretty')}
                                     className={`py-4 border-4 border-black font-black uppercase text-[11px] tracking-widest transition-all ${layout === 'pretty' ? 'bg-pink-500 text-white shadow-[4px_4px_0_black] -translate-y-1' : 'bg-white text-black'}`}
+                                    disabled={text.length > MAX_IMAGE_CHARS}
                                 >
                                     {layout === 'pretty' ? 'Pretty Mode' : 'Classic Mode'}
                                 </button>
                                 <button 
                                     onClick={() => setWidthMode(w => w === 'wide' ? 'square' : 'wide')}
                                     className={`py-4 border-4 border-black font-black uppercase text-[11px] tracking-widest transition-all ${widthMode === 'wide' ? 'bg-cyan-400 text-black shadow-[4px_4px_0_black] -translate-y-1' : 'bg-white text-black'}`}
+                                    disabled={text.length > MAX_IMAGE_CHARS}
                                 >
                                     {widthMode === 'wide' ? 'Wide' : 'Square'}
                                 </button>
@@ -279,7 +353,8 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ text, bookTitle, author, cove
 
                             <button 
                                 onClick={handleDownload}
-                                className="w-full py-5 bg-black text-white font-black uppercase tracking-[0.2em] text-sm border-4 border-black shadow-[6px_6px_0_cyan] hover:translate-y-[-2px] hover:shadow-[8px_8px_0_cyan] active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-3"
+                                disabled={text.length > MAX_IMAGE_CHARS}
+                                className={`w-full py-5 font-black uppercase tracking-[0.2em] text-sm border-4 border-black transition-all flex items-center justify-center gap-3 ${text.length > MAX_IMAGE_CHARS ? 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-50' : 'bg-black text-white shadow-[6px_6px_0_cyan] hover:translate-y-[-2px] hover:shadow-[8px_8px_0_cyan] active:translate-y-1 active:shadow-none'}`}
                             >
                                 <IconDownload className="w-5 h-5" /> Export Final Frame
                             </button>

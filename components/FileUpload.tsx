@@ -1,5 +1,5 @@
 
-import React from 'react';
+import { FC } from 'react';
 import { Box, SimpleGrid, Stack, Text, Image, Group, Progress, ActionIcon, Button } from '@mantine/core';
 import { IconClose, IconSpinner, IconPlay } from './icons';
 import type { GenerationStatus, Theme } from '../types';
@@ -101,7 +101,7 @@ const EmptyLibraryGraphic = () => (
     </svg>
 );
 
-const BookCard: React.FC<{ 
+const BookCard: FC<{ 
     book: BookCardData; 
     theme: Theme;
     onSelect: (id: string) => void; 
@@ -124,7 +124,7 @@ const BookCard: React.FC<{
                     <Stack gap={2}>
                         <Group justify="space-between" align="start" wrap="nowrap">
                             <Text className="font-black text-[14px] md:text-[16px] leading-tight truncate text-[var(--color-primary-text)]" title={book.title}>{book.title}</Text>
-                            <ActionIcon variant="filled" color="red" size="sm" className="border-2 border-black" onClick={(e) => { e.stopPropagation(); onDelete(book.id); }}>
+                            <ActionIcon variant="filled" color="red" size="sm" className="border-2 border-black rounded-none" onClick={(e) => { e.stopPropagation(); onDelete(book.id); }}>
                                 <IconClose className="w-4 h-4 text-white" />
                             </ActionIcon>
                         </Group>
@@ -151,7 +151,7 @@ const BookCard: React.FC<{
     );
 };
 
-const Library: React.FC<LibraryProps> = ({ books, theme, onBookSelect, isLoading, onDelete, onGenerateSummary, generationStatuses, onViewSummary, viewMode }) => {
+const LibraryView: FC<LibraryProps> = ({ books, theme, onBookSelect, isLoading, onDelete, onGenerateSummary, generationStatuses, onViewSummary, viewMode }) => {
   return (
     <Box className="py-4 md:py-8 animate-fade-in pb-32">
         <header className="mb-10 border-b-4 border-[var(--color-border-color)] pb-6 flex justify-between items-end">
@@ -178,4 +178,4 @@ const Library: React.FC<LibraryProps> = ({ books, theme, onBookSelect, isLoading
   );
 };
 
-export default Library;
+export default LibraryView;

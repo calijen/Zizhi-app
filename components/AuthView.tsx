@@ -132,7 +132,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
 
     return (
         <div className="fixed inset-0 z-[100] bg-[var(--color-background)] flex flex-col items-center p-6 animate-fade-in overflow-y-auto no-scrollbar">
-            <button onClick={onClose} className="absolute top-6 right-6 p-2 text-[var(--color-primary-text)] hover:bg-black/10 transition-colors rounded-full z-[110]" aria-label="Close auth">
+            <button onClick={onClose} className="absolute top-6 right-6 p-2 text-[var(--color-primary-text)] hover:bg-black/10 transition-colors rounded-none z-[110]" aria-label="Close auth">
                 <IconClose className="w-8 h-8" />
             </button>
             
@@ -153,7 +153,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
                     <button 
                         onClick={handleGoogleLogin} 
                         disabled={isLoading} 
-                        className="w-full flex items-center justify-center gap-4 py-4 bg-[var(--color-surface)] border-4 border-[var(--color-border-color)] font-black uppercase text-[12px] shadow-[4px_4px_0_var(--color-border-color)] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_var(--color-border-color)] active:translate-y-1 active:shadow-none transition-all disabled:opacity-50 text-[var(--color-primary-text)]"
+                        className="w-full flex items-center justify-center gap-4 py-4 bg-[var(--color-surface)] border-4 border-[var(--color-border-color)] font-black uppercase text-[12px] shadow-[4px_4px_0_var(--color-border-color)] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_var(--color-border-color)] active:translate-y-1 active:shadow-none transition-all disabled:opacity-50 text-[var(--color-primary-text)] rounded-none"
                     >
                         <IconGoogle className="w-6 h-6" />
                         <span>Continue with Google</span>
@@ -197,7 +197,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
 
                         <button 
                             disabled={isLoading} 
-                            className="w-full bg-cyan-400 text-black border-4 border-black font-black uppercase py-5 shadow-[8px_8px_0_black] hover:translate-y-[-2px] hover:shadow-[10px_10px_0_black] active:translate-y-1 active:shadow-none transition-all mt-6 text-sm tracking-[0.2em]"
+                            className="w-full bg-cyan-400 text-black border-4 border-black font-black uppercase py-5 shadow-[8px_8px_0_black] hover:translate-y-[-2px] hover:shadow-[10px_10px_0_black] active:translate-y-1 active:shadow-none transition-all mt-6 text-sm tracking-[0.2em] rounded-none"
                         >
                             {isLoading ? <IconSpinner className="w-8 h-8 mx-auto" /> : (view === 'login' ? 'Authenticate' : 'Register')}
                         </button>
@@ -205,7 +205,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
                 </div>
 
                 <footer className="text-center mt-12 w-full space-y-6">
-                    <button className="text-[11px] font-black uppercase tracking-widest text-[var(--color-primary-text)] bg-white border-2 border-black px-4 py-2 shadow-[4px_4px_0_black] hover:translate-y-1 hover:shadow-none transition-all block mx-auto">Forgot Secret Key?</button>
+                    <button className="text-[11px] font-black uppercase tracking-widest text-[var(--color-primary-text)] bg-white border-2 border-black px-4 py-2 shadow-[4px_4px_0_black] hover:translate-y-1 hover:shadow-none transition-all block mx-auto rounded-none">Forgot Secret Key?</button>
                     <p className="text-xs font-black text-[var(--color-muted-text)] uppercase tracking-widest">
                         {view === 'login' ? "Identity unknown?" : "Registered user?"} 
                         <button onClick={() => setView(view === 'login' ? 'signup' : 'login')} className="ml-2 text-pink-600 font-black underline decoration-4 underline-offset-4 hover:text-pink-700 transition-colors">

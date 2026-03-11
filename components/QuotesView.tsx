@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import { FC, useState, useMemo } from 'react';
 import { Text, Group, ActionIcon, Box, Stack } from '@mantine/core';
 import type { Quote, Theme, Book } from '../types';
 import { IconTrash, IconSearch, IconShare } from './icons';
@@ -73,7 +73,7 @@ const EmptyQuotesGraphic = () => (
     </svg>
 );
 
-const QuoteCard: React.FC<{ quote: Quote; onDelete: (id: string) => void; onGoToQuote: (q: Quote) => void; onShare: (q: Quote) => void; }> = ({ quote, onDelete, onGoToQuote, onShare }) => {
+const QuoteCard: FC<{ quote: Quote; onDelete: (id: string) => void; onGoToQuote: (q: Quote) => void; onShare: (q: Quote) => void; }> = ({ quote, onDelete, onGoToQuote, onShare }) => {
     const [expanded, setExpanded] = useState(false);
     const words = useMemo(() => quote.text.trim().split(/\s+/), [quote.text]);
     const isLong = words.length > 20;
@@ -94,7 +94,7 @@ const QuoteCard: React.FC<{ quote: Quote; onDelete: (id: string) => void; onGoTo
     );
 };
 
-const QuotesView: React.FC<QuotesViewProps> = ({ quotes, library = [], theme, onDelete, onGoToQuote }) => {
+const QuotesView: FC<QuotesViewProps> = ({ quotes, library = [], theme, onDelete, onGoToQuote }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeShare, setActiveShare] = useState<Quote | null>(null);
   const filteredQuotes = useMemo(() => quotes.filter(q => q.text.toLowerCase().includes(searchQuery.toLowerCase()) || q.author.toLowerCase().includes(searchQuery.toLowerCase()) || q.bookTitle.toLowerCase().includes(searchQuery.toLowerCase())), [quotes, searchQuery]);

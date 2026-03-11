@@ -199,7 +199,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShow
                 <Box className="p-12 bg-[var(--color-surface)] border-8 border-[var(--color-border-color)] shadow-[16px_16px_0_var(--color-border-color)] w-full">
                     <h2 className="text-3xl font-black mb-6 uppercase text-[var(--color-primary-text)]">Private Library</h2>
                     <p className="text-[12px] text-[var(--color-muted-text)] mb-10 font-bold uppercase tracking-widest leading-relaxed">Sign in to sync your profile, though books remain local for privacy.</p>
-                    <button onClick={onShowAuth} className="w-full py-5 bg-yellow-400 text-black border-4 border-black font-black uppercase shadow-[8px_8px_0_black] active:translate-y-1 transition-all text-xs">Log In</button>
+                    <button onClick={onShowAuth} className="w-full py-5 bg-yellow-400 text-black border-4 border-black font-black uppercase shadow-[8px_8px_0_black] active:translate-y-1 transition-all text-xs rounded-none">Log In</button>
                 </Box>
             </div>
         );
@@ -212,7 +212,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShow
                     <Text className="text-[10px] font-black uppercase tracking-[0.5em] text-pink-500 mb-2">The Archive of</Text>
                     <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tighter leading-none text-[var(--color-primary-text)]">{user.email.split('@')[0]}</h2>
                 </Stack>
-                <button onClick={onSignOut} className="mt-8 md:mt-0 bg-[var(--color-surface)] border-4 border-[var(--color-border-color)] px-8 py-4 text-[11px] font-black uppercase tracking-[0.3em] shadow-[6px_6px_0_var(--color-border-color)] hover:translate-y-[-2px] transition-all text-[var(--color-primary-text)]">Sign Out</button>
+                <button onClick={onSignOut} className="mt-8 md:mt-0 bg-[var(--color-surface)] border-4 border-[var(--color-border-color)] px-8 py-4 text-[11px] font-black uppercase tracking-[0.3em] shadow-[6px_6px_0_var(--color-border-color)] hover:translate-y-[-2px] transition-all text-[var(--color-primary-text)] rounded-none">Sign Out</button>
             </header>
 
             <section className="flex flex-col md:flex-row items-center gap-12 bg-[var(--color-surface)] border-8 border-[var(--color-border-color)] p-8 md:p-16 shadow-[20px_20px_0_var(--color-border-color)] relative overflow-hidden">

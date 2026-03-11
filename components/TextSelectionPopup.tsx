@@ -10,23 +10,23 @@ interface TextSelectionPopupProps {
   onShare: () => void;
 }
 
+const Button = ({ onClick, icon: Icon, label }: { onClick: () => void; icon: any; label: string }) => (
+  <button 
+    onPointerDown={(e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onClick();
+    }} 
+    className="flex flex-col items-center justify-center gap-1.5 px-5 py-3.5 hover:bg-white/10 active:bg-white/20 active:scale-90 transition-all min-w-[70px]"
+  >
+    <Icon className="w-4 h-4 text-white/90" />
+    <span className="text-[9px] font-black uppercase tracking-[0.15em] text-white/40">{label}</span>
+  </button>
+);
+
+const Separator = () => <div className="w-px h-8 bg-white/10 self-center mx-0.5" />;
+
 const TextSelectionPopup: React.FC<TextSelectionPopupProps> = ({ rect, onCopy, onQuote, onSearch, onShare }) => {
-  const Button = ({ onClick, icon: Icon, label }: { onClick: () => void; icon: any; label: string }) => (
-    <button 
-      onPointerDown={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onClick();
-      }} 
-      className="flex flex-col items-center justify-center gap-1.5 px-5 py-3.5 hover:bg-white/10 active:bg-white/20 active:scale-90 transition-all min-w-[70px]"
-    >
-      <Icon className="w-4 h-4 text-white/90" />
-      <span className="text-[9px] font-black uppercase tracking-[0.15em] text-white/40">{label}</span>
-    </button>
-  );
-
-  const Separator = () => <div className="w-px h-8 bg-white/10 self-center mx-0.5" />;
-
   const positionStyle = useMemo(() => {
     const barWidth = 300;
     const barHeight = 65;
@@ -53,7 +53,7 @@ const TextSelectionPopup: React.FC<TextSelectionPopupProps> = ({ rect, onCopy, o
   return (
     <div
       style={positionStyle}
-      className="fixed z-[1000] flex items-stretch bg-[#0A0A0B] text-white rounded-[1.25rem] shadow-[0_30px_70px_-15px_rgba(0,0,0,0.8)] border border-white/15 overflow-hidden animate-pop-in selection-popup backdrop-blur-2xl"
+      className="fixed z-[1000] flex items-stretch bg-[#0A0A0B] text-white rounded-none shadow-[0_30px_70px_-15px_rgba(0,0,0,0.8)] border border-white/15 overflow-hidden animate-pop-in selection-popup backdrop-blur-2xl"
       onPointerDown={(e) => e.stopPropagation()}
     >
       <Button onClick={onCopy} icon={IconCopy} label="Copy" />

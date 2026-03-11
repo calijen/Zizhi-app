@@ -33,12 +33,12 @@ const Toast: React.FC<ToastProps> = ({ message, action, onClose }) => {
   };
 
   return (
-    <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 bg-[var(--color-primary-text)] text-[var(--color-background)] px-4 py-2 rounded-md shadow-lg animate-fade-in-out flex items-center gap-4" role="alert">
-      <span>{message}</span>
+    <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[5000] bg-black text-white px-6 py-4 rounded-none border-4 border-white shadow-[8px_8px_0_black] animate-fade-in flex items-center gap-6 min-w-[300px]" role="alert">
+      <span className="font-black uppercase tracking-widest text-xs">{message}</span>
       {action && (
         <button 
           onClick={handleActionClick} 
-          className="font-bold uppercase text-sm tracking-wider bg-[var(--color-primary)] text-white px-3 py-1 rounded-md hover:opacity-90 transition-opacity"
+          className="font-black uppercase text-[10px] tracking-[0.2em] bg-cyan-400 text-black px-4 py-2 rounded-none border-2 border-black hover:bg-yellow-400 transition-colors shadow-[3px_3px_0_white]"
         >
           {action.label}
         </button>
