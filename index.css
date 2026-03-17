@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #a0522d;
+  --color-background: #fdf6e3;
+  --color-surface: #f5efdc;
+  --color-primary-text: #1a110a;
+  --color-secondary-text: #3a2a1a;
+  --color-muted-text: #5a4334;
+  --color-border-color: #c1b496;
+}
+
+@layer base {
+  body {
+    @apply bg-[var(--color-background)] text-[var(--color-primary-text)] font-sans;
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out forwards;
+}

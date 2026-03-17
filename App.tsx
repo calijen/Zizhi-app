@@ -10,7 +10,6 @@ import SummaryView from './components/TrailerView';
 import ProfileView from './components/ProfileView';
 import LandingView from './components/LandingView';
 import Toast from './components/Toast';
-import ErrorBoundary from './components/ErrorBoundary';
 import { Logo, IconSettings, IconUser, IconLibrary, IconQuote, IconUpload, IconLayoutGrid, IconLayoutList, IconSpinner } from './components/icons';
 import * as db from './db';
 import { supabase } from './supabase';

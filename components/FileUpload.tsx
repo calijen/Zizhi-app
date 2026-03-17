@@ -171,7 +171,7 @@ const LibraryView: FC<LibraryProps> = ({ books, theme, onBookSelect, isLoading, 
                 <EmptyLibraryGraphic /><h2 className="text-2xl font-black mt-4 text-[var(--color-primary-text)]">Empty Library</h2><p className="text-[12px] font-bold opacity-60 mt-2 uppercase text-[var(--color-secondary-text)]">Upload a book to start.</p>
             </Box>
         )}
-        <SimpleGrid cols={viewMode === 'list' ? 1 : { base: 2, sm: 2, md: 3, lg: 4, xl: 5 }} spacing="xl">
+        <SimpleGrid cols={viewMode === 'list' ? { base: 1, md: 2 } : { base: 2, sm: 2, md: 3, lg: 4, xl: 4 }} spacing="xl">
             {books.map(book => <BookCard key={book.id} book={book} theme={theme} onSelect={onBookSelect} onDelete={onDelete} onGenerateSummary={onGenerateSummary} onViewSummary={onViewSummary} status={generationStatuses[book.id]} viewMode={viewMode} />)}
         </SimpleGrid>
     </Box>
