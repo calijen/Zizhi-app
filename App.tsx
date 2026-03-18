@@ -125,7 +125,7 @@ const App: FC = () => {
     if (savedTheme) { 
       try { 
         const parsed = JSON.parse(savedTheme);
-        setTheme(parsed); 
+        setTheme(prev => prev.id === parsed.id && prev.fontSize === parsed.fontSize && prev.lineHeight === parsed.lineHeight && prev.font.name === parsed.font.name ? prev : parsed); 
         setColorScheme(parsed.id === 'nocturne' ? 'dark' : 'light');
       } catch(e) {} 
     } 
