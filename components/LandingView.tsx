@@ -19,7 +19,7 @@ interface LandingViewProps {
 
 const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
   return (
-    <div className="min-h-screen bg-[#F5F5F0] text-[#1A1A1A] font-sans selection:bg-[#FF6321] selection:text-white overflow-x-hidden">
+    <div className="h-[100dvh] overflow-y-auto overflow-x-hidden bg-[#F5F5F0] text-[#1A1A1A] font-sans selection:bg-[#FF6321] selection:text-white">
       {/* Navigation */}
       <nav className="fixed top-0 w-full z-50 bg-[#F5F5F0]/80 backdrop-blur-md border-b border-black/10 px-6 py-4 flex justify-between items-center">
         <div className="flex items-center gap-2">
