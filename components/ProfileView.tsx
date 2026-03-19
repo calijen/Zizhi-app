@@ -162,7 +162,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShow
                 // We limit the number of titles to avoid context bloat
                 const titles = library.slice(0, 5).map(b => b.title).join(', ');
                 const response = await ai.models.generateContent({
-                    model: 'gemini-3-flash-preview',
+                    model: 'gemini-1.5-flash',
                     contents: `User library contains: ${titles}. Based on these books, recommend 3 similar must-read titles. Return valid JSON only.`,
                     config: { 
                         responseMimeType: 'application/json',

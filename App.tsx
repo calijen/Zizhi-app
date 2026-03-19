@@ -1,5 +1,5 @@
 
-import { FC, useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { FC, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Box, Stack, Group, Text, ActionIcon, Button, Tabs, Badge, Avatar, SimpleGrid, Progress, useMantineColorScheme } from '@mantine/core';
 import LibraryView from './components/FileUpload';
 import QuotesView from './components/QuotesView';
@@ -94,7 +94,7 @@ const App: FC = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [summaryBook, setSummaryBook] = useState<Book | null>(null);
-  const [toast, setToast] = useState<{ message: string; action?: { label: string; onClick: () => void } } | null>(null);
+  const [toast, setToast] = useState<{ message: string; action?: { label: string; onClick: () => void }; type?: 'success' | 'warning' | 'error' | 'info' } | null>(null);
   const [theme, setTheme] = useState<Theme>(ATMOSPHERES.warm);
   const [isUploading, setIsUploading] = useState(false);
   const [generationStatuses, setGenerationStatuses] = useState<Record<string, GenerationStatus>>({});
@@ -144,8 +144,8 @@ const App: FC = () => {
     try {
         const newBook = await parseEpub(file); newBook.lastOpened = Date.now();
         await db.saveBook(newBook); setLibrary(prev => [newBook, ...prev]);
-        setToast({ message: "Book added to your library." });
-    } catch (err) { setToast({ message: "EPUB parsing failed." }); } finally { setIsUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
+        setToast({ message: "Book added to your library.", type: 'success' });
+    } catch (err) { setToast({ message: "EPUB parsing failed.", type: 'error' }); } finally { setIsUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
   };
 
   const handleGenerateSummary = async (bookId: string) => {
@@ -160,7 +160,7 @@ const App: FC = () => {
         Write a continuous narrative script (no headers or markdown). 800 words approx. Clear, insightful, human tone.`;
 
         const scriptRes = await ai.models.generateContent({ 
-            model: 'gemini-3-flash-preview', 
+            model: 'gemini-1.5-flash', 
             contents: summaryPrompt 
         });
         const script = scriptRes.text || "";
@@ -186,10 +186,10 @@ const App: FC = () => {
         const updatedBook = { ...book, summaryScript: script, audioSummaryUrl: `data:audio/pcm;base64,${base64Audio}` };
         await db.saveBook(updatedBook); 
         setLibrary(prev => prev.map(b => b.id === bookId ? updatedBook : b));
-        setToast({ message: "Insight generated successfully." });
+        setToast({ message: "Insight generated successfully.", type: 'success' });
     } catch (err: any) { 
         console.error("Summary error:", err);
-        setToast({ message: `AI Service Error: ${err.message || 'Check your internet connection and try again.'}` }); 
+        setToast({ message: `AI Service Error: ${err.message || 'Check your internet connection and try again.'}`, type: 'error' }); 
     } finally { 
         setGenerationStatuses(prev => { const next = { ...prev }; delete next[bookId]; return next; }); 
     }
@@ -199,9 +199,9 @@ const App: FC = () => {
     try {
         await db.deleteBook(id);
         setLibrary(prev => prev.filter(b => b.id !== id));
-        setToast({ message: "Book removed." });
+        setToast({ message: "Book removed.", type: 'success' });
     } catch (e) {
-        setToast({ message: "Failed to delete book." });
+        setToast({ message: "Failed to delete book.", type: 'error' });
     }
     setDeleteConfirm(null);
   };
@@ -277,10 +277,10 @@ const App: FC = () => {
               <NavItem tab="profile" activeTab={activeTab} onSelect={setActiveTab} icon={IconUser} label="Profile" />
               <NavItem tab="settings" activeTab={activeTab} onSelect={setActiveTab} icon={IconSettings} label="Settings" />
           </nav>
-          {selectedBook && <ReaderView book={selectedBook} theme={theme} onClose={() => setSelectedBook(null)} onUpdateProgress={async (bid, ci, st, ts, gp) => { const bidx = library.findIndex(b => b.id === bid); if (bidx === -1) return; const updated = { ...library[bidx], progress: gp, lastScrollTop: st, readingTime: (library[bidx].readingTime || 0) + ts, lastOpened: Date.now() }; await db.saveBook(updated); setLibrary(prev => prev.map(b => b.id === bid ? updated : b)); }} onSaveQuote={async (t, c) => { const nq: Quote = { id: crypto.randomUUID(), text: t, bookTitle: selectedBook.title, author: selectedBook.author, bookId: selectedBook.id, location: c, createdAt: Date.now() }; await db.saveQuote(nq); setQuotes(prev => [nq, ...prev]); setToast({ message: "Quote archived." }); }} onSearch={() => {}} />}
+          {selectedBook && <ReaderView book={selectedBook} theme={theme} onClose={() => setSelectedBook(null)} onUpdateProgress={async (bid, ci, st, ts, gp) => { const bidx = library.findIndex(b => b.id === bid); if (bidx === -1) return; const updated = { ...library[bidx], progress: gp, lastScrollTop: st, readingTime: (library[bidx].readingTime || 0) + ts, lastOpened: Date.now() }; await db.saveBook(updated); setLibrary(prev => prev.map(b => b.id === bid ? updated : b)); }} onSaveQuote={async (t, c) => { const nq: Quote = { id: crypto.randomUUID(), text: t, bookTitle: selectedBook.title, author: selectedBook.author, bookId: selectedBook.id, location: c, createdAt: Date.now() }; await db.saveQuote(nq); setQuotes(prev => [nq, ...prev]); setToast({ message: "Quote archived.", type: 'success' }); }} onSearch={() => {}} />}
           {summaryBook && <SummaryView book={summaryBook} onClose={() => setSummaryBook(null)} />}
           {showAuth && <AuthView onClose={() => setShowAuth(false)} onLogin={(u) => setUser(u)} />}
-          {toast && <Toast message={toast.message} action={toast.action} onClose={() => setToast(null)} />}
+          {toast && <Toast message={toast.message} type={toast.type} action={toast.action} onClose={() => setToast(null)} />}
 
           {deleteConfirm && (
             <Box className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[3000] flex items-center justify-center p-6">

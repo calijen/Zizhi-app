@@ -1,6 +1,4 @@
-
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-// Import Box from @mantine/core to fix missing component error
 import { Box } from '@mantine/core';
 import type { Book, GenerationStatus } from '../types';
 import { IconPlay, IconPause, IconClose, IconRewind, IconForward } from './icons';
@@ -49,13 +47,15 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
   const [isReady, setIsReady] = useState(false);
   const [userInteracted, setUserInteracted] = useState(false);
 
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingProgress, setRecordingProgress] = useState(0);
+
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioBufferRef = useRef<AudioBuffer | null>(null);
   const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
   const startTimeRef = useRef<number>(0);
   const pauseTimeRef = useRef<number>(0);
   const rafRef = useRef<number>(0);
-  const activePhraseRef = useRef<HTMLParagraphElement>(null);
 
   const timedLines = useMemo(() => {
     if (!book.summaryScript || !duration) return [];
@@ -112,13 +112,15 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
     initAudio();
     return () => {
       sourceNodeRef.current?.stop();
-      audioContextRef.current?.close();
+      if (audioContextRef.current?.state !== 'closed') {
+        audioContextRef.current?.close().catch(() => {});
+      }
       cancelAnimationFrame(rafRef.current);
     };
   }, [book.audioSummaryUrl]);
 
   const updateProgress = useCallback(() => {
-    if (!audioContextRef.current || !isPlaying) return;
+    if (!audioContextRef.current || !isPlaying || isRecording) return;
     const now = audioContextRef.current.currentTime;
     const elapsed = now - startTimeRef.current;
     setCurrentTime(elapsed);
@@ -131,19 +133,19 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
     } else {
         rafRef.current = requestAnimationFrame(updateProgress);
     }
-  }, [isPlaying, duration]);
+  }, [isPlaying, duration, isRecording]);
 
   useEffect(() => {
-    if (isPlaying) {
+    if (isPlaying && !isRecording) {
       rafRef.current = requestAnimationFrame(updateProgress);
     } else {
         cancelAnimationFrame(rafRef.current);
     }
     return () => cancelAnimationFrame(rafRef.current);
-  }, [isPlaying, updateProgress]);
+  }, [isPlaying, updateProgress, isRecording]);
 
   const handlePlayPause = () => {
-    if (!audioBufferRef.current || !audioContextRef.current) return;
+    if (!audioBufferRef.current || !audioContextRef.current || isRecording) return;
     if (isPlaying) {
       pauseTimeRef.current = currentTime;
       sourceNodeRef.current?.stop();
@@ -156,16 +158,17 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
 
   useEffect(() => {
     const index = timedLines.findIndex(p => currentTime >= p.start && currentTime < p.end);
-    if (index !== -1 && index !== activePhraseIndex) setActivePhraseIndex(index);
+    if (index !== -1 && index !== activePhraseIndex) {
+        setActivePhraseIndex(index);
+        const el = document.getElementById(`phrase-${index}`);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
   }, [currentTime, timedLines, activePhraseIndex]);
 
-  useEffect(() => {
-    if (activePhraseRef.current) {
-        activePhraseRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  }, [activePhraseIndex]);
-
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isRecording) return;
     const time = parseFloat(e.target.value);
     pauseTimeRef.current = time;
     if (isPlaying) {
@@ -175,89 +178,239 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
     }
   };
 
+  const handleDownloadVideo = async () => {
+      if (!audioBufferRef.current || !audioContextRef.current || isRecording) return;
+      setIsRecording(true);
+      setRecordingProgress(0);
+
+      if (isPlaying) {
+          sourceNodeRef.current?.stop();
+          setIsPlaying(false);
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 1080;
+      canvas.height = 1920;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const stream = canvas.captureStream(30);
+      const dest = audioContextRef.current.createMediaStreamDestination();
+      const source = audioContextRef.current.createBufferSource();
+      source.buffer = audioBufferRef.current;
+      source.connect(dest);
+      source.connect(audioContextRef.current.destination); // Let user hear the render playback
+
+      const audioTrack = dest.stream.getAudioTracks()[0];
+      if (audioTrack) stream.addTrack(audioTrack);
+
+      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = e => chunks.push(e.data);
+      recorder.onstop = () => {
+          const blob = new Blob(chunks, { type: 'video/webm' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${book.title}_Summary.webm`;
+          a.click();
+          setIsRecording(false);
+          setRecordingProgress(0);
+          sourceNodeRef.current = null;
+      };
+
+      recorder.start();
+      source.start(0);
+      const startRecordTime = audioContextRef.current.currentTime;
+      const totalDuration = audioBufferRef.current.duration;
+
+      let frameId: number;
+      const renderFrame = () => {
+          const now = audioContextRef.current!.currentTime;
+          const elapsed = now - startRecordTime;
+          setRecordingProgress(elapsed / totalDuration);
+          setCurrentTime(elapsed); // Updates UI during recording too
+
+          if (elapsed >= totalDuration) {
+              source.stop();
+              return;
+          }
+
+          // Background
+          ctx.fillStyle = '#fdf6e3'; 
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          const line = timedLines.find(l => elapsed >= l.start && elapsed < l.end);
+          const textToDraw = line ? line.text : book.title;
+
+          // Active Text styling
+          ctx.fillStyle = '#1a110a';
+          ctx.font = '900 64px "Inter", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          const words = textToDraw.split(' ');
+          let tempLine = '';
+          const lines = [];
+          for(let n = 0; n < words.length; n++) {
+              const testLine = tempLine + words[n] + ' ';
+              const metrics = ctx.measureText(testLine);
+              if (metrics.width > canvas.width - 200 && n > 0) {
+                  lines.push(tempLine);
+                  tempLine = words[n] + ' ';
+              } else {
+                  tempLine = testLine;
+              }
+          }
+          lines.push(tempLine);
+
+          // Brutalist Box for Text
+          const blockHeight = lines.length * 80 + 120;
+          ctx.fillStyle = '#f472b6'; // pink-400
+          ctx.fillRect(100, canvas.height/2 - blockHeight/2, canvas.width - 200, blockHeight);
+          ctx.lineWidth = 12;
+          ctx.strokeStyle = '#000000';
+          ctx.strokeRect(100, canvas.height/2 - blockHeight/2, canvas.width - 200, blockHeight);
+          
+          ctx.fillStyle = '#000000';
+          let y = canvas.height / 2 - (lines.length * 80) / 2 + 40;
+          for(let i = 0; i < lines.length; i++) {
+              ctx.fillText(lines[i], canvas.width / 2, y);
+              y += 80;
+          }
+
+          // Progress Bar overlay
+          ctx.fillStyle = '#22d3ee'; // cyan
+          ctx.fillRect(100, canvas.height - 200, (elapsed / totalDuration) * (canvas.width - 200), 40);
+          ctx.strokeRect(100, canvas.height - 200, canvas.width - 200, 40);
+
+          if (recorder.state === 'recording') {
+              frameId = requestAnimationFrame(renderFrame);
+          }
+      };
+
+      requestAnimationFrame(renderFrame);
+
+      source.onended = () => {
+          recorder.stop();
+          cancelAnimationFrame(frameId);
+      };
+  };
+
+  const formatTime = (sec: number) => {
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
   return (
-    <div className="fixed inset-0 z-[2000] bg-[var(--color-background)] text-[var(--color-primary-text)] flex flex-col animate-fade-in select-none overflow-hidden">
-        <header className="p-8 flex items-center justify-between z-20 relative bg-[var(--color-surface)] border-b-4 border-black shadow-[0_4px_0_#000] rounded-none">
-            <button onClick={onClose} className="p-3 bg-cyan-400 border-2 border-black shadow-[2px_2px_0_#000] transition-all rounded-none"><IconClose className="w-6 h-6 text-black" /></button>
-            <div className="text-center">
-                <p className="text-[10px] font-black uppercase tracking-[0.5em] text-pink-500">Insights</p>
-                <p className="text-xs font-black truncate max-w-[200px] uppercase mt-1 text-[var(--color-primary-text)]">{book.title}</p>
+    <div className="fixed inset-0 z-[2000] bg-[var(--color-surface)] text-[var(--color-primary-text)] flex flex-col animate-fade-in select-none">
+        
+        {/* Top Nav */}
+        <header className="p-4 flex items-center justify-between z-20 bg-white border-b-4 border-black shadow-[0_4px_0_#000]">
+            <button onClick={onClose} disabled={isRecording} className="p-2 bg-pink-500 border-4 border-black shadow-[4px_4px_0_#000] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all disabled:opacity-50">
+                <IconClose className="w-6 h-6 text-black" />
+            </button>
+            <div className="text-center truncate px-4 flex-1">
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--color-muted-text)]">Summary</p>
+                <p className="text-sm font-black truncate uppercase text-[var(--color-primary-text)]">{book.title}</p>
             </div>
             <button onClick={() => {
+                if (isRecording) return;
                 const speeds = [1, 1.25, 1.5, 2];
                 const next = speeds[(speeds.indexOf(playbackRate) + 1) % speeds.length];
                 setPlaybackRate(next);
                 if (sourceNodeRef.current) sourceNodeRef.current.playbackRate.value = next;
-            }} className="w-12 h-12 bg-yellow-300 border-2 border-black flex items-center justify-center text-[12px] font-black shadow-[2px_2px_0_#000] text-black rounded-none">
+            }} 
+            disabled={isRecording}
+            className="w-12 h-12 bg-yellow-400 border-4 border-black flex items-center justify-center text-[12px] font-black shadow-[4px_4px_0_#000] text-black disabled:opacity-50">
                 {playbackRate}X
             </button>
         </header>
 
-        <main className="flex-1 flex flex-col md:flex-row p-10 md:p-20 gap-16 items-center overflow-hidden relative">
+        {/* Main Content -> Desktop split, Mobile stacked */}
+        <main className="flex-1 flex flex-col md:flex-row overflow-hidden bg-[var(--color-background)]">
+            
             {!isReady ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-center">
-                    <div className="w-12 h-12 border-4 border-black border-t-cyan-400 animate-spin mb-6"></div>
-                    <p className="text-[11px] font-black uppercase tracking-widest text-[var(--color-primary-text)]">Loading session...</p>
+                    <div className="w-16 h-16 border-8 border-black border-t-cyan-400 animate-spin mb-6"></div>
+                    <p className="text-xs font-black uppercase tracking-widest text-[var(--color-primary-text)]">Loading summary...</p>
                 </div>
-            ) : !userInteracted ? (
-                 <div className="flex-1 flex flex-col items-center justify-center text-center space-y-8">
-                     <Box className="w-48 aspect-square border-4 border-black shadow-[10px_10px_0_#000] overflow-hidden rounded-none">
+            ) : !userInteracted && !isRecording ? (
+                 <div className="flex-1 flex flex-col items-center justify-center text-center space-y-10 p-6">
+                     <div className="w-48 aspect-square border-4 border-black shadow-[12px_12px_0_black] bg-white">
                         <img src={book.coverImageUrl || ''} className="w-full h-full object-cover" />
-                     </Box>
+                     </div>
                      <button 
                         onClick={() => { setUserInteracted(true); playAt(0); }}
-                        className="px-12 py-6 bg-pink-500 text-white font-black border-4 border-black shadow-[8px_8px_0_#000] active:translate-y-1 active:shadow-none transition-all uppercase tracking-widest text-xl rounded-none"
+                        className="px-10 py-5 bg-cyan-400 text-black font-black border-4 border-black shadow-[8px_8px_0_black] active:translate-y-1 active:translate-x-1 active:shadow-none transition-all uppercase tracking-widest text-xl"
                      >
-                         Start Insight
+                         Start Playback
                      </button>
                  </div>
             ) : (
-                <>
-                    <div className="w-48 md:w-full md:max-w-[400px] aspect-square shadow-[10px_10px_0_#000] border-4 border-black overflow-hidden bg-[var(--color-surface)] rounded-none">
-                        {book.coverImageUrl && <img src={book.coverImageUrl} className="w-full h-full object-cover" />}
-                    </div>
-
-                    <div className="flex-1 flex flex-col justify-center h-full overflow-hidden w-full">
-                        <div className="h-full overflow-y-auto no-scrollbar py-[50vh]" style={{ maskImage: 'linear-gradient(to bottom, transparent, black 40%, black 60%, transparent)' }}>
-                            <div className="font-sans text-2xl md:text-5xl leading-[1.6] text-left px-4 space-y-16">
-                                {timedLines.map((item, index) => (
-                                    <p 
-                                        key={index} 
-                                        ref={index === activePhraseIndex ? activePhraseRef : null} 
-                                        onClick={() => playAt(item.start)}
-                                        className={`transition-all duration-500 font-black uppercase tracking-tighter cursor-pointer rounded-none ${index === activePhraseIndex ? 'bg-yellow-300 text-black px-4 py-2 border-l-8 border-black shadow-[6px_6px_0_#000] scale-105' : 'text-[var(--color-muted-text)] scale-95 hover:text-[var(--color-primary-text)]'}`}
-                                    >
-                                        {item.text}
-                                    </p>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </>
+                <div className="flex-1 max-w-3xl mx-auto w-full h-full overflow-y-auto no-scrollbar p-6 md:p-12 pb-64 space-y-6 scroll-smooth">
+                    {/* Transcript reading view */}
+                    {timedLines.map((item, index) => {
+                        const isActive = index === activePhraseIndex;
+                        return (
+                            <p 
+                                id={`phrase-${index}`}
+                                key={index} 
+                                onClick={() => { if (!isRecording) playAt(item.start); }}
+                                className={`transition-all duration-300 font-serif text-xl md:text-3xl leading-relaxed cursor-pointer p-4 border-l-8 ${isActive ? 'bg-yellow-400 text-black border-black shadow-[6px_6px_0_black] font-black scale-[1.02]' : 'border-transparent text-[var(--color-muted-text)] hover:text-black opacity-80'}`}
+                            >
+                                {item.text}
+                            </p>
+                        );
+                    })}
+                </div>
             )}
         </main>
 
-        <footer className="p-10 bg-[var(--color-surface)] border-t-4 border-black relative z-20 shadow-[0_-4px_0_#000] rounded-none">
-            <div className="max-w-4xl mx-auto w-full space-y-4">
-                <div className="h-6 bg-black/10 border-4 border-black relative overflow-hidden rounded-none">
-                   <div className="absolute inset-y-0 left-0 bg-cyan-400" style={{ width: `${(currentTime / (duration || 1)) * 100}%` }} />
-                   <input type="range" min="0" max={duration || 100} step="0.1" value={currentTime} onChange={handleSeek} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+        {/* Bottom Player */}
+        <footer className="bg-white border-t-4 border-black p-4 md:p-6 shadow-[0_-8px_0_var(--color-border-color)] absolute bottom-0 w-full z-30">
+            <div className="max-w-4xl mx-auto space-y-6">
+                
+                {/* Progress bar */}
+                <div className="flex items-center gap-4">
+                    <span className="text-xs font-black w-10 text-right">{formatTime(currentTime)}</span>
+                    <div className="flex-1 h-8 bg-[var(--color-surface)] border-4 border-black relative overflow-hidden shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]">
+                       <div className="absolute inset-y-0 left-0 bg-cyan-400 border-r-4 border-black" style={{ width: `${(currentTime / (duration || 1)) * 100}%` }} />
+                       <input type="range" min="0" max={duration || 100} step="0.1" value={currentTime} onChange={handleSeek} disabled={isRecording} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full disabled:cursor-not-allowed" />
+                    </div>
+                    <span className="text-xs font-black w-10">{formatTime(duration)}</span>
                 </div>
-                <div className="flex justify-between text-[11px] font-black tracking-widest uppercase text-[var(--color-primary-text)]">
-                    <span>{Math.floor(currentTime / 60)}:{Math.floor(currentTime % 60).toString().padStart(2, '0')}</span>
-                    <span>{Math.floor(duration / 60)}:{Math.floor(duration % 60).toString().padStart(2, '0')}</span>
+
+                {/* Controls */}
+                <div className="flex items-center justify-between px-2">
+                    <div className="flex items-center gap-6">
+                        <button onClick={() => playAt(Math.max(0, currentTime - 10))} disabled={isRecording || !isReady} className="p-3 bg-[var(--color-surface)] border-4 border-black shadow-[4px_4px_0_black] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all disabled:opacity-50">
+                            <IconRewind className="w-6 h-6 text-black" />
+                        </button>
+                        <button 
+                            onClick={handlePlayPause} 
+                            disabled={!isReady || isRecording}
+                            className="w-20 h-20 bg-pink-500 border-4 border-black shadow-[6px_6px_0_black] active:translate-x-1 active:translate-y-1 active:shadow-none flex items-center justify-center transition-all disabled:opacity-50"
+                        >
+                            {isPlaying && !isRecording ? <IconPause className="w-8 h-8 text-black" /> : <IconPlay className="w-8 h-8 pl-1 text-black" />}
+                        </button>
+                        <button onClick={() => playAt(Math.min(duration, currentTime + 10))} disabled={isRecording || !isReady} className="p-3 bg-[var(--color-surface)] border-4 border-black shadow-[4px_4px_0_black] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all disabled:opacity-50">
+                            <IconForward className="w-6 h-6 text-black" />
+                        </button>
+                    </div>
+
+                    {/* Download Button */}
+                    <button 
+                        onClick={handleDownloadVideo} 
+                        disabled={isRecording || !isReady} 
+                        className={`px-6 py-4 border-4 border-black font-black uppercase text-sm md:text-base flex items-center gap-2 shadow-[6px_6px_0_black] transition-all
+                            ${isRecording ? 'bg-yellow-400 text-black cursor-wait tracking-widest' : 'bg-black text-white hover:-translate-y-1 hover:-translate-x-1 active:translate-x-1 active:translate-y-1 active:shadow-none'}`}
+                    >
+                        {isRecording ? `Encoding ${Math.round(recordingProgress * 100)}%` : "Save Video"}
+                    </button>
                 </div>
-            </div>
-            <div className="flex items-center justify-center gap-12 mt-6">
-                <button onClick={() => playAt(Math.max(0, currentTime - 10))} className="bg-[var(--color-background)] border-2 border-black p-3 shadow-[2px_2px_0_#000] text-[var(--color-primary-text)] rounded-none"><IconRewind className="w-8 h-8" /></button>
-                <button 
-                    onClick={handlePlayPause} 
-                    disabled={!isReady}
-                    className="w-24 h-24 bg-pink-500 border-4 border-black shadow-[6px_6px_0_#000] flex flex-col items-center justify-center transition-all disabled:opacity-50 rounded-none"
-                >
-                    {isPlaying ? <IconPause className="w-8 h-8 text-white" /> : <IconPlay className="w-8 h-8 pl-1 text-white" />}
-                </button>
-                <button onClick={() => playAt(Math.min(duration, currentTime + 10))} className="bg-[var(--color-background)] border-2 border-black p-3 shadow-[2px_2px_0_#000] text-[var(--color-primary-text)] rounded-none"><IconForward className="w-8 h-8" /></button>
+
             </div>
         </footer>
     </div>
