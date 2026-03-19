@@ -1,5 +1,5 @@
 
-import React, { FC, useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { FC, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Box, Stack, Group, Text, ActionIcon, Button, Tabs, Badge, Avatar, SimpleGrid, Progress, useMantineColorScheme } from '@mantine/core';
 import LibraryView from './components/FileUpload';
 import QuotesView from './components/QuotesView';
@@ -13,7 +13,7 @@ import Toast from './components/Toast';
 import { Logo, IconSettings, IconUser, IconLibrary, IconQuote, IconUpload, IconLayoutGrid, IconLayoutList, IconSpinner } from './components/icons';
 import * as db from './db';
 import { supabase } from './supabase';
-import type { Book, Quote, Theme, ThemeFont, GenerationStatus } from './types';
+import type { Book, BookMetadata, BookContent, Quote, Theme, ThemeFont, GenerationStatus } from './types';
 import { parseEpub } from './epubParser';
 import { GoogleGenAI, Modality } from "@google/genai";
 
@@ -84,8 +84,8 @@ const NavItem = ({ tab, activeTab, icon: Icon, label, onSelect }: { tab: 'librar
 };
 
 const App: FC = () => {
-  const { setColorScheme } = useMantineColorScheme();
-  const [library, setLibrary] = useState<Book[]>([]);
+  const { colorScheme, setColorScheme } = useMantineColorScheme();
+  const [library, setLibrary] = useState<BookMetadata[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [user, setUser] = useState<any>(null);
   const [showAuth, setShowAuth] = useState(false);
@@ -94,7 +94,7 @@ const App: FC = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [summaryBook, setSummaryBook] = useState<Book | null>(null);
-  const [toast, setToast] = useState<{ message: string; action?: { label: string; onClick: () => void }; type?: 'success' | 'warning' | 'error' | 'info' } | null>(null);
+  const [toast, setToast] = useState<{ message: string; action?: { label: string; onClick: () => void } } | null>(null);
   const [theme, setTheme] = useState<Theme>(ATMOSPHERES.warm);
   const [isUploading, setIsUploading] = useState(false);
   const [generationStatuses, setGenerationStatuses] = useState<Record<string, GenerationStatus>>({});
@@ -103,7 +103,23 @@ const App: FC = () => {
 
   const loadData = useCallback(async () => {
     try {
-      const [localBooks, localQuotes] = await Promise.all([db.getBooks(), db.getQuotes()]);
+      let localBooks = await db.getBooks();
+      const localQuotes = await db.getQuotes();
+      
+      // Migration check for legacy data (pre-split)
+      const needsMigration = localBooks.some(b => (b as any).chapters);
+      if (needsMigration) {
+          console.log("Migrating legacy book data to optimized storage...");
+          for (const b of localBooks) {
+              if ((b as any).chapters) {
+                  // This is a legacy book, save it using the new split logic
+                  await db.saveBook(b as unknown as Book);
+              }
+          }
+          // Reload books after migration to get clean metadata
+          localBooks = await db.getBooks();
+      }
+
       setLibrary(localBooks); 
       setQuotes(localQuotes);
       
@@ -116,20 +132,36 @@ const App: FC = () => {
 
       const { data } = await supabase.auth.getUser();
       if (data.user) setUser(data.user);
-    } catch (e) { console.error("Load failed", e); }
+    } catch (e) { 
+        console.error("Load failed", e); 
+        setHasEntered(false); // Ensure we don't stay in null state
+    }
   }, []);
 
   useEffect(() => { 
-    loadData(); 
+    let isMounted = true;
+    loadData().then(() => {
+      if (!isMounted) return;
+    }); 
+    return () => { isMounted = false; };
+  }, [loadData]);
+
+  useEffect(() => {
     const savedTheme = localStorage.getItem('zizhi-theme'); 
     if (savedTheme) { 
       try { 
-        const parsed = JSON.parse(savedTheme);
-        setTheme(prev => prev.id === parsed.id && prev.fontSize === parsed.fontSize && prev.lineHeight === parsed.lineHeight && prev.font.name === parsed.font.name ? prev : parsed); 
-        setColorScheme(parsed.id === 'nocturne' ? 'dark' : 'light');
+        const parsed = JSON.parse(savedTheme) as Theme;
+        setTheme(prev => {
+          if (prev.id === parsed.id) return prev;
+          return parsed;
+        }); 
+        const targetScheme = parsed.id === 'nocturne' ? 'dark' : 'light';
+        if (colorScheme !== targetScheme) {
+          setColorScheme(targetScheme);
+        }
       } catch(e) {} 
     } 
-  }, [loadData, setColorScheme]);
+  }, [setColorScheme]); // Only run when setColorScheme is available, or on mount. colorScheme removed to avoid loop.
   
   const sortedLibrary = useMemo(() => [...library].sort((a, b) => (b.lastOpened || 0) - (a.lastOpened || 0)), [library]);
 
@@ -143,13 +175,44 @@ const App: FC = () => {
     setIsUploading(true);
     try {
         const newBook = await parseEpub(file); newBook.lastOpened = Date.now();
-        await db.saveBook(newBook); setLibrary(prev => [newBook, ...prev]);
-        setToast({ message: "Book added to your library.", type: 'success' });
-    } catch (err) { setToast({ message: "EPUB parsing failed.", type: 'error' }); } finally { setIsUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
+        await db.saveBook(newBook); 
+        
+        // Update library state with metadata only
+        const { chapters, toc, summaryScript, audioSummaryUrl, audioDuration, ...metadata } = newBook;
+        const metaWithFlags = { ...metadata, hasSummary: !!summaryScript, hasAudio: !!audioSummaryUrl };
+        setLibrary(prev => [metaWithFlags, ...prev]);
+        
+        setToast({ message: "Book added to your library." });
+    } catch (err) { setToast({ message: "EPUB parsing failed." }); } finally { setIsUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
+  };
+
+  const handleBookSelect = async (bookId: string) => {
+    const meta = library.find(b => b.id === bookId);
+    if (!meta) return;
+    const content = await db.getBookContent(bookId);
+    if (content) {
+        setSelectedBook({ ...meta, ...content });
+    } else {
+        setToast({ message: "Book content missing." });
+    }
+  };
+
+  const handleViewSummary = async (bookId: string) => {
+    const meta = library.find(b => b.id === bookId);
+    if (!meta) return;
+    const content = await db.getBookContent(bookId);
+    if (content) {
+        setSummaryBook({ ...meta, ...content });
+    } else {
+        setToast({ message: "Summary content missing." });
+    }
   };
 
   const handleGenerateSummary = async (bookId: string) => {
-    const book = library.find(b => b.id === bookId); if (!book) return;
+    const meta = library.find(b => b.id === bookId); if (!meta) return;
+    const content = await db.getBookContent(bookId); if (!content) return;
+    const book: Book = { ...meta, ...content };
+
     setGenerationStatuses(prev => ({ ...prev, [bookId]: { stage: 'Checking', progress: 0.1, currentAction: 'Authenticating...' } }));
     
     try {
@@ -160,7 +223,7 @@ const App: FC = () => {
         Write a continuous narrative script (no headers or markdown). 800 words approx. Clear, insightful, human tone.`;
 
         const scriptRes = await ai.models.generateContent({ 
-            model: 'gemini-1.5-flash', 
+            model: 'gemini-3-flash-preview', 
             contents: summaryPrompt 
         });
         const script = scriptRes.text || "";
@@ -185,11 +248,14 @@ const App: FC = () => {
         
         const updatedBook = { ...book, summaryScript: script, audioSummaryUrl: `data:audio/pcm;base64,${base64Audio}` };
         await db.saveBook(updatedBook); 
-        setLibrary(prev => prev.map(b => b.id === bookId ? updatedBook : b));
-        setToast({ message: "Insight generated successfully.", type: 'success' });
+        
+        // Update library state (metadata only)
+        const metaWithFlags = { ...meta, hasSummary: true, hasAudio: true };
+        setLibrary(prev => prev.map(b => b.id === bookId ? metaWithFlags : b));
+        setToast({ message: "Insight generated successfully." });
     } catch (err: any) { 
         console.error("Summary error:", err);
-        setToast({ message: `AI Service Error: ${err.message || 'Check your internet connection and try again.'}`, type: 'error' }); 
+        setToast({ message: `AI Service Error: ${err.message || 'Check your internet connection and try again.'}` }); 
     } finally { 
         setGenerationStatuses(prev => { const next = { ...prev }; delete next[bookId]; return next; }); 
     }
@@ -199,9 +265,9 @@ const App: FC = () => {
     try {
         await db.deleteBook(id);
         setLibrary(prev => prev.filter(b => b.id !== id));
-        setToast({ message: "Book removed.", type: 'success' });
+        setToast({ message: "Book removed." });
     } catch (e) {
-        setToast({ message: "Failed to delete book.", type: 'error' });
+        setToast({ message: "Failed to delete book." });
     }
     setDeleteConfirm(null);
   };
@@ -253,17 +319,23 @@ const App: FC = () => {
                         <LibraryView 
                           books={sortedLibrary} 
                           theme={theme} 
-                          onBookSelect={(id) => setSelectedBook(library.find(b => b.id === id) || null)} 
+                          onBookSelect={handleBookSelect} 
                           isLoading={isUploading} 
                           error={null} 
                           onDelete={(id) => setDeleteConfirm(id)} 
                           onGenerateSummary={handleGenerateSummary} 
                           generationStatuses={generationStatuses} 
-                          onViewSummary={(id) => setSummaryBook(library.find(b => b.id === id) || null)} 
+                          onViewSummary={handleViewSummary} 
                           viewMode={viewMode} 
                         />
                       )}
-                      {activeTab === 'quotes' && <QuotesView theme={theme} quotes={quotes} library={library} onDelete={(id) => { db.deleteQuote(id).then(() => setQuotes(prev => prev.filter(q => q.id !== id))); }} onGoToQuote={(q) => setSelectedBook(library.find(b => b.id === q.bookId) || null)} />}
+                      {activeTab === 'quotes' && <QuotesView theme={theme} quotes={quotes} library={library} onDelete={(id) => { db.deleteQuote(id).then(() => setQuotes(prev => prev.filter(q => q.id !== id))); }} onGoToQuote={async (q) => { 
+                          const meta = library.find(b => b.id === q.bookId);
+                          if (meta) {
+                              const content = await db.getBookContent(q.bookId);
+                              if (content) setSelectedBook({ ...meta, ...content });
+                          }
+                      }} />}
                       {activeTab === 'profile' && <ProfileView user={user} streak={0} library={library} onShowAuth={() => setShowAuth(true)} activity={[]} onSignOut={async () => { await supabase.auth.signOut(); setUser(null); }} />}
                       {activeTab === 'settings' && <SettingsView currentTheme={theme} onThemeChange={(t) => { setTheme(t); setColorScheme(t.id === 'nocturne' ? 'dark' : 'light'); localStorage.setItem('zizhi-theme', JSON.stringify(t)); }} themes={ATMOSPHERES} fonts={FONTS} textures={{}} />}
                   </Box>
@@ -277,10 +349,28 @@ const App: FC = () => {
               <NavItem tab="profile" activeTab={activeTab} onSelect={setActiveTab} icon={IconUser} label="Profile" />
               <NavItem tab="settings" activeTab={activeTab} onSelect={setActiveTab} icon={IconSettings} label="Settings" />
           </nav>
-          {selectedBook && <ReaderView book={selectedBook} theme={theme} onClose={() => setSelectedBook(null)} onUpdateProgress={async (bid, ci, st, ts, gp) => { const bidx = library.findIndex(b => b.id === bid); if (bidx === -1) return; const updated = { ...library[bidx], progress: gp, lastScrollTop: st, readingTime: (library[bidx].readingTime || 0) + ts, lastOpened: Date.now() }; await db.saveBook(updated); setLibrary(prev => prev.map(b => b.id === bid ? updated : b)); }} onSaveQuote={async (t, c) => { const nq: Quote = { id: crypto.randomUUID(), text: t, bookTitle: selectedBook.title, author: selectedBook.author, bookId: selectedBook.id, location: c, createdAt: Date.now() }; await db.saveQuote(nq); setQuotes(prev => [nq, ...prev]); setToast({ message: "Quote archived.", type: 'success' }); }} onSearch={() => {}} />}
+          {selectedBook && <ReaderView book={selectedBook} theme={theme} onClose={() => setSelectedBook(null)} onUpdateProgress={async (bid, ci, st, ts, gp) => { 
+              const bidx = library.findIndex(b => b.id === bid); 
+              if (bidx === -1) return; 
+              const updatedMeta = { 
+                  ...library[bidx], 
+                  progress: gp, 
+                  lastScrollTop: st, 
+                  readingTime: (library[bidx].readingTime || 0) + ts, 
+                  lastOpened: Date.now() 
+              }; 
+              
+              // We need the full book to save it, but we only have metadata in library
+              // Fetch content first
+              const content = await db.getBookContent(bid);
+              if (content) {
+                  await db.saveBook({ ...updatedMeta, ...content }); 
+                  setLibrary(prev => prev.map(b => b.id === bid ? updatedMeta : b)); 
+              }
+          }} onSaveQuote={async (t, c) => { const nq: Quote = { id: crypto.randomUUID(), text: t, bookTitle: selectedBook.title, author: selectedBook.author, bookId: selectedBook.id, location: c, createdAt: Date.now() }; await db.saveQuote(nq); setQuotes(prev => [nq, ...prev]); setToast({ message: "Quote archived." }); }} onSearch={() => {}} />}
           {summaryBook && <SummaryView book={summaryBook} onClose={() => setSummaryBook(null)} />}
           {showAuth && <AuthView onClose={() => setShowAuth(false)} onLogin={(u) => setUser(u)} />}
-          {toast && <Toast message={toast.message} type={toast.type} action={toast.action} onClose={() => setToast(null)} />}
+          {toast && <Toast message={toast.message} action={toast.action} onClose={() => setToast(null)} />}
 
           {deleteConfirm && (
             <Box className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[3000] flex items-center justify-center p-6">

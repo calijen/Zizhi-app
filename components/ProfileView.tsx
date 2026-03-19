@@ -1,14 +1,14 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Box, Group, Stack, Text, SimpleGrid } from '@mantine/core';
-import type { Book, ReadingActivity } from '../types';
+import type { BookMetadata, ReadingActivity } from '../types';
 import { GoogleGenAI, Type } from "@google/genai";
 import { IconSpinner } from './icons';
 
 interface ProfileViewProps {
   user: any;
   streak: number;
-  library: Book[];
+  library: BookMetadata[];
   onShowAuth: () => void;
   activity: ReadingActivity[];
   onSignOut: () => void;
@@ -162,7 +162,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShow
                 // We limit the number of titles to avoid context bloat
                 const titles = library.slice(0, 5).map(b => b.title).join(', ');
                 const response = await ai.models.generateContent({
-                    model: 'gemini-1.5-flash',
+                    model: 'gemini-3-flash-preview',
                     contents: `User library contains: ${titles}. Based on these books, recommend 3 similar must-read titles. Return valid JSON only.`,
                     config: { 
                         responseMimeType: 'application/json',

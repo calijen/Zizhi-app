@@ -1,13 +1,13 @@
 
 import { FC, useState, useMemo } from 'react';
 import { Text, Group, ActionIcon, Box, Stack } from '@mantine/core';
-import type { Quote, Theme, Book } from '../types';
+import type { Quote, Theme, BookMetadata } from '../types';
 import { IconTrash, IconSearch, IconShare } from './icons';
 import ShareDialog from './ShareDialog';
 
 interface QuotesViewProps {
   quotes: Quote[];
-  library?: Book[];
+  library?: BookMetadata[];
   theme: Theme;
   onDelete: (id: string) => void;
   onGoToQuote: (quote: Quote) => void;

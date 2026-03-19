@@ -1,8 +1,9 @@
-import type { Book, Quote, ReadingActivity } from './types';
+import type { Book, BookMetadata, BookContent, Quote, ReadingActivity } from './types';
 
 const DB_NAME = 'ZizhiDB';
-const DB_VERSION = 4; 
+const DB_VERSION = 5; 
 const BOOK_STORE = 'books';
+const CONTENT_STORE = 'book_contents';
 const QUOTE_STORE = 'quotes';
 const ACTIVITY_STORE = 'reading_activity';
 
@@ -22,6 +23,9 @@ export const initDB = (): Promise<IDBDatabase> => {
       if (!dbInstance.objectStoreNames.contains(BOOK_STORE)) {
         dbInstance.createObjectStore(BOOK_STORE, { keyPath: 'id' });
       }
+      if (!dbInstance.objectStoreNames.contains(CONTENT_STORE)) {
+        dbInstance.createObjectStore(CONTENT_STORE, { keyPath: 'id' });
+      }
       if (!dbInstance.objectStoreNames.contains(QUOTE_STORE)) {
         dbInstance.createObjectStore(QUOTE_STORE, { keyPath: 'id' });
       }
@@ -35,15 +39,31 @@ export const initDB = (): Promise<IDBDatabase> => {
 export const saveBook = async (book: Book): Promise<void> => {
   const db = await initDB();
   return new Promise((resolve, reject) => {
-    const transaction = db.transaction(BOOK_STORE, 'readwrite');
-    const store = transaction.objectStore(BOOK_STORE);
-    const request = store.put(book);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject();
+    const transaction = db.transaction([BOOK_STORE, CONTENT_STORE], 'readwrite');
+    
+    // Extract metadata
+    const { chapters, toc, summaryScript, audioSummaryUrl, audioDuration, ...metadata } = book;
+    const content = { id: book.id, chapters, toc, summaryScript, audioSummaryUrl, audioDuration };
+    
+    // Add flags to metadata
+    const metadataWithFlags = {
+        ...metadata,
+        hasSummary: !!summaryScript,
+        hasAudio: !!audioSummaryUrl
+    };
+
+    const bookStore = transaction.objectStore(BOOK_STORE);
+    const contentStore = transaction.objectStore(CONTENT_STORE);
+    
+    bookStore.put(metadataWithFlags);
+    contentStore.put(content);
+    
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject();
   });
 };
 
-export const getBooks = async (): Promise<Book[]> => {
+export const getBooks = async (): Promise<BookMetadata[]> => {
     const db = await initDB();
     return new Promise((resolve) => {
         const transaction = db.transaction(BOOK_STORE, 'readonly');
@@ -51,13 +71,24 @@ export const getBooks = async (): Promise<Book[]> => {
     });
 };
 
+export const getBookContent = async (id: string): Promise<BookContent | null> => {
+    const db = await initDB();
+    return new Promise((resolve) => {
+        const transaction = db.transaction(CONTENT_STORE, 'readonly');
+        const request = transaction.objectStore(CONTENT_STORE).get(id);
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => resolve(null);
+    });
+};
+
 export const deleteBook = async (id: string): Promise<void> => {
     const db = await initDB();
     return new Promise((resolve, reject) => {
-        const transaction = db.transaction(BOOK_STORE, 'readwrite');
-        const request = transaction.objectStore(BOOK_STORE).delete(id);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject();
+        const transaction = db.transaction([BOOK_STORE, CONTENT_STORE], 'readwrite');
+        transaction.objectStore(BOOK_STORE).delete(id);
+        transaction.objectStore(CONTENT_STORE).delete(id);
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject();
     });
 };
 

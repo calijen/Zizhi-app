@@ -35,23 +35,30 @@ export interface ReadingActivity {
     seconds: number;
 }
 
-export interface Book {
+export interface BookMetadata {
     id: string;
     title: string;
     author: string;
     coverImageUrl: string | null;
-    chapters: Chapter[];
-    toc: TocItem[];
     progress: number;
     lastScrollTop: number;
     lastOpened?: number;
     readingTime: number; 
     genre?: string;
-    
-    audioSummaryUrl?: string;
-    summaryScript?: string;
-    audioDuration?: number;
+    hasSummary?: boolean;
+    hasAudio?: boolean;
+}
 
+export interface BookContent {
+    id: string;
+    chapters: Chapter[];
+    toc: TocItem[];
+    summaryScript?: string;
+    audioSummaryUrl?: string;
+    audioDuration?: number;
+}
+
+export interface Book extends BookMetadata, BookContent {
     epubFile?: File | Blob;
 }
 

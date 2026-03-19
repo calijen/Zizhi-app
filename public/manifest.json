@@ -16,9 +16,5 @@
       "purpose": "any"
     }
   ],
-  "categories": [
-    "books",
-    "productivity",
-    "utilities"
-  ]
+  "categories": ["books", "productivity", "utilities"]
 }

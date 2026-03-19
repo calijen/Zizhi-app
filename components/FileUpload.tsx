@@ -2,19 +2,10 @@
 import { FC } from 'react';
 import { Box, SimpleGrid, Stack, Text, Image, Group, Progress, ActionIcon, Button } from '@mantine/core';
 import { IconClose, IconSpinner, IconPlay } from './icons';
-import type { GenerationStatus, Theme } from '../types';
-
-export interface BookCardData {
-  id: string;
-  title: string;
-  author: string;
-  coverImageUrl: string | null;
-  progress: number;
-  audioSummaryUrl?: string;
-}
+import type { GenerationStatus, Theme, BookMetadata } from '../types';
 
 interface LibraryProps {
-  books: BookCardData[];
+  books: BookMetadata[];
   theme: Theme;
   onBookSelect: (bookId: string) => void;
   isLoading: boolean;
@@ -102,7 +93,7 @@ const EmptyLibraryGraphic = () => (
 );
 
 const BookCard: FC<{ 
-    book: BookCardData; 
+    book: BookMetadata; 
     theme: Theme;
     onSelect: (id: string) => void; 
     onDelete: (id: string) => void;
@@ -138,7 +129,7 @@ const BookCard: FC<{
                         <Progress value={progressPercent} size="sm" radius={0} color="var(--color-primary-text)" className="border-2 border-[var(--color-border-color)] h-2 bg-transparent" />
                         <Group gap="xs" mt={4} grow>
                             <Button variant="filled" color="cyan" className="border-2 border-black rounded-none shadow-[2px_2px_0_#000] h-8 p-0 text-[10px] font-black uppercase text-black" onClick={() => onSelect(book.id)}>Open</Button>
-                            {book.audioSummaryUrl ? (
+                            {book.hasAudio || book.hasSummary ? (
                                 <Button variant="filled" color="yellow" className="border-2 border-black rounded-none shadow-[2px_2px_0_#000] h-8 p-0 text-[10px] font-black uppercase text-black" onClick={(e) => { e.stopPropagation(); onViewSummary(book.id); }} leftSection={<IconPlay className="w-3 h-3" />}>Summary</Button>
                             ) : (
                                 <Button variant="outline" color="dark" className="border-2 border-[var(--color-border-color)] rounded-none h-8 p-0 text-[10px] font-black uppercase text-[var(--color-primary-text)]" onClick={(e) => { e.stopPropagation(); onGenerateSummary(book.id); }} loading={!!status}>{status ? status.stage : 'Analyze'}</Button>
