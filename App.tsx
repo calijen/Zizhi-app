@@ -294,9 +294,37 @@ const App: FC = () => {
       ) : (
         <Box style={appStyles} className="relative h-[100dvh] w-full overflow-hidden transition-colors duration-300 flex flex-col md:flex-row text-[var(--color-primary-text)]" bg="var(--color-background)">
           <aside className={`hidden md:flex ${isSidebarCollapsed ? 'w-20' : 'w-64 lg:w-72'} bg-[var(--color-surface)] border-r-4 border-black flex-col z-[150] transition-all duration-300`}>
-              <div className="h-16 md:h-20 flex items-center px-8 border-b-4 border-black overflow-hidden">
-                <Logo className={`h-6 w-auto text-[var(--color-primary-text)] transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0' : 'opacity-100'}`} />
-                {isSidebarCollapsed && <div className="absolute left-6 font-black text-2xl">Z</div>}
+              <div className="h-16 md:h-20 flex items-center border-b-4 border-black overflow-hidden relative">
+                {!isSidebarCollapsed ? (
+                  <div className="flex items-center justify-between w-full px-8">
+                    <Logo className="h-6 w-auto text-[var(--color-primary-text)]" />
+                    <ActionIcon 
+                        variant="subtle" 
+                        color="gray" 
+                        size="md" 
+                        onClick={() => setIsSidebarCollapsed(true)} 
+                        className="border-2 border-black shadow-[2px_2px_0_black] bg-[var(--color-background)] rounded-none"
+                    >
+                        <IconMenu className="w-4 h-4 text-[var(--color-primary-text)]" />
+                    </ActionIcon>
+                  </div>
+                ) : (
+                  <div 
+                    className="w-full h-full flex items-center justify-center cursor-pointer group/toggle"
+                    onClick={() => setIsSidebarCollapsed(false)}
+                  >
+                    <div className="relative flex items-center justify-center w-full h-full">
+                      {/* Normal state: Logo Icon */}
+                      <div className="font-black text-2xl group-hover/toggle:opacity-0 transition-opacity">Z</div>
+                      
+                      {/* Hover state: Toggle Icon + Text */}
+                      <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover/toggle:opacity-100 transition-opacity bg-[var(--color-surface)]">
+                        <IconMenu className="w-5 h-5 text-[var(--color-primary-text)] mb-1" />
+                        <Text className="text-[7px] font-black uppercase tracking-tighter text-center leading-none">Open<br/>Sidebar</Text>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               <nav className="flex-1 p-6 space-y-4">
                   <NavItem tab="library" activeTab={activeTab} onSelect={setActiveTab} icon={IconLibrary} label="Library" collapsed={isSidebarCollapsed} />
@@ -311,15 +339,6 @@ const App: FC = () => {
           <Box className="flex-1 flex flex-col h-full overflow-hidden relative">
               <header className="h-16 md:h-20 bg-[var(--color-surface)] z-[100] px-8 flex items-center justify-between border-b-4 border-black">
                   <div className="flex items-center gap-4">
-                    <ActionIcon 
-                        variant="subtle" 
-                        color="gray" 
-                        size="lg" 
-                        onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
-                        className="hidden md:flex border-2 border-black shadow-[2px_2px_0_black] bg-[var(--color-background)] rounded-none"
-                    >
-                        <IconMenu className="w-5 h-5 text-[var(--color-primary-text)]" />
-                    </ActionIcon>
                     <div className="md:hidden"><Logo className="h-4 w-auto text-[var(--color-primary-text)]" /></div>
                     <div className="hidden md:flex items-center gap-10">
                         <Text className="text-[10px] font-black uppercase tracking-widest text-[var(--color-muted-text)]">Theme: {theme.name} v5.0</Text>
