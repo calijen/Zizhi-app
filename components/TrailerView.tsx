@@ -177,18 +177,18 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-[2000] bg-[var(--color-background)] text-[var(--color-primary-text)] flex flex-col animate-fade-in select-none overflow-hidden">
-        <header className="p-8 flex items-center justify-between z-20 relative bg-[var(--color-surface)] border-b-4 border-black shadow-[0_4px_0_#000] rounded-none">
-            <button onClick={onClose} className="p-3 bg-cyan-400 border-2 border-black shadow-[2px_2px_0_#000] transition-all rounded-none"><IconClose className="w-6 h-6 text-black" /></button>
+        <header className="p-4 md:p-8 flex items-center justify-between z-20 relative bg-[var(--color-surface)] border-b-4 border-black shadow-[0_4px_0_#000] rounded-none">
+            <button onClick={onClose} className="p-2 md:p-3 bg-cyan-400 border-2 border-black shadow-[2px_2px_0_#000] transition-all rounded-none"><IconClose className="w-5 h-5 md:w-6 md:h-6 text-black" /></button>
             <div className="text-center">
-                <p className="text-[10px] font-black uppercase tracking-[0.5em] text-pink-500">Insights</p>
-                <p className="text-xs font-black truncate max-w-[200px] uppercase mt-1 text-[var(--color-primary-text)]">{book.title}</p>
+                <p className="text-[8px] md:text-[10px] font-black uppercase tracking-[0.5em] text-pink-500">Insights</p>
+                <p className="text-[10px] md:text-xs font-black truncate max-w-[150px] md:max-w-[200px] uppercase mt-1 text-[var(--color-primary-text)]">{book.title}</p>
             </div>
             <button onClick={() => {
                 const speeds = [1, 1.25, 1.5, 2];
                 const next = speeds[(speeds.indexOf(playbackRate) + 1) % speeds.length];
                 setPlaybackRate(next);
                 if (sourceNodeRef.current) sourceNodeRef.current.playbackRate.value = next;
-            }} className="w-12 h-12 bg-yellow-300 border-2 border-black flex items-center justify-center text-[12px] font-black shadow-[2px_2px_0_#000] text-black rounded-none">
+            }} className="w-10 h-10 md:w-12 md:h-12 bg-yellow-300 border-2 border-black flex items-center justify-center text-[10px] md:text-[12px] font-black shadow-[2px_2px_0_#000] text-black rounded-none">
                 {playbackRate}X
             </button>
         </header>
@@ -213,14 +213,27 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
                  </div>
             ) : (
                 <div className="flex-1 flex flex-col md:flex-row gap-8 md:gap-16 items-center md:items-start overflow-hidden w-full h-full">
-                    {/* Left Column: Cover and Desktop Controls */}
+                    {/* Left Column: Cover, Progress, and Controls (Desktop) */}
                     <div className={`flex-col items-center gap-8 md:w-1/3 lg:w-1/4 ${isPlaying ? 'hidden md:flex' : 'flex'} transition-all duration-300`}>
                         <div className="w-48 md:w-full aspect-square shadow-[10px_10px_0_#000] border-4 border-black overflow-hidden bg-[var(--color-surface)] rounded-none">
                             {book.coverImageUrl && <img src={book.coverImageUrl} className="w-full h-full object-cover" />}
                         </div>
                         
-                        {/* Desktop-only playback controls */}
-                        <div className="hidden md:flex flex-col items-center gap-6 w-full">
+                        {/* Desktop-only playback controls and progress */}
+                        <div className="hidden md:flex flex-col items-center gap-10 w-full">
+                            {/* Progress Bar */}
+                            <div className="w-full space-y-3">
+                                <div className="h-4 bg-black/10 border-2 border-black relative overflow-hidden rounded-none">
+                                   <div className="absolute inset-y-0 left-0 bg-cyan-400" style={{ width: `${(currentTime / (duration || 1)) * 100}%` }} />
+                                   <input type="range" min="0" max={duration || 100} step="0.1" value={currentTime} onChange={handleSeek} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+                                </div>
+                                <div className="flex justify-between text-[10px] font-black tracking-widest uppercase text-[var(--color-primary-text)]">
+                                    <span>{Math.floor(currentTime / 60)}:{Math.floor(currentTime % 60).toString().padStart(2, '0')}</span>
+                                    <span>{Math.floor(duration / 60)}:{Math.floor(duration % 60).toString().padStart(2, '0')}</span>
+                                </div>
+                            </div>
+
+                            {/* Controls */}
                             <div className="flex items-center justify-center gap-6">
                                 <button onClick={() => playAt(Math.max(0, currentTime - 10))} className="bg-[var(--color-background)] border-2 border-black p-2 shadow-[2px_2px_0_#000] text-[var(--color-primary-text)] rounded-none hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all">
                                     <IconRewind className="w-6 h-6" />
@@ -259,28 +272,28 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
             )}
         </main>
 
-        <footer className="p-6 md:p-8 bg-[var(--color-surface)] border-t-4 border-black relative z-20 shadow-[0_-4px_0_#000] rounded-none">
-            <div className="max-w-4xl mx-auto w-full space-y-4">
-                <div className="h-4 bg-black/10 border-2 border-black relative overflow-hidden rounded-none">
+        <footer className="md:hidden p-4 bg-[var(--color-surface)] border-t-4 border-black relative z-20 shadow-[0_-4px_0_#000] rounded-none">
+            <div className="max-w-4xl mx-auto w-full space-y-3">
+                <div className="h-3 bg-black/10 border-2 border-black relative overflow-hidden rounded-none">
                    <div className="absolute inset-y-0 left-0 bg-cyan-400" style={{ width: `${(currentTime / (duration || 1)) * 100}%` }} />
                    <input type="range" min="0" max={duration || 100} step="0.1" value={currentTime} onChange={handleSeek} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
                 </div>
-                <div className="flex justify-between text-[10px] font-black tracking-widest uppercase text-[var(--color-primary-text)]">
+                <div className="flex justify-between text-[9px] font-black tracking-widest uppercase text-[var(--color-primary-text)]">
                     <span>{Math.floor(currentTime / 60)}:{Math.floor(currentTime % 60).toString().padStart(2, '0')}</span>
                     <span>{Math.floor(duration / 60)}:{Math.floor(duration % 60).toString().padStart(2, '0')}</span>
                 </div>
             </div>
             {/* Mobile-only playback controls */}
-            <div className="flex md:hidden items-center justify-center gap-8 mt-4">
-                <button onClick={() => playAt(Math.max(0, currentTime - 10))} className="bg-[var(--color-background)] border-2 border-black p-2 shadow-[2px_2px_0_#000] text-[var(--color-primary-text)] rounded-none"><IconRewind className="w-6 h-6" /></button>
+            <div className="flex items-center justify-center gap-6 mt-3">
+                <button onClick={() => playAt(Math.max(0, currentTime - 10))} className="bg-[var(--color-background)] border-2 border-black p-2 shadow-[2px_2px_0_#000] text-[var(--color-primary-text)] rounded-none"><IconRewind className="w-5 h-5" /></button>
                 <button 
                     onClick={handlePlayPause} 
                     disabled={!isReady}
-                    className="w-16 h-16 bg-pink-500 border-4 border-black shadow-[4px_4px_0_#000] flex flex-col items-center justify-center transition-all disabled:opacity-50 rounded-none"
+                    className="w-14 h-14 bg-pink-500 border-4 border-black shadow-[4px_4px_0_#000] flex flex-col items-center justify-center transition-all disabled:opacity-50 rounded-none"
                 >
-                    {isPlaying ? <IconPause className="w-6 h-6 text-white" /> : <IconPlay className="w-6 h-6 pl-1 text-white" />}
+                    {isPlaying ? <IconPause className="w-5 h-5 text-white" /> : <IconPlay className="w-5 h-5 pl-1 text-white" />}
                 </button>
-                <button onClick={() => playAt(Math.min(duration, currentTime + 10))} className="bg-[var(--color-background)] border-2 border-black p-2 shadow-[2px_2px_0_#000] text-[var(--color-primary-text)] rounded-none"><IconForward className="w-6 h-6" /></button>
+                <button onClick={() => playAt(Math.min(duration, currentTime + 10))} className="bg-[var(--color-background)] border-2 border-black p-2 shadow-[2px_2px_0_#000] text-[var(--color-primary-text)] rounded-none"><IconForward className="w-5 h-5" /></button>
             </div>
         </footer>
     </div>
