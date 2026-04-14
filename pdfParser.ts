@@ -13,7 +13,9 @@ export const parsePdf = async (file: File): Promise<Book> => {
     pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
     const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjs.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+    // Create a copy for PDF.js to prevent it from detaching the buffer we want to save
+    const pdfData = new Uint8Array(arrayBuffer);
+    const pdf = await pdfjs.getDocument({ data: new Uint8Array(arrayBuffer.slice(0)) }).promise;
     
     const chapters: Chapter[] = [];
     const numPages = pdf.numPages;
@@ -73,6 +75,6 @@ export const parsePdf = async (file: File): Promise<Book> => {
         lastOpened: Date.now(),
         genre: 'PDF Document',
         isPdf: true,
-        pdfData: new Uint8Array(arrayBuffer)
+        pdfData: pdfData
     };
 };
