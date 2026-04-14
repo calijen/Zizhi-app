@@ -10,6 +10,7 @@ import SummaryView from './components/TrailerView';
 import ProfileView from './components/ProfileView';
 import LandingView from './components/LandingView';
 import Toast from './components/Toast';
+import ReloadPrompt from './components/ReloadPrompt';
 import { Logo, IconSettings, IconUser, IconLibrary, IconQuote, IconUpload, IconLayoutGrid, IconLayoutList, IconSpinner, IconMenu } from './components/icons';
 import * as db from './db';
 import { supabase } from './supabase';
@@ -289,6 +290,7 @@ const App: FC = () => {
 
   return (
     <>
+      <ReloadPrompt />
       {!hasEntered ? (
         <LandingView onEnter={handleEnterApp} />
       ) : (
