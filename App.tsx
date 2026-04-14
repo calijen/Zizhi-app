@@ -10,7 +10,7 @@ import SummaryView from './components/TrailerView';
 import ProfileView from './components/ProfileView';
 import LandingView from './components/LandingView';
 import Toast from './components/Toast';
-import { Logo, IconSettings, IconUser, IconLibrary, IconQuote, IconUpload, IconLayoutGrid, IconLayoutList, IconSpinner } from './components/icons';
+import { Logo, IconSettings, IconUser, IconLibrary, IconQuote, IconUpload, IconLayoutGrid, IconLayoutList, IconSpinner, IconMenu } from './components/icons';
 import * as db from './db';
 import { supabase } from './supabase';
 import type { Book, BookMetadata, BookContent, Quote, Theme, ThemeFont, GenerationStatus } from './types';
@@ -68,14 +68,14 @@ export const ATMOSPHERES: { [key: string]: Theme } = {
     }
 };
 
-const NavItem = ({ tab, activeTab, icon: Icon, label, onSelect }: { tab: 'library' | 'quotes' | 'profile' | 'settings'; activeTab: string; icon: any; label: string; onSelect: (tab: any) => void }) => {
+const NavItem = ({ tab, activeTab, icon: Icon, label, onSelect, collapsed }: { tab: 'library' | 'quotes' | 'profile' | 'settings'; activeTab: string; icon: any; label: string; onSelect: (tab: any) => void; collapsed?: boolean }) => {
     const isActive = activeTab === tab;
     return (
         <Stack gap={4} align="center" className={`cursor-pointer transition-all duration-200 group ${isActive ? 'text-[var(--color-primary-text)]' : 'text-[var(--color-muted-text)] hover:text-[var(--color-primary-text)]'}`} onClick={() => onSelect(tab)}>
             <Box className={`relative flex items-center justify-center w-10 h-10 md:w-full md:px-6 md:py-6 transition-all border-2 rounded-none ${isActive ? 'bg-[var(--color-primary)] border-black md:translate-x-1 shadow-[4px_4px_0px_black]' : 'border-transparent'}`}>
-                <Group gap="md" wrap="nowrap" className="w-full justify-center md:justify-start">
+                <Group gap="md" wrap="nowrap" className={`w-full justify-center ${collapsed ? 'md:justify-center' : 'md:justify-start'}`}>
                     <Icon className={`w-5 h-5 transition-transform ${isActive ? 'scale-110 text-white' : ''}`} />
-                    <Text className={`hidden md:block text-[13px] font-black uppercase tracking-widest ${isActive ? 'text-white' : ''}`}>{label}</Text>
+                    {!collapsed && <Text className={`hidden md:block text-[13px] font-black uppercase tracking-widest ${isActive ? 'text-white' : ''}`}>{label}</Text>}
                 </Group>
             </Box>
             <Text className="md:hidden text-[9px] font-black uppercase tracking-wider">{label}</Text>
@@ -92,6 +92,7 @@ const App: FC = () => {
   const [hasEntered, setHasEntered] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState<'library' | 'quotes' | 'profile' | 'settings'>('library');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [summaryBook, setSummaryBook] = useState<Book | null>(null);
   const [toast, setToast] = useState<{ message: string; action?: { label: string; onClick: () => void } } | null>(null);
@@ -292,22 +293,38 @@ const App: FC = () => {
         <LandingView onEnter={handleEnterApp} />
       ) : (
         <Box style={appStyles} className="relative h-[100dvh] w-full overflow-hidden transition-colors duration-300 flex flex-col md:flex-row text-[var(--color-primary-text)]" bg="var(--color-background)">
-          <aside className="hidden md:flex w-64 lg:w-72 bg-[var(--color-surface)] border-r-4 border-black flex-col z-[150]">
-              <div className="p-8 border-b-4 border-black"><Logo className="h-6 w-auto text-[var(--color-primary-text)]" /></div>
+          <aside className={`hidden md:flex ${isSidebarCollapsed ? 'w-20' : 'w-64 lg:w-72'} bg-[var(--color-surface)] border-r-4 border-black flex-col z-[150] transition-all duration-300`}>
+              <div className="h-16 md:h-20 flex items-center px-8 border-b-4 border-black overflow-hidden">
+                <Logo className={`h-6 w-auto text-[var(--color-primary-text)] transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0' : 'opacity-100'}`} />
+                {isSidebarCollapsed && <div className="absolute left-6 font-black text-2xl">Z</div>}
+              </div>
               <nav className="flex-1 p-6 space-y-4">
-                  <NavItem tab="library" activeTab={activeTab} onSelect={setActiveTab} icon={IconLibrary} label="Library" />
-                  <NavItem tab="quotes" activeTab={activeTab} onSelect={setActiveTab} icon={IconQuote} label="Quotes" />
-                  <NavItem tab="profile" activeTab={activeTab} onSelect={setActiveTab} icon={IconUser} label="Profile" />
-                  <NavItem tab="settings" activeTab={activeTab} onSelect={setActiveTab} icon={IconSettings} label="Settings" />
+                  <NavItem tab="library" activeTab={activeTab} onSelect={setActiveTab} icon={IconLibrary} label="Library" collapsed={isSidebarCollapsed} />
+                  <NavItem tab="quotes" activeTab={activeTab} onSelect={setActiveTab} icon={IconQuote} label="Quotes" collapsed={isSidebarCollapsed} />
+                  <NavItem tab="profile" activeTab={activeTab} onSelect={setActiveTab} icon={IconUser} label="Profile" collapsed={isSidebarCollapsed} />
+                  <NavItem tab="settings" activeTab={activeTab} onSelect={setActiveTab} icon={IconSettings} label="Settings" collapsed={isSidebarCollapsed} />
               </nav>
-              <div className="p-8 border-t-2 border-black opacity-30"><Text className="text-[10px] font-black uppercase text-[var(--color-primary-text)]">Zizhi v4.2</Text></div>
+              <div className="p-8 border-t-2 border-black opacity-30 overflow-hidden whitespace-nowrap">
+                <Text className="text-[10px] font-black uppercase text-[var(--color-primary-text)]">{isSidebarCollapsed ? 'v4.2' : 'Zizhi v4.2'}</Text>
+              </div>
           </aside>
           <Box className="flex-1 flex flex-col h-full overflow-hidden relative">
               <header className="h-16 md:h-20 bg-[var(--color-surface)] z-[100] px-8 flex items-center justify-between border-b-4 border-black">
-                  <div className="md:hidden"><Logo className="h-4 w-auto text-[var(--color-primary-text)]" /></div>
-                  <div className="hidden md:flex items-center gap-10">
-                      <Text className="text-[10px] font-black uppercase tracking-widest text-[var(--color-muted-text)]">Theme: {theme.name} v5.0</Text>
-                      {user && <Box className="bg-cyan-400 px-3 py-1 border-2 border-black shadow-[2px_2px_0_black]"><Text className="text-[9px] font-black uppercase text-black">Cloud Sync Active</Text></Box>}
+                  <div className="flex items-center gap-4">
+                    <ActionIcon 
+                        variant="subtle" 
+                        color="gray" 
+                        size="lg" 
+                        onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
+                        className="hidden md:flex border-2 border-black shadow-[2px_2px_0_black] bg-[var(--color-background)] rounded-none"
+                    >
+                        <IconMenu className="w-5 h-5 text-[var(--color-primary-text)]" />
+                    </ActionIcon>
+                    <div className="md:hidden"><Logo className="h-4 w-auto text-[var(--color-primary-text)]" /></div>
+                    <div className="hidden md:flex items-center gap-10">
+                        <Text className="text-[10px] font-black uppercase tracking-widest text-[var(--color-muted-text)]">Theme: {theme.name} v5.0</Text>
+                        {user && <Box className="bg-cyan-400 px-3 py-1 border-2 border-black shadow-[2px_2px_0_black]"><Text className="text-[9px] font-black uppercase text-black">Cloud Sync Active</Text></Box>}
+                    </div>
                   </div>
                   <ActionIcon variant="subtle" color="gray" size="lg" onClick={() => setViewMode(v => v === 'grid' ? 'list' : 'grid')} className="border-2 border-black shadow-[2px_2px_0_black] bg-[var(--color-background)] rounded-none">
                       {viewMode === 'grid' ? <IconLayoutList className="w-5 h-5 text-[var(--color-primary-text)]" /> : <IconLayoutGrid className="w-5 h-5 text-[var(--color-primary-text)]" />}
