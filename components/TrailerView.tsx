@@ -193,7 +193,7 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
             </button>
         </header>
 
-        <main className="flex-1 flex flex-col md:flex-row p-10 md:p-20 gap-16 items-center overflow-hidden relative">
+        <main className="flex-1 flex flex-col md:flex-row p-6 md:p-20 gap-8 md:gap-16 items-center overflow-hidden relative">
             {!isReady ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-center">
                     <div className="w-12 h-12 border-4 border-black border-t-cyan-400 animate-spin mb-6"></div>
@@ -201,7 +201,7 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
                 </div>
             ) : !userInteracted ? (
                  <div className="flex-1 flex flex-col items-center justify-center text-center space-y-8">
-                     <Box className="w-48 aspect-square border-4 border-black shadow-[10px_10px_0_#000] overflow-hidden rounded-none">
+                     <Box className="w-48 md:w-64 aspect-square border-4 border-black shadow-[10px_10px_0_#000] overflow-hidden rounded-none">
                         <img src={book.coverImageUrl || ''} className="w-full h-full object-cover" />
                      </Box>
                      <button 
@@ -212,20 +212,42 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
                      </button>
                  </div>
             ) : (
-                <>
-                    <div className="w-48 md:w-full md:max-w-[400px] aspect-square shadow-[10px_10px_0_#000] border-4 border-black overflow-hidden bg-[var(--color-surface)] rounded-none">
-                        {book.coverImageUrl && <img src={book.coverImageUrl} className="w-full h-full object-cover" />}
+                <div className="flex-1 flex flex-col md:flex-row gap-8 md:gap-16 items-center md:items-start overflow-hidden w-full h-full">
+                    {/* Left Column: Cover and Desktop Controls */}
+                    <div className={`flex-col items-center gap-8 md:w-1/3 lg:w-1/4 ${isPlaying ? 'hidden md:flex' : 'flex'} transition-all duration-300`}>
+                        <div className="w-48 md:w-full aspect-square shadow-[10px_10px_0_#000] border-4 border-black overflow-hidden bg-[var(--color-surface)] rounded-none">
+                            {book.coverImageUrl && <img src={book.coverImageUrl} className="w-full h-full object-cover" />}
+                        </div>
+                        
+                        {/* Desktop-only playback controls */}
+                        <div className="hidden md:flex flex-col items-center gap-6 w-full">
+                            <div className="flex items-center justify-center gap-6">
+                                <button onClick={() => playAt(Math.max(0, currentTime - 10))} className="bg-[var(--color-background)] border-2 border-black p-2 shadow-[2px_2px_0_#000] text-[var(--color-primary-text)] rounded-none hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all">
+                                    <IconRewind className="w-6 h-6" />
+                                </button>
+                                <button 
+                                    onClick={handlePlayPause} 
+                                    className="w-16 h-16 bg-pink-500 border-4 border-black shadow-[4px_4px_0_#000] flex items-center justify-center transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none rounded-none"
+                                >
+                                    {isPlaying ? <IconPause className="w-6 h-6 text-white" /> : <IconPlay className="w-6 h-6 pl-1 text-white" />}
+                                </button>
+                                <button onClick={() => playAt(Math.min(duration, currentTime + 10))} className="bg-[var(--color-background)] border-2 border-black p-2 shadow-[2px_2px_0_#000] text-[var(--color-primary-text)] rounded-none hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all">
+                                    <IconForward className="w-6 h-6" />
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
+                    {/* Right Column: Transcript */}
                     <div className="flex-1 flex flex-col justify-center h-full overflow-hidden w-full">
-                        <div className="h-full overflow-y-auto no-scrollbar py-[50vh]" style={{ maskImage: 'linear-gradient(to bottom, transparent, black 40%, black 60%, transparent)' }}>
-                            <div className="font-sans text-2xl md:text-5xl leading-[1.6] text-left px-4 space-y-16">
+                        <div className="h-full overflow-y-auto no-scrollbar py-[40vh]" style={{ maskImage: 'linear-gradient(to bottom, transparent, black 30%, black 70%, transparent)' }}>
+                            <div className="font-sans text-lg md:text-2xl leading-[1.4] text-left px-4 space-y-6">
                                 {timedLines.map((item, index) => (
                                     <p 
                                         key={index} 
                                         ref={index === activePhraseIndex ? activePhraseRef : null} 
                                         onClick={() => playAt(item.start)}
-                                        className={`transition-all duration-500 font-black uppercase tracking-tighter cursor-pointer rounded-none ${index === activePhraseIndex ? 'bg-yellow-300 text-black px-4 py-2 border-l-8 border-black shadow-[6px_6px_0_#000] scale-105' : 'text-[var(--color-muted-text)] scale-95 hover:text-[var(--color-primary-text)]'}`}
+                                        className={`transition-all duration-500 font-black uppercase tracking-tighter cursor-pointer rounded-none ${index === activePhraseIndex ? 'bg-yellow-300 text-black px-4 py-2 border-l-8 border-black shadow-[4px_4px_0_#000] scale-105' : 'text-[var(--color-muted-text)] scale-95 hover:text-[var(--color-primary-text)]'}`}
                                     >
                                         {item.text}
                                     </p>
@@ -233,31 +255,32 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
                             </div>
                         </div>
                     </div>
-                </>
+                </div>
             )}
         </main>
 
-        <footer className="p-10 bg-[var(--color-surface)] border-t-4 border-black relative z-20 shadow-[0_-4px_0_#000] rounded-none">
+        <footer className="p-6 md:p-8 bg-[var(--color-surface)] border-t-4 border-black relative z-20 shadow-[0_-4px_0_#000] rounded-none">
             <div className="max-w-4xl mx-auto w-full space-y-4">
-                <div className="h-6 bg-black/10 border-4 border-black relative overflow-hidden rounded-none">
+                <div className="h-4 bg-black/10 border-2 border-black relative overflow-hidden rounded-none">
                    <div className="absolute inset-y-0 left-0 bg-cyan-400" style={{ width: `${(currentTime / (duration || 1)) * 100}%` }} />
                    <input type="range" min="0" max={duration || 100} step="0.1" value={currentTime} onChange={handleSeek} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
                 </div>
-                <div className="flex justify-between text-[11px] font-black tracking-widest uppercase text-[var(--color-primary-text)]">
+                <div className="flex justify-between text-[10px] font-black tracking-widest uppercase text-[var(--color-primary-text)]">
                     <span>{Math.floor(currentTime / 60)}:{Math.floor(currentTime % 60).toString().padStart(2, '0')}</span>
                     <span>{Math.floor(duration / 60)}:{Math.floor(duration % 60).toString().padStart(2, '0')}</span>
                 </div>
             </div>
-            <div className="flex items-center justify-center gap-12 mt-6">
-                <button onClick={() => playAt(Math.max(0, currentTime - 10))} className="bg-[var(--color-background)] border-2 border-black p-3 shadow-[2px_2px_0_#000] text-[var(--color-primary-text)] rounded-none"><IconRewind className="w-8 h-8" /></button>
+            {/* Mobile-only playback controls */}
+            <div className="flex md:hidden items-center justify-center gap-8 mt-4">
+                <button onClick={() => playAt(Math.max(0, currentTime - 10))} className="bg-[var(--color-background)] border-2 border-black p-2 shadow-[2px_2px_0_#000] text-[var(--color-primary-text)] rounded-none"><IconRewind className="w-6 h-6" /></button>
                 <button 
                     onClick={handlePlayPause} 
                     disabled={!isReady}
-                    className="w-24 h-24 bg-pink-500 border-4 border-black shadow-[6px_6px_0_#000] flex flex-col items-center justify-center transition-all disabled:opacity-50 rounded-none"
+                    className="w-16 h-16 bg-pink-500 border-4 border-black shadow-[4px_4px_0_#000] flex flex-col items-center justify-center transition-all disabled:opacity-50 rounded-none"
                 >
-                    {isPlaying ? <IconPause className="w-8 h-8 text-white" /> : <IconPlay className="w-8 h-8 pl-1 text-white" />}
+                    {isPlaying ? <IconPause className="w-6 h-6 text-white" /> : <IconPlay className="w-6 h-6 pl-1 text-white" />}
                 </button>
-                <button onClick={() => playAt(Math.min(duration, currentTime + 10))} className="bg-[var(--color-background)] border-2 border-black p-3 shadow-[2px_2px_0_#000] text-[var(--color-primary-text)] rounded-none"><IconForward className="w-8 h-8" /></button>
+                <button onClick={() => playAt(Math.min(duration, currentTime + 10))} className="bg-[var(--color-background)] border-2 border-black p-2 shadow-[2px_2px_0_#000] text-[var(--color-primary-text)] rounded-none"><IconForward className="w-6 h-6" /></button>
             </div>
         </footer>
     </div>
