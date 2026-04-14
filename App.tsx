@@ -204,12 +204,21 @@ const App: FC = () => {
 
   const handleBookSelect = async (bookId: string) => {
     const meta = library.find(b => b.id === bookId);
-    if (!meta) return;
-    const content = await db.getBookContent(bookId);
-    if (content) {
-        setSelectedBook({ ...meta, ...content });
-    } else {
-        setToast({ message: "Book content missing." });
+    if (!meta) {
+        console.error(`Book metadata not found for ID: ${bookId}`);
+        return;
+    }
+    try {
+        const content = await db.getBookContent(bookId);
+        if (content) {
+            setSelectedBook({ ...meta, ...content });
+        } else {
+            console.error(`Book content missing for ID: ${bookId}`);
+            setToast({ message: "Book content missing." });
+        }
+    } catch (err) {
+        console.error(`Error loading book content for ID: ${bookId}:`, err);
+        setToast({ message: "Failed to load book." });
     }
   };
 

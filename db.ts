@@ -43,27 +43,42 @@ export const initDB = (): Promise<IDBDatabase> => {
 export const saveBook = async (book: Book): Promise<void> => {
   const db = await initDB();
   return new Promise((resolve, reject) => {
-    const transaction = db.transaction([BOOK_STORE, CONTENT_STORE], 'readwrite');
-    
-    // Extract metadata
-    const { chapters, toc, summaryScript, audioSummaryUrl, audioDuration, pdfData, ...metadata } = book;
-    const content = { id: book.id, chapters, toc, summaryScript, audioSummaryUrl, audioDuration, pdfData };
-    
-    // Add flags to metadata
-    const metadataWithFlags = {
-        ...metadata,
-        hasSummary: !!summaryScript,
-        hasAudio: !!audioSummaryUrl
-    };
+    try {
+        const transaction = db.transaction([BOOK_STORE, CONTENT_STORE], 'readwrite');
+        
+        // Extract metadata
+        const { chapters, toc, summaryScript, audioSummaryUrl, audioDuration, pdfData, ...metadata } = book;
+        const content = { id: book.id, chapters, toc, summaryScript, audioSummaryUrl, audioDuration, pdfData };
+        
+        // Add flags to metadata
+        const metadataWithFlags = {
+            ...metadata,
+            hasSummary: !!summaryScript,
+            hasAudio: !!audioSummaryUrl
+        };
 
-    const bookStore = transaction.objectStore(BOOK_STORE);
-    const contentStore = transaction.objectStore(CONTENT_STORE);
-    
-    bookStore.put(metadataWithFlags);
-    contentStore.put(content);
-    
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject();
+        const bookStore = transaction.objectStore(BOOK_STORE);
+        const contentStore = transaction.objectStore(CONTENT_STORE);
+        
+        bookStore.put(metadataWithFlags);
+        contentStore.put(content);
+        
+        transaction.oncomplete = () => {
+            console.log(`Book ${book.id} saved successfully`);
+            resolve();
+        };
+        transaction.onerror = (event) => {
+            console.error(`Transaction error saving book ${book.id}:`, (event.target as any).error);
+            reject((event.target as any).error);
+        };
+        transaction.onabort = (event) => {
+            console.error(`Transaction aborted saving book ${book.id}:`, (event.target as any).error);
+            reject((event.target as any).error);
+        };
+    } catch (err) {
+        console.error(`Error in saveBook for ${book.id}:`, err);
+        reject(err);
+    }
   });
 };
 

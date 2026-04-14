@@ -4,23 +4,33 @@ import type { Book, Chapter } from './types';
 declare const pdfjsLib: any;
 
 export const parsePdf = async (file: File): Promise<Book> => {
-    if (typeof pdfjsLib === 'undefined') {
+    const pdfjs = (window as any).pdfjsLib;
+    if (!pdfjs) {
         throw new Error('PDF library is not ready.');
     }
 
     // Set worker
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
     const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const pdf = await pdfjs.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
     
     const chapters: Chapter[] = [];
     const numPages = pdf.numPages;
 
-    // Get metadata
-    const metadata = await pdf.getMetadata();
-    const title = metadata.info?.Title || file.name.replace(/\.pdf$/i, '') || 'Untitled PDF';
-    const author = metadata.info?.Author || 'Unknown Author';
+    // Get metadata safely
+    let title = file.name.replace(/\.pdf$/i, '') || 'Untitled PDF';
+    let author = 'Unknown Author';
+
+    try {
+        const meta = await pdf.getMetadata();
+        if (meta && meta.info) {
+            title = meta.info.Title || title;
+            author = meta.info.Author || author;
+        }
+    } catch (e) {
+        console.error("Failed to extract PDF metadata", e);
+    }
 
     // Create skeleton chapters for each page
     for (let i = 1; i <= numPages; i++) {
@@ -28,8 +38,8 @@ export const parsePdf = async (file: File): Promise<Book> => {
             id: `page-${i}`,
             href: `page-${i}`,
             label: `Page ${i}`,
-            html: '', // Will be rendered on demand
-            textContent: '' // Will be extracted on demand if needed
+            html: '', 
+            textContent: '' 
         });
     }
 
@@ -40,16 +50,18 @@ export const parsePdf = async (file: File): Promise<Book> => {
         const viewport = firstPage.getViewport({ scale: 0.5 });
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d');
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
-        await firstPage.render({ canvasContext: context, viewport }).promise;
-        coverImageUrl = canvas.toDataURL('image/jpeg', 0.6);
+        if (context) {
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            await firstPage.render({ canvasContext: context, viewport }).promise;
+            coverImageUrl = canvas.toDataURL('image/jpeg', 0.6);
+        }
     } catch (e) {
         console.error("Failed to extract PDF cover", e);
     }
 
     return {
-        id: crypto.randomUUID(),
+        id: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Math.random().toString(36).substring(2),
         title,
         author,
         coverImageUrl,
@@ -61,6 +73,6 @@ export const parsePdf = async (file: File): Promise<Book> => {
         lastOpened: Date.now(),
         genre: 'PDF Document',
         isPdf: true,
-        pdfData: arrayBuffer
+        pdfData: new Uint8Array(arrayBuffer)
     };
 };

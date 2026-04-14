@@ -68,7 +68,7 @@ export interface BookContent {
     summaryScript?: string;
     audioSummaryUrl?: string;
     audioDuration?: number;
-    pdfData?: ArrayBuffer;
+    pdfData?: Uint8Array;
 }
 
 export interface Book extends BookMetadata, BookContent {
