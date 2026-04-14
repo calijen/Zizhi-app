@@ -3,6 +3,7 @@ import { FC, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Box, Stack, Group, Text, ActionIcon, Button, Tabs, Badge, Avatar, SimpleGrid, Progress, useMantineColorScheme } from '@mantine/core';
 import LibraryView from './components/FileUpload';
 import QuotesView from './components/QuotesView';
+import NotesView from './components/NotesView';
 import SettingsView from './components/SettingsView';
 import AuthView from './components/AuthView';
 import ReaderView from './components/ReaderView';
@@ -11,10 +12,10 @@ import ProfileView from './components/ProfileView';
 import LandingView from './components/LandingView';
 import Toast from './components/Toast';
 import ReloadPrompt from './components/ReloadPrompt';
-import { Logo, IconSettings, IconUser, IconLibrary, IconQuote, IconUpload, IconLayoutGrid, IconLayoutList, IconSpinner, IconMenu } from './components/icons';
+import { Logo, IconSettings, IconUser, IconLibrary, IconQuote, IconUpload, IconLayoutGrid, IconLayoutList, IconSpinner, IconMenu, IconNote } from './components/icons';
 import * as db from './db';
 import { supabase } from './supabase';
-import type { Book, BookMetadata, BookContent, Quote, Theme, ThemeFont, GenerationStatus } from './types';
+import type { Book, BookMetadata, BookContent, Quote, Note, Theme, ThemeFont, GenerationStatus } from './types';
 import { parseEpub } from './epubParser';
 import { GoogleGenAI, Modality } from "@google/genai";
 
@@ -69,7 +70,7 @@ export const ATMOSPHERES: { [key: string]: Theme } = {
     }
 };
 
-const NavItem = ({ tab, activeTab, icon: Icon, label, onSelect, collapsed }: { tab: 'library' | 'quotes' | 'profile' | 'settings'; activeTab: string; icon: any; label: string; onSelect: (tab: any) => void; collapsed?: boolean }) => {
+const NavItem = ({ tab, activeTab, icon: Icon, label, onSelect, collapsed }: { tab: 'library' | 'quotes' | 'notes' | 'profile' | 'settings'; activeTab: string; icon: any; label: string; onSelect: (tab: any) => void; collapsed?: boolean }) => {
     const isActive = activeTab === tab;
     return (
         <Stack gap={4} align="center" className={`cursor-pointer transition-all duration-200 group ${isActive ? 'text-[var(--color-primary-text)]' : 'text-[var(--color-muted-text)] hover:text-[var(--color-primary-text)]'}`} onClick={() => onSelect(tab)}>
@@ -88,10 +89,11 @@ const App: FC = () => {
   const { colorScheme, setColorScheme } = useMantineColorScheme();
   const [library, setLibrary] = useState<BookMetadata[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [notes, setNotes] = useState<Note[]>([]);
   const [user, setUser] = useState<any>(null);
   const [showAuth, setShowAuth] = useState(false);
   const [hasEntered, setHasEntered] = useState<boolean | null>(null);
-  const [activeTab, setActiveTab] = useState<'library' | 'quotes' | 'profile' | 'settings'>('library');
+  const [activeTab, setActiveTab] = useState<'library' | 'quotes' | 'notes' | 'profile' | 'settings'>('library');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
@@ -107,6 +109,7 @@ const App: FC = () => {
     try {
       let localBooks = await db.getBooks();
       const localQuotes = await db.getQuotes();
+      const localNotes = await db.getNotes();
       
       // Migration check for legacy data (pre-split)
       const needsMigration = localBooks.some(b => (b as any).chapters);
@@ -124,6 +127,7 @@ const App: FC = () => {
 
       setLibrary(localBooks); 
       setQuotes(localQuotes);
+      setNotes(localNotes);
       
       const savedHasEntered = localStorage.getItem('zizhi-entered');
       if (localBooks.length > 0 || savedHasEntered === 'true') {
@@ -331,6 +335,7 @@ const App: FC = () => {
               <nav className="flex-1 p-6 space-y-4">
                   <NavItem tab="library" activeTab={activeTab} onSelect={setActiveTab} icon={IconLibrary} label="Library" collapsed={isSidebarCollapsed} />
                   <NavItem tab="quotes" activeTab={activeTab} onSelect={setActiveTab} icon={IconQuote} label="Quotes" collapsed={isSidebarCollapsed} />
+                  <NavItem tab="notes" activeTab={activeTab} onSelect={setActiveTab} icon={IconNote} label="Notes" collapsed={isSidebarCollapsed} />
                   <NavItem tab="profile" activeTab={activeTab} onSelect={setActiveTab} icon={IconUser} label="Profile" collapsed={isSidebarCollapsed} />
                   <NavItem tab="settings" activeTab={activeTab} onSelect={setActiveTab} icon={IconSettings} label="Settings" collapsed={isSidebarCollapsed} />
               </nav>
@@ -374,6 +379,13 @@ const App: FC = () => {
                               if (content) setSelectedBook({ ...meta, ...content });
                           }
                       }} />}
+                      {activeTab === 'notes' && <NotesView theme={theme} notes={notes} library={library} onDelete={(id) => { db.deleteNote(id).then(() => setNotes(prev => prev.filter(n => n.id !== id))); }} onGoToNote={async (n) => { 
+                          const meta = library.find(b => b.id === n.bookId);
+                          if (meta) {
+                              const content = await db.getBookContent(n.bookId);
+                              if (content) setSelectedBook({ ...meta, ...content });
+                          }
+                      }} />}
                       {activeTab === 'profile' && <ProfileView user={user} streak={0} library={library} onShowAuth={() => setShowAuth(true)} activity={[]} onSignOut={async () => { await supabase.auth.signOut(); setUser(null); }} />}
                       {activeTab === 'settings' && <SettingsView currentTheme={theme} onThemeChange={(t) => { setTheme(t); setColorScheme(t.id === 'nocturne' ? 'dark' : 'light'); localStorage.setItem('zizhi-theme', JSON.stringify(t)); }} themes={ATMOSPHERES} fonts={FONTS} textures={{}} />}
                   </Box>
@@ -384,6 +396,7 @@ const App: FC = () => {
               <NavItem tab="library" activeTab={activeTab} onSelect={setActiveTab} icon={IconLibrary} label="Library" />
               <NavItem tab="quotes" activeTab={activeTab} onSelect={setActiveTab} icon={IconQuote} label="Quotes" />
               <Box className="relative -top-6"><input type="file" ref={fileInputRef} onChange={handleUpload} accept=".epub" className="hidden" /><ActionIcon size={72} className="bg-yellow-400 border-4 border-black shadow-[6px_6px_0_black] rounded-none" onClick={() => fileInputRef.current?.click()}>{isUploading ? <IconSpinner className="w-8 h-8 text-black" /> : <IconUpload className="w-8 h-8 text-black" />}</ActionIcon></Box>
+              <NavItem tab="notes" activeTab={activeTab} onSelect={setActiveTab} icon={IconNote} label="Notes" />
               <NavItem tab="profile" activeTab={activeTab} onSelect={setActiveTab} icon={IconUser} label="Profile" />
               <NavItem tab="settings" activeTab={activeTab} onSelect={setActiveTab} icon={IconSettings} label="Settings" />
           </nav>
@@ -405,7 +418,7 @@ const App: FC = () => {
                   await db.saveBook({ ...updatedMeta, ...content }); 
                   setLibrary(prev => prev.map(b => b.id === bid ? updatedMeta : b)); 
               }
-          }} onSaveQuote={async (t, c) => { const nq: Quote = { id: crypto.randomUUID(), text: t, bookTitle: selectedBook.title, author: selectedBook.author, bookId: selectedBook.id, location: c, createdAt: Date.now() }; await db.saveQuote(nq); setQuotes(prev => [nq, ...prev]); setToast({ message: "Quote archived." }); }} onSearch={() => {}} />}
+          }} onSaveQuote={async (t, c) => { const nq: Quote = { id: crypto.randomUUID(), text: t, bookTitle: selectedBook.title, author: selectedBook.author, bookId: selectedBook.id, location: c, createdAt: Date.now() }; await db.saveQuote(nq); setQuotes(prev => [nq, ...prev]); setToast({ message: "Quote archived." }); }} onSaveNote={async (t, n, c) => { const nn: Note = { id: crypto.randomUUID(), text: t, note: n, bookTitle: selectedBook.title, author: selectedBook.author, bookId: selectedBook.id, location: c, createdAt: Date.now() }; await db.saveNote(nn); setNotes(prev => [nn, ...prev]); setToast({ message: "Note saved." }); }} onSearch={() => {}} />}
           {summaryBook && <SummaryView book={summaryBook} onClose={() => setSummaryBook(null)} />}
           {showAuth && <AuthView onClose={() => setShowAuth(false)} onLogin={(u) => setUser(u)} />}
           {toast && <Toast message={toast.message} action={toast.action} onClose={() => setToast(null)} />}

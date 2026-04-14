@@ -13,6 +13,7 @@ interface ReaderViewProps {
     onClose: () => void;
     onUpdateProgress: (bookId: string, chapterIndex: number, scrollTop: number, timeSpent: number, granularProgress: number) => void;
     onSaveQuote: (text: string, chapterId: string) => void;
+    onSaveNote: (text: string, note: string, chapterId: string) => void;
     onSearch: (query: string) => void;
 }
 
@@ -20,11 +21,13 @@ const ChapterContent = memo(({ html, id, className }: { html: string, id: string
     <div id={`chapter-${id.replace(/[^a-zA-Z0-9]/g, '-')}`} dangerouslySetInnerHTML={{ __html: html }} className={className} />
 ));
 
-const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateProgress, onSaveQuote, onSearch }) => {
+const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateProgress, onSaveQuote, onSaveNote, onSearch }) => {
     const [currentChapterIndex, setCurrentChapterIndex] = useState(0);
     const [showToc, setShowToc] = useState(false);
     const [isDesktopTocPersistent, setIsDesktopTocPersistent] = useState(window.innerWidth > 1400);
     const [selection, setSelection] = useState<{ text: string, rect: DOMRect } | null>(null);
+    const [noteInput, setNoteInput] = useState<{ text: string } | null>(null);
+    const [noteValue, setNoteValue] = useState('');
     const [showShareDialog, setShowShareDialog] = useState<string | null>(null);
     const [scrollProgress, setScrollProgress] = useState(book.progress || 0);
     const [isInitialScrollDone, setIsInitialScrollDone] = useState(false);
@@ -171,11 +174,47 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
             {selection && (
                 <TextSelectionPopup 
                     rect={selection.rect}
-                    onCopy={() => { navigator.clipboard.writeText(selection.text); setSelection(null); }}
+                    onNote={() => { setNoteInput({ text: selection.text }); setSelection(null); }}
                     onQuote={() => { onSaveQuote(selection.text, book.chapters[currentChapterIndex].id); setSelection(null); }}
                     onSearch={() => { onSearch(selection.text); setSelection(null); }}
                     onShare={() => { setShowShareDialog(selection.text); setSelection(null); }}
                 />
+            )}
+
+            {noteInput && (
+                <Box className="fixed inset-0 z-[2000] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm animate-fade-in">
+                    <Box className="bg-[var(--bg-color)] border-4 border-black p-8 shadow-[12px_12px_0_black] max-w-md w-full animate-pop-in">
+                        <h3 className="text-xl font-black uppercase mb-4 text-[var(--text-color)]">Add Note</h3>
+                        <Box className="mb-6 p-4 bg-black/5 border-l-4 border-cyan-400 italic text-sm text-[var(--sec-text)]">
+                            "{noteInput.text}"
+                        </Box>
+                        <textarea 
+                            autoFocus
+                            value={noteValue}
+                            onChange={(e) => setNoteValue(e.target.value)}
+                            placeholder="Type your note here..."
+                            className="w-full h-32 p-4 bg-[var(--bg-color)] border-2 border-black font-bold text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 mb-6 text-[var(--text-color)]"
+                        />
+                        <Group grow gap="md">
+                            <button 
+                                onClick={() => { setNoteInput(null); setNoteValue(''); }}
+                                className="px-6 py-3 border-2 border-black font-black uppercase text-xs hover:bg-black/5 transition-all"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={() => { 
+                                    onSaveNote(noteInput.text, noteValue, book.chapters[currentChapterIndex].id); 
+                                    setNoteInput(null); 
+                                    setNoteValue(''); 
+                                }}
+                                className="px-6 py-3 bg-cyan-400 border-2 border-black font-black uppercase text-xs shadow-[4px_4px_0_black] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all"
+                            >
+                                Save Note
+                            </button>
+                        </Group>
+                    </Box>
+                </Box>
             )}
 
             <Transition mounted={showToc && !isDesktopTocPersistent} transition="slide-right" duration={300}>

@@ -1,10 +1,11 @@
-import type { Book, BookMetadata, BookContent, Quote, ReadingActivity } from './types';
+import type { Book, BookMetadata, BookContent, Quote, Note, ReadingActivity } from './types';
 
 const DB_NAME = 'ZizhiDB';
-const DB_VERSION = 5; 
+const DB_VERSION = 6; 
 const BOOK_STORE = 'books';
 const CONTENT_STORE = 'book_contents';
 const QUOTE_STORE = 'quotes';
+const NOTE_STORE = 'notes';
 const ACTIVITY_STORE = 'reading_activity';
 
 let db: IDBDatabase;
@@ -28,6 +29,9 @@ export const initDB = (): Promise<IDBDatabase> => {
       }
       if (!dbInstance.objectStoreNames.contains(QUOTE_STORE)) {
         dbInstance.createObjectStore(QUOTE_STORE, { keyPath: 'id' });
+      }
+      if (!dbInstance.objectStoreNames.contains(NOTE_STORE)) {
+        dbInstance.createObjectStore(NOTE_STORE, { keyPath: 'id' });
       }
       if (!dbInstance.objectStoreNames.contains(ACTIVITY_STORE)) {
         dbInstance.createObjectStore(ACTIVITY_STORE, { keyPath: 'date' });
@@ -115,6 +119,34 @@ export const deleteQuote = async (id: string): Promise<void> => {
     return new Promise((resolve, reject) => {
         const transaction = db.transaction(QUOTE_STORE, 'readwrite');
         const request = transaction.objectStore(QUOTE_STORE).delete(id);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject();
+    });
+};
+
+export const saveNote = async (note: Note): Promise<void> => {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(NOTE_STORE, 'readwrite');
+        const request = transaction.objectStore(NOTE_STORE).put(note);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject();
+    });
+};
+
+export const getNotes = async (): Promise<Note[]> => {
+    const db = await initDB();
+    return new Promise((resolve) => {
+        const transaction = db.transaction(NOTE_STORE, 'readonly');
+        transaction.objectStore(NOTE_STORE).getAll().onsuccess = (e) => resolve((e.target as any).result);
+    });
+};
+
+export const deleteNote = async (id: string): Promise<void> => {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(NOTE_STORE, 'readwrite');
+        const request = transaction.objectStore(NOTE_STORE).delete(id);
         request.onsuccess = () => resolve();
         request.onerror = () => reject();
     });

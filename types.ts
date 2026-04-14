@@ -22,6 +22,17 @@ export interface Quote {
   createdAt?: number;
 }
 
+export interface Note {
+  id: string;
+  text: string; // The selected text from the book
+  note: string; // The user's note
+  bookTitle: string;
+  author: string;
+  bookId: string;
+  location?: string;
+  createdAt?: number;
+}
+
 export interface Chapter {
     id: string;
     href: string;
