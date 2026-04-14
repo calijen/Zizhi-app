@@ -1,7 +1,7 @@
 import type { Book, BookMetadata, BookContent, Quote, Note, ReadingActivity } from './types';
 
 const DB_NAME = 'ZizhiDB';
-const DB_VERSION = 6; 
+const DB_VERSION = 7; 
 const BOOK_STORE = 'books';
 const CONTENT_STORE = 'book_contents';
 const QUOTE_STORE = 'quotes';

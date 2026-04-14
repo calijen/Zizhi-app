@@ -191,7 +191,7 @@ const App: FC = () => {
         await db.saveBook(newBook); 
         
         // Update library state with metadata only
-        const { chapters, toc, summaryScript, audioSummaryUrl, audioDuration, ...metadata } = newBook;
+        const { chapters, toc, summaryScript, audioSummaryUrl, audioDuration, pdfData, ...metadata } = newBook;
         const metaWithFlags = { ...metadata, hasSummary: !!summaryScript, hasAudio: !!audioSummaryUrl };
         setLibrary(prev => [metaWithFlags, ...prev]);
         
