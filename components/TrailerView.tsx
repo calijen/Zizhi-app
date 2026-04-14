@@ -212,15 +212,15 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
                      </button>
                  </div>
             ) : (
-                <div className="flex-1 flex flex-col md:flex-row gap-8 md:gap-16 items-center md:items-start overflow-hidden w-full h-full">
+                <div className="flex-1 flex flex-col md:flex-row gap-8 md:gap-16 items-center md:items-start overflow-hidden w-full h-full max-w-7xl mx-auto">
                     {/* Left Column: Cover, Progress, and Controls (Desktop) */}
-                    <div className={`flex-col items-center gap-8 md:w-1/3 lg:w-1/4 ${isPlaying ? 'hidden md:flex' : 'flex'} transition-all duration-300`}>
-                        <div className="w-48 md:w-full aspect-square shadow-[10px_10px_0_#000] border-4 border-black overflow-hidden bg-[var(--color-surface)] rounded-none">
+                    <div className={`flex-col items-center gap-4 md:gap-8 md:w-1/3 lg:w-1/4 ${isPlaying ? 'hidden md:flex' : 'flex'} transition-all duration-300 max-h-full overflow-y-auto no-scrollbar`}>
+                        <div className="w-40 md:w-full max-w-[280px] aspect-square shadow-[10px_10px_0_#000] border-4 border-black overflow-hidden bg-[var(--color-surface)] rounded-none flex-shrink-0">
                             {book.coverImageUrl && <img src={book.coverImageUrl} className="w-full h-full object-cover" />}
                         </div>
                         
                         {/* Desktop-only playback controls and progress */}
-                        <div className="hidden md:flex flex-col items-center gap-10 w-full">
+                        <div className="hidden md:flex flex-col items-center gap-6 lg:gap-10 w-full flex-shrink-0">
                             {/* Progress Bar */}
                             <div className="w-full space-y-3">
                                 <div className="h-4 bg-black/10 border-2 border-black relative overflow-hidden rounded-none">
@@ -240,7 +240,7 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
                                 </button>
                                 <button 
                                     onClick={handlePlayPause} 
-                                    className="w-16 h-16 bg-pink-500 border-4 border-black shadow-[4px_4px_0_#000] flex items-center justify-center transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none rounded-none"
+                                    className="w-14 h-14 lg:w-16 lg:h-16 bg-pink-500 border-4 border-black shadow-[4px_4px_0_#000] flex items-center justify-center transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none rounded-none"
                                 >
                                     {isPlaying ? <IconPause className="w-6 h-6 text-white" /> : <IconPlay className="w-6 h-6 pl-1 text-white" />}
                                 </button>
@@ -252,7 +252,7 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
                     </div>
 
                     {/* Right Column: Transcript */}
-                    <div className="flex-1 flex flex-col justify-center h-full overflow-hidden w-full">
+                    <div className="flex-1 flex flex-col justify-center h-full overflow-hidden w-full max-w-3xl">
                         <div className="h-full overflow-y-auto no-scrollbar py-[40vh]" style={{ maskImage: 'linear-gradient(to bottom, transparent, black 30%, black 70%, transparent)' }}>
                             <div className="font-sans text-lg md:text-2xl leading-[1.4] text-left px-4 space-y-6">
                                 {timedLines.map((item, index) => (
