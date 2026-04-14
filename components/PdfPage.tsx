@@ -21,7 +21,14 @@ const PdfPage: React.FC<PdfPageProps> = ({ pdfDocument, pageNumber, scale = 1.5 
     let isMounted = true;
 
     const renderPage = async () => {
-      if (!pdfDocument || typeof pdfjsLib === 'undefined') return;
+      const pdfjs = (window as any).pdfjsLib;
+      if (!pdfDocument || !pdfjs) {
+        if (!pdfjs && isMounted) {
+          // Retry in a bit if pdfjs is not ready
+          setTimeout(renderPage, 500);
+        }
+        return;
+      }
       
       setLoading(true);
       setError(null);
@@ -36,6 +43,8 @@ const PdfPage: React.FC<PdfPageProps> = ({ pdfDocument, pageNumber, scale = 1.5 
         if (!canvas) return;
 
         const context = canvas.getContext('2d');
+        if (!context) return;
+
         canvas.height = viewport.height;
         canvas.width = viewport.width;
 
@@ -55,14 +64,18 @@ const PdfPage: React.FC<PdfPageProps> = ({ pdfDocument, pageNumber, scale = 1.5 
         // Render text layer
         if (textLayerRef.current) {
           textLayerRef.current.innerHTML = '';
-          const textContent = await page.getTextContent();
-          
-          pdfjsLib.renderTextLayer({
-            textContent: textContent,
-            container: textLayerRef.current,
-            viewport: viewport,
-            textDivs: []
-          });
+          try {
+            const textContent = await page.getTextContent();
+            const textLayerTask = pdfjs.renderTextLayer({
+              textContent: textContent,
+              container: textLayerRef.current,
+              viewport: viewport,
+              textDivs: []
+            });
+            await textLayerTask.promise;
+          } catch (textErr) {
+            console.warn('Text layer rendering failed, but page image should be visible:', textErr);
+          }
         }
 
         if (isMounted) setLoading(false);
