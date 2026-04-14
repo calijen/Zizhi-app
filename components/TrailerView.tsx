@@ -174,18 +174,185 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
     }
   };
 
-  const handleDownload = () => {
-    if (!book.audioSummaryUrl) return;
-    const link = document.createElement('a');
-    link.href = book.audioSummaryUrl;
-    link.download = `${book.title.replace(/\s+/g, '_')}_Insight.mp3`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+
+  const handleDownload = async () => {
+    if (!book.audioSummaryUrl || !audioBufferRef.current || !audioContextRef.current) return;
+    
+    setIsExporting(true);
+    setExportProgress(0);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 1280;
+    canvas.height = 720;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Load cover image for canvas
+    const coverImg = new Image();
+    coverImg.crossOrigin = "anonymous";
+    if (book.coverImageUrl) {
+        coverImg.src = book.coverImageUrl;
+        await new Promise((resolve) => { coverImg.onload = resolve; coverImg.onerror = resolve; });
+    }
+
+    const exportStreamDest = audioContextRef.current.createMediaStreamDestination();
+    const exportSource = audioContextRef.current.createBufferSource();
+    exportSource.buffer = audioBufferRef.current;
+    exportSource.connect(exportStreamDest);
+    
+    const stream = canvas.captureStream(30);
+    const combinedStream = new MediaStream([
+        ...stream.getVideoTracks(),
+        ...exportStreamDest.stream.getAudioTracks()
+    ]);
+
+    const mimeType = MediaRecorder.isTypeSupported('video/mp4') ? 'video/mp4' : 'video/webm';
+    const recorder = new MediaRecorder(combinedStream, { mimeType });
+    const chunks: Blob[] = [];
+
+    recorder.ondataavailable = (e) => chunks.push(e.data);
+    recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${book.title.replace(/\s+/g, '_')}_Insight.${mimeType.split('/')[1]}`;
+        link.click();
+        setIsExporting(false);
+    };
+
+    // Rendering loop for video
+    let startTime = 0;
+    const render = (now: number) => {
+        if (!startTime) startTime = now;
+        const elapsed = (now - startTime) / 1000;
+        const progress = elapsed / duration;
+        setExportProgress(progress * 100);
+
+        if (elapsed >= duration) {
+            recorder.stop();
+            exportSource.stop();
+            return;
+        }
+
+        // Draw background
+        ctx.fillStyle = '#fdf6e3'; // Neo Brutalist background
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw Header
+        ctx.fillStyle = '#000';
+        ctx.font = '900 24px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('INSIGHTS', canvas.width / 2, 60);
+        ctx.font = '900 18px sans-serif';
+        ctx.fillText(book.title.toUpperCase(), canvas.width / 2, 90);
+        ctx.fillRect(0, 120, canvas.width, 4); // Divider
+
+        // Draw Cover
+        const coverSize = 300;
+        const coverX = 100;
+        const coverY = 200;
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 8;
+        ctx.strokeRect(coverX, coverY, coverSize, coverSize);
+        ctx.fillStyle = '#000';
+        ctx.shadowColor = 'rgba(0,0,0,1)';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 10;
+        ctx.shadowOffsetY = 10;
+        ctx.fillRect(coverX, coverY, coverSize, coverSize);
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        
+        if (coverImg.complete && coverImg.naturalWidth > 0) {
+            ctx.drawImage(coverImg, coverX, coverY, coverSize, coverSize);
+        }
+
+        // Draw Transcript
+        const activeLine = timedLines.find(l => elapsed >= l.start && elapsed < l.end);
+        if (activeLine) {
+            const textX = 500;
+            const textY = 300;
+            const maxWidth = 680;
+            
+            ctx.font = '900 32px sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            
+            // Draw highlight box
+            const words = activeLine.text.toUpperCase().split(' ');
+            let line = '';
+            let lines = [];
+            for (let n = 0; n < words.length; n++) {
+                let testLine = line + words[n] + ' ';
+                let metrics = ctx.measureText(testLine);
+                if (metrics.width > maxWidth && n > 0) {
+                    lines.push(line);
+                    line = words[n] + ' ';
+                } else {
+                    line = testLine;
+                }
+            }
+            lines.push(line);
+
+            const lineHeight = 45;
+            const boxPadding = 20;
+            const boxHeight = lines.length * lineHeight + boxPadding * 2;
+            
+            ctx.fillStyle = '#000';
+            ctx.shadowOffsetX = 8;
+            ctx.shadowOffsetY = 8;
+            ctx.fillRect(textX - boxPadding, textY - boxPadding, maxWidth + boxPadding * 2, boxHeight);
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+            
+            ctx.fillStyle = '#facc15'; // Yellow-300
+            ctx.fillRect(textX - boxPadding, textY - boxPadding, maxWidth + boxPadding * 2, boxHeight);
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(textX - boxPadding, textY - boxPadding, maxWidth + boxPadding * 2, boxHeight);
+
+            ctx.fillStyle = '#000';
+            lines.forEach((l, i) => {
+                ctx.fillText(l, textX, textY + i * lineHeight);
+            });
+        }
+
+        // Draw Progress Bar
+        const barY = 650;
+        const barWidth = 1080;
+        const barX = 100;
+        ctx.fillStyle = 'rgba(0,0,0,0.1)';
+        ctx.fillRect(barX, barY, barWidth, 20);
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(barX, barY, barWidth, 20);
+        ctx.fillStyle = '#22d3ee'; // Cyan-400
+        ctx.fillRect(barX, barY, barWidth * progress, 20);
+
+        requestAnimationFrame(render);
+    };
+
+    recorder.start();
+    exportSource.start(0);
+    requestAnimationFrame(render);
   };
 
   return (
     <div className="fixed inset-0 z-[2000] bg-[var(--color-background)] text-[var(--color-primary-text)] flex flex-col animate-fade-in select-none overflow-hidden">
+        {isExporting && (
+            <div className="absolute inset-0 z-[3000] bg-black/90 flex flex-col items-center justify-center text-white p-8 text-center">
+                <div className="w-24 h-24 border-8 border-white/20 border-t-yellow-300 animate-spin mb-8 rounded-none"></div>
+                <h2 className="text-4xl font-black uppercase tracking-tighter mb-4">Exporting Video</h2>
+                <p className="text-xl font-bold text-gray-400 mb-8 max-w-md">Please keep this tab open. We are rendering your insight into a high-quality video...</p>
+                <div className="w-full max-w-xl h-8 bg-white/10 border-4 border-white relative overflow-hidden">
+                    <div className="absolute inset-y-0 left-0 bg-yellow-300 transition-all duration-300" style={{ width: `${exportProgress}%` }} />
+                </div>
+                <p className="mt-4 font-black text-2xl text-yellow-300">{Math.round(exportProgress)}%</p>
+            </div>
+        )}
         <header className="p-3 md:p-6 flex items-center justify-between z-20 relative bg-[var(--color-surface)] border-b-4 border-black shadow-[0_4px_0_#000] rounded-none">
             <button onClick={onClose} className="p-2 md:p-3 bg-cyan-400 border-2 border-black shadow-[2px_2px_0_#000] transition-all rounded-none hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"><IconClose className="w-5 h-5 md:w-6 md:h-6 text-black" /></button>
             <div className="text-center">
