@@ -58,6 +58,7 @@ export interface BookMetadata {
     genre?: string;
     hasSummary?: boolean;
     hasAudio?: boolean;
+    isPdf?: boolean;
 }
 
 export interface BookContent {
@@ -67,6 +68,7 @@ export interface BookContent {
     summaryScript?: string;
     audioSummaryUrl?: string;
     audioDuration?: number;
+    pdfData?: ArrayBuffer;
 }
 
 export interface Book extends BookMetadata, BookContent {

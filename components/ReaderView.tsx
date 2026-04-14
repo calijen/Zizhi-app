@@ -4,7 +4,10 @@ import { Box, Group, Stack, Text, ActionIcon, ScrollArea, Transition } from '@ma
 import type { Book, Chapter, Theme } from '../types';
 import { IconChevronLeft, IconMenu, IconClose } from './icons';
 import TextSelectionPopup from './TextSelectionPopup';
+import PdfPage from './PdfPage';
 import ShareDialog from './ShareDialog';
+
+declare const pdfjsLib: any;
 
 interface ReaderViewProps {
     book: Book;
@@ -18,7 +21,7 @@ interface ReaderViewProps {
 }
 
 const ChapterContent = memo(({ html, id, className }: { html: string, id: string, className: string }) => (
-    <div id={`chapter-${id.replace(/[^a-zA-Z0-9]/g, '-')}`} dangerouslySetInnerHTML={{ __html: html }} className={className} />
+    <div dangerouslySetInnerHTML={{ __html: html }} className={className} />
 ));
 
 const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateProgress, onSaveQuote, onSaveNote, onSearch }) => {
@@ -31,9 +34,21 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
     const [showShareDialog, setShowShareDialog] = useState<string | null>(null);
     const [scrollProgress, setScrollProgress] = useState(book.progress || 0);
     const [isInitialScrollDone, setIsInitialScrollDone] = useState(false);
+    const [pdfDocument, setPdfDocument] = useState<any>(null);
     
     const scrollViewportRef = useRef<HTMLDivElement>(null);
     const lastUpdateRef = useRef<number>(Date.now());
+
+    useEffect(() => {
+        if (book.isPdf && book.pdfData && typeof pdfjsLib !== 'undefined') {
+            const loadingTask = pdfjsLib.getDocument({ data: book.pdfData });
+            loadingTask.promise.then((pdf: any) => {
+                setPdfDocument(pdf);
+            }).catch((err: any) => {
+                console.error("Error loading PDF document:", err);
+            });
+        }
+    }, [book.isPdf, book.pdfData]);
 
     useEffect(() => {
         const handleResize = () => {
@@ -88,7 +103,8 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
 
     const navigateToChapter = (idx: number) => {
         const chapter = book.chapters[idx];
-        const element = document.getElementById(`chapter-${chapter.id.replace(/[^a-zA-Z0-9]/g, '-')}`);
+        const elementId = book.isPdf ? `pdf-page-${idx + 1}` : `chapter-${chapter.id.replace(/[^a-zA-Z0-9]/g, '-')}`;
+        const element = document.getElementById(elementId);
         if (element && scrollViewportRef.current) {
             scrollViewportRef.current.scrollTo({ top: element.offsetTop - 20, behavior: 'smooth' });
             setCurrentChapterIndex(idx);
@@ -157,12 +173,20 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
                 </header>
 
                 <ScrollArea className={`flex-1 ${theme.texture === 'paper' ? 'printed-texture' : ''}`} viewportRef={scrollViewportRef} onScrollPositionChange={handleScroll}>
-                    <Box className={`relative max-w-full md:max-w-3xl lg:max-w-4xl mx-auto min-h-screen pt-8 md:pt-16 pb-64 px-6 md:px-24 font-serif text-[var(--text-color)]`}>
-                        {book.chapters.map((chapter) => (
-                            <section key={chapter.id} className="mb-24 last:mb-0">
-                                <ChapterContent html={chapter.html} id={chapter.id} className={`epub-content`} />
-                            </section>
-                        ))}
+                    <Box className={`relative max-w-full ${book.isPdf ? 'md:max-w-4xl' : 'md:max-w-3xl lg:max-w-4xl'} mx-auto min-h-screen pt-8 md:pt-16 pb-64 px-6 md:px-24 font-serif text-[var(--text-color)]`}>
+                        {book.isPdf && pdfDocument ? (
+                            book.chapters.map((chapter, idx) => (
+                                <section key={chapter.id} id={`pdf-page-${idx + 1}`} className="mb-8 last:mb-0">
+                                    <PdfPage pdfDocument={pdfDocument} pageNumber={idx + 1} />
+                                </section>
+                            ))
+                        ) : (
+                            book.chapters.map((chapter) => (
+                                <section key={chapter.id} id={`chapter-${chapter.id.replace(/[^a-zA-Z0-9]/g, '-')}`} className="mb-24 last:mb-0">
+                                    <ChapterContent html={chapter.html} id={chapter.id} className={`epub-content`} />
+                                </section>
+                            ))
+                        )}
                     </Box>
                 </ScrollArea>
                 

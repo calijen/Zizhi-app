@@ -46,8 +46,8 @@ export const saveBook = async (book: Book): Promise<void> => {
     const transaction = db.transaction([BOOK_STORE, CONTENT_STORE], 'readwrite');
     
     // Extract metadata
-    const { chapters, toc, summaryScript, audioSummaryUrl, audioDuration, ...metadata } = book;
-    const content = { id: book.id, chapters, toc, summaryScript, audioSummaryUrl, audioDuration };
+    const { chapters, toc, summaryScript, audioSummaryUrl, audioDuration, pdfData, ...metadata } = book;
+    const content = { id: book.id, chapters, toc, summaryScript, audioSummaryUrl, audioDuration, pdfData };
     
     // Add flags to metadata
     const metadataWithFlags = {
