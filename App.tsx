@@ -352,9 +352,26 @@ const App: FC = () => {
                         {user && <Box className="bg-cyan-400 px-3 py-1 border-2 border-black shadow-[2px_2px_0_black]"><Text className="text-[9px] font-black uppercase text-black">Cloud Sync Active</Text></Box>}
                     </div>
                   </div>
-                  <ActionIcon variant="subtle" color="gray" size="lg" onClick={() => setViewMode(v => v === 'grid' ? 'list' : 'grid')} className="border-2 border-black shadow-[2px_2px_0_black] bg-[var(--color-background)] rounded-none">
-                      {viewMode === 'grid' ? <IconLayoutList className="w-5 h-5 text-[var(--color-primary-text)]" /> : <IconLayoutGrid className="w-5 h-5 text-[var(--color-primary-text)]" />}
-                  </ActionIcon>
+                  <Group gap="md">
+                    <ActionIcon 
+                      variant="subtle" 
+                      color="gray" 
+                      size="lg" 
+                      onClick={() => setActiveTab('settings')} 
+                      className="md:hidden border-2 border-black shadow-[2px_2px_0_black] bg-[var(--color-background)] rounded-none"
+                    >
+                        <IconSettings className="w-5 h-5 text-[var(--color-primary-text)]" />
+                    </ActionIcon>
+                    <ActionIcon 
+                      variant="subtle" 
+                      color="gray" 
+                      size="lg" 
+                      onClick={() => setViewMode(v => v === 'grid' ? 'list' : 'grid')} 
+                      className="hidden md:flex border-2 border-black shadow-[2px_2px_0_black] bg-[var(--color-background)] rounded-none"
+                    >
+                        {viewMode === 'grid' ? <IconLayoutList className="w-5 h-5 text-[var(--color-primary-text)]" /> : <IconLayoutGrid className="w-5 h-5 text-[var(--color-primary-text)]" />}
+                    </ActionIcon>
+                  </Group>
               </header>
               <main className="flex-1 overflow-y-auto no-scrollbar pb-64 md:pb-24">
                   <Box className="max-w-7xl mx-auto px-6 py-6 h-full">
@@ -398,7 +415,6 @@ const App: FC = () => {
               <Box className="relative -top-6"><input type="file" ref={fileInputRef} onChange={handleUpload} accept=".epub" className="hidden" /><ActionIcon size={72} className="bg-yellow-400 border-4 border-black shadow-[6px_6px_0_black] rounded-none" onClick={() => fileInputRef.current?.click()}>{isUploading ? <IconSpinner className="w-8 h-8 text-black" /> : <IconUpload className="w-8 h-8 text-black" />}</ActionIcon></Box>
               <NavItem tab="notes" activeTab={activeTab} onSelect={setActiveTab} icon={IconNote} label="Notes" />
               <NavItem tab="profile" activeTab={activeTab} onSelect={setActiveTab} icon={IconUser} label="Profile" />
-              <NavItem tab="settings" activeTab={activeTab} onSelect={setActiveTab} icon={IconSettings} label="Settings" />
           </nav>
           {selectedBook && <ReaderView book={selectedBook} theme={theme} onClose={() => setSelectedBook(null)} onUpdateProgress={async (bid, ci, st, ts, gp) => { 
               const bidx = library.findIndex(b => b.id === bid); 
