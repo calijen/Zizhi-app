@@ -13,7 +13,6 @@ interface PdfPageProps {
 const PdfPage: React.FC<PdfPageProps> = ({ pdfDocument, pageNumber, scale = 1.5 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textLayerRef = useRef<HTMLDivElement>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const renderTaskRef = useRef<any>(null);
 
@@ -30,7 +29,6 @@ const PdfPage: React.FC<PdfPageProps> = ({ pdfDocument, pageNumber, scale = 1.5 
         return;
       }
       
-      setLoading(true);
       setError(null);
 
       try {
@@ -77,14 +75,11 @@ const PdfPage: React.FC<PdfPageProps> = ({ pdfDocument, pageNumber, scale = 1.5 
             console.warn('Text layer rendering failed, but page image should be visible:', textErr);
           }
         }
-
-        if (isMounted) setLoading(false);
       } catch (err: any) {
         if (err.name === 'RenderingCancelledException') return;
         console.error('Error rendering PDF page:', err);
         if (isMounted) {
           setError('Failed to render page');
-          setLoading(false);
         }
       }
     };
@@ -101,11 +96,6 @@ const PdfPage: React.FC<PdfPageProps> = ({ pdfDocument, pageNumber, scale = 1.5 
 
   return (
     <Box className="relative mx-auto shadow-2xl border border-black/10 bg-white" style={{ width: 'fit-content' }}>
-      {loading && (
-        <Center className="absolute inset-0 z-10 bg-white/50 backdrop-blur-sm">
-          <Loader color="cyan" size="xl" />
-        </Center>
-      )}
       {error && (
         <Center className="absolute inset-0 z-10 bg-red-50 text-red-500 font-bold">
           {error}
