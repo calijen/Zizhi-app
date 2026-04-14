@@ -17,6 +17,7 @@ import * as db from './db';
 import { supabase } from './supabase';
 import type { Book, BookMetadata, BookContent, Quote, Note, Theme, ThemeFont, GenerationStatus } from './types';
 import { parseEpub } from './epubParser';
+import { parsePdf } from './pdfParser';
 import { GoogleGenAI, Modality } from "@google/genai";
 
 const FONTS: ThemeFont[] = [
@@ -180,7 +181,13 @@ const App: FC = () => {
     const file = e.target.files?.[0]; if (!file) return;
     setIsUploading(true);
     try {
-        const newBook = await parseEpub(file); newBook.lastOpened = Date.now();
+        let newBook: Book;
+        if (file.name.toLowerCase().endsWith('.pdf')) {
+            newBook = await parsePdf(file);
+        } else {
+            newBook = await parseEpub(file);
+        }
+        newBook.lastOpened = Date.now();
         await db.saveBook(newBook); 
         
         // Update library state with metadata only
@@ -188,8 +195,11 @@ const App: FC = () => {
         const metaWithFlags = { ...metadata, hasSummary: !!summaryScript, hasAudio: !!audioSummaryUrl };
         setLibrary(prev => [metaWithFlags, ...prev]);
         
-        setToast({ message: "Book added to your library." });
-    } catch (err) { setToast({ message: "EPUB parsing failed." }); } finally { setIsUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
+        setToast({ message: `${file.name.toLowerCase().endsWith('.pdf') ? 'PDF' : 'EPUB'} added to your library.` });
+    } catch (err) { 
+        console.error(err);
+        setToast({ message: "File parsing failed." }); 
+    } finally { setIsUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
   };
 
   const handleBookSelect = async (bookId: string) => {
@@ -407,12 +417,12 @@ const App: FC = () => {
                       {activeTab === 'settings' && <SettingsView currentTheme={theme} onThemeChange={(t) => { setTheme(t); setColorScheme(t.id === 'nocturne' ? 'dark' : 'light'); localStorage.setItem('zizhi-theme', JSON.stringify(t)); }} themes={ATMOSPHERES} fonts={FONTS} textures={{}} />}
                   </Box>
               </main>
-              <Box className="hidden md:block fixed bottom-12 right-12 z-[250]"><input type="file" ref={fileInputRef} onChange={handleUpload} accept=".epub" className="hidden" /><ActionIcon size={80} className="bg-yellow-400 border-4 border-black shadow-[8px_8px_0_black] hover:translate-y-[-2px] transition-all rounded-none" onClick={() => fileInputRef.current?.click()}>{isUploading ? <IconSpinner className="w-10 h-10 text-black" /> : <IconUpload className="w-10 h-10 text-black" />}</ActionIcon></Box>
+              <Box className="hidden md:block fixed bottom-12 right-12 z-[250]"><input type="file" ref={fileInputRef} onChange={handleUpload} accept=".epub,.pdf" className="hidden" /><ActionIcon size={80} className="bg-yellow-400 border-4 border-black shadow-[8px_8px_0_black] hover:translate-y-[-2px] transition-all rounded-none" onClick={() => fileInputRef.current?.click()}>{isUploading ? <IconSpinner className="w-10 h-10 text-black" /> : <IconUpload className="w-10 h-10 text-black" />}</ActionIcon></Box>
           </Box>
           <nav className="fixed bottom-0 left-0 right-0 bg-[var(--color-surface)] h-20 flex items-center justify-around z-[200] border-t-4 border-black md:hidden">
               <NavItem tab="library" activeTab={activeTab} onSelect={setActiveTab} icon={IconLibrary} label="Library" />
               <NavItem tab="quotes" activeTab={activeTab} onSelect={setActiveTab} icon={IconQuote} label="Quotes" />
-              <Box className="relative -top-6"><input type="file" ref={fileInputRef} onChange={handleUpload} accept=".epub" className="hidden" /><ActionIcon size={72} className="bg-yellow-400 border-4 border-black shadow-[6px_6px_0_black] rounded-none" onClick={() => fileInputRef.current?.click()}>{isUploading ? <IconSpinner className="w-8 h-8 text-black" /> : <IconUpload className="w-8 h-8 text-black" />}</ActionIcon></Box>
+              <Box className="relative -top-6"><input type="file" ref={fileInputRef} onChange={handleUpload} accept=".epub,.pdf" className="hidden" /><ActionIcon size={72} className="bg-yellow-400 border-4 border-black shadow-[6px_6px_0_black] rounded-none" onClick={() => fileInputRef.current?.click()}>{isUploading ? <IconSpinner className="w-8 h-8 text-black" /> : <IconUpload className="w-8 h-8 text-black" />}</ActionIcon></Box>
               <NavItem tab="notes" activeTab={activeTab} onSelect={setActiveTab} icon={IconNote} label="Notes" />
               <NavItem tab="profile" activeTab={activeTab} onSelect={setActiveTab} icon={IconUser} label="Profile" />
           </nav>

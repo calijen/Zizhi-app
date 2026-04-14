@@ -299,6 +299,15 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
                     display: block !important;
                     border: 1px solid var(--border-color);
                 }
+                .pdf-page-container {
+                    margin-bottom: 2rem;
+                    display: flex;
+                    justify-content: center;
+                }
+                .pdf-page-container img {
+                    margin: 0 !important;
+                    box-shadow: 0 20px 50px rgba(0,0,0,0.15) !important;
+                }
             `}</style>
         </Box>
     );
