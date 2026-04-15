@@ -30,39 +30,44 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
         </div>
         <button 
           onClick={onEnter}
-          className="bg-[#FF6321] text-white px-6 py-2 border-2 border-black shadow-[4px_4px_0px_black] font-black uppercase text-sm hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all"
+          aria-label="Start reading"
+          className="bg-[#FF6321] text-white px-6 py-2 border-2 border-black shadow-[4px_4px_0px_black] font-black uppercase text-sm hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none focus-visible:ring-4 focus-visible:ring-cyan-400 outline-none transition-all"
         >
           Start Reading
         </button>
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-40 pb-20 px-6 max-w-7xl mx-auto">
-        <div className="flex flex-col items-center text-center mb-16">
+      <section className="pt-32 md:pt-40 pb-16 md:pb-20 px-6 max-w-7xl mx-auto">
+        <div className="flex flex-col items-center text-center mb-12 md:mb-16">
           <motion.div
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
           >
-            <div className="inline-block bg-yellow-300 border-2 border-black px-4 py-1 mb-6 rotate-[-2deg] font-black uppercase tracking-widest text-xs">
+            <div className="inline-block bg-yellow-300 border-2 border-black px-4 py-1 mb-6 rotate-[-2deg] font-black uppercase tracking-widest text-[10px] md:text-xs">
               The future of reading is here
             </div>
-            <h1 className="text-7xl md:text-[10rem] font-black uppercase tracking-tighter leading-[0.8] mb-8">
+            <h1 className="text-5xl sm:text-7xl md:text-[9rem] lg:text-[10rem] font-black uppercase tracking-tighter leading-[0.9] md:leading-[0.8] mb-8 break-words">
               Turn books <br />
-              <span className="text-[#FF6321] bg-black px-4 inline-block rotate-[1deg]">into ideas</span>
+              <span className="text-[#FF6321] bg-black px-2 md:px-4 inline-block rotate-[1deg]">into ideas</span>
             </h1>
-            <p className="text-2xl md:text-3xl font-bold text-black max-w-2xl mx-auto mb-12 leading-tight">
+            <p className="text-xl md:text-3xl font-bold text-black max-w-2xl mx-auto mb-10 md:mb-12 leading-tight">
               Zizhi turns everything you read into something you actually remember. No more lost highlights.
             </p>
-            <div className="flex flex-col sm:flex-row gap-6 justify-center">
+            <div className="flex flex-col sm:flex-row gap-4 md:gap-6 justify-center">
               <button 
                 onClick={onEnter}
-                className="bg-black text-white px-12 py-5 border-4 border-black shadow-[10px_10px_0px_#FF6321] font-black text-xl flex items-center justify-center gap-3 hover:translate-x-[4px] hover:translate-y-[4px] hover:shadow-none transition-all uppercase group"
+                aria-label="Start reading now"
+                className="bg-black text-white px-8 md:px-12 py-4 md:py-5 border-4 border-black shadow-[6px_6px_0px_#FF6321] md:shadow-[10px_10px_0px_#FF6321] font-black text-lg md:text-xl flex items-center justify-center gap-3 hover:translate-x-[4px] hover:translate-y-[4px] hover:shadow-none focus-visible:ring-4 focus-visible:ring-cyan-400 outline-none transition-all uppercase group"
               >
                 Start Reading
-                <ArrowRight className="w-6 h-6 group-hover:translate-x-2 transition-transform" />
+                <ArrowRight className="w-5 h-5 md:w-6 md:h-6 group-hover:translate-x-2 transition-transform" />
               </button>
-              <button className="bg-white border-4 border-black text-black px-12 py-5 shadow-[10px_10px_0px_black] font-black text-xl hover:translate-x-[4px] hover:translate-y-[4px] hover:shadow-none transition-all uppercase">
+              <button 
+                aria-label="Learn how it works"
+                className="bg-white border-4 border-black text-black px-8 md:px-12 py-4 md:py-5 shadow-[6px_6px_0px_black] md:shadow-[10px_10px_0px_black] font-black text-lg md:text-xl hover:translate-x-[4px] hover:translate-y-[4px] hover:shadow-none focus-visible:ring-4 focus-visible:ring-cyan-400 outline-none transition-all uppercase"
+              >
                 How it works
               </button>
             </div>
@@ -70,15 +75,15 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
         </div>
 
         {/* Marquee */}
-        <div className="w-full border-y-4 border-black py-4 overflow-hidden bg-cyan-400 mb-20 rotate-[-1deg]">
-          <div className="flex whitespace-nowrap animate-marquee">
+        <div className="w-full border-y-4 border-black py-4 overflow-hidden bg-cyan-400 mb-16 md:mb-20 rotate-[-1deg]">
+          <div className="flex whitespace-nowrap animate-marquee motion-reduce:animate-none">
             {[...Array(10)].map((_, i) => (
-              <span key={i} className="text-2xl font-black uppercase mx-8 flex items-center gap-4">
-                <Sparkles className="w-6 h-6" />
+              <span key={i} className="text-xl md:text-2xl font-black uppercase mx-8 flex items-center gap-4">
+                <Sparkles className="w-5 h-5 md:w-6 md:h-6" />
                 Stop Forgetting
-                <Sparkles className="w-6 h-6" />
+                <Sparkles className="w-5 h-5 md:w-6 md:h-6" />
                 Read Better
-                <Sparkles className="w-6 h-6" />
+                <Sparkles className="w-5 h-5 md:w-6 md:h-6" />
                 Think Deeper
               </span>
             ))}
@@ -86,11 +91,11 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
         </div>
 
         {/* Split Screen Visual */}
-        <div className="grid md:grid-cols-2 gap-0 border-4 border-black overflow-hidden shadow-[24px_24px_0px_black]">
+        <div className="grid md:grid-cols-2 gap-0 border-4 border-black overflow-hidden shadow-[12px_12px_0px_black] md:shadow-[24px_24px_0px_black]">
           {/* Left: Chaos */}
-          <div className="bg-[#E5E5E0] p-8 md:p-12 relative overflow-hidden min-h-[400px] flex flex-col justify-center items-center border-b md:border-b-0 md:border-r-2 border-black">
-            <div className="absolute top-4 left-4 uppercase text-[10px] font-black tracking-widest opacity-40">The Chaos</div>
-            <div className="relative w-full h-full flex items-center justify-center">
+          <div className="bg-[#E5E5E0] p-6 md:p-12 relative overflow-hidden min-h-[300px] md:min-h-[400px] flex flex-col justify-center items-center border-b md:border-b-0 md:border-r-2 border-black">
+            <div className="absolute top-4 left-4 uppercase text-[8px] md:text-[10px] font-black tracking-widest opacity-40">The Chaos</div>
+            <div className="relative w-full h-full flex items-center justify-center scale-75 md:scale-100">
               {/* Stack of messy books representation */}
               <div className="relative w-64 h-80">
                 <div className="absolute top-0 left-0 w-48 h-64 bg-white border-2 border-black rotate-[-15deg] shadow-md flex flex-col p-4 gap-2">
@@ -166,32 +171,32 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
       </section>
 
       {/* Section 2: Forgetting Problem */}
-      <section className="py-32 bg-black text-white overflow-hidden border-y-8 border-[#FF6321]">
+      <section className="py-20 md:py-32 bg-black text-white overflow-hidden border-y-8 border-[#FF6321]">
         <div className="max-w-5xl mx-auto px-6">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
-            className="space-y-12"
+            className="space-y-8 md:space-y-12"
           >
-            <h2 className="text-5xl md:text-8xl font-black uppercase tracking-tighter leading-[0.8] text-center">
+            <h2 className="text-4xl sm:text-5xl md:text-8xl font-black uppercase tracking-tighter leading-[0.9] md:leading-[0.8] text-center">
               You don’t have a <br />
-              <span className="bg-[#FF6321] text-black px-4 inline-block mt-2">reading problem.</span>
+              <span className="bg-[#FF6321] text-black px-2 md:px-4 inline-block mt-2">reading problem.</span>
             </h2>
             
-            <div className="grid md:grid-cols-2 gap-16 items-center pt-12">
-              <div className="space-y-6 text-2xl md:text-4xl font-black uppercase italic">
+            <div className="grid md:grid-cols-2 gap-10 md:gap-16 items-center pt-8 md:pt-12">
+              <div className="space-y-4 md:space-y-6 text-xl sm:text-2xl md:text-4xl font-black uppercase italic">
                 <p className="text-white/40 hover:text-white transition-colors">You highlight.</p>
                 <p className="text-white/40 hover:text-white transition-colors">You screenshot.</p>
                 <p className="text-white/40 hover:text-white transition-colors">You bookmark.</p>
                 <p className="text-white/40 hover:text-white transition-colors">You tell yourself you’ll come back to it.</p>
-                <p className="text-[#FF6321] text-5xl md:text-7xl mt-8 not-italic underline decoration-8">You don’t.</p>
+                <p className="text-[#FF6321] text-4xl sm:text-5xl md:text-7xl mt-6 md:mt-8 not-italic underline decoration-4 md:decoration-8 underline-offset-4">You don’t.</p>
               </div>
-              <div className="space-y-8">
-                <p className="text-2xl md:text-3xl font-bold leading-tight">
+              <div className="space-y-6 md:space-y-8">
+                <p className="text-xl md:text-3xl font-bold leading-tight">
                   Your best ideas are buried inside books you already read. They are dead weight.
                 </p>
-                <div className="inline-block bg-cyan-400 text-black px-8 py-4 border-4 border-white font-black text-3xl uppercase rotate-[-3deg] shadow-[8px_8px_0px_white]">
+                <div className="inline-block bg-cyan-400 text-black px-6 md:px-8 py-3 md:py-4 border-2 md:border-4 border-white font-black text-xl md:text-3xl uppercase rotate-[-3deg] shadow-[6px_6px_0px_white] md:shadow-[8px_8px_0px_white]">
                   Zizhi fixes that.
                 </div>
               </div>
@@ -201,12 +206,12 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
       </section>
 
       {/* Section 3: 3 Columns */}
-      <section className="py-32 px-6 max-w-7xl mx-auto">
-        <h2 className="text-5xl md:text-7xl font-black uppercase tracking-tighter text-center mb-24 leading-[0.9]">
+      <section className="py-20 md:py-32 px-6 max-w-7xl mx-auto">
+        <h2 className="text-4xl md:text-7xl font-black uppercase tracking-tighter text-center mb-16 md:mb-24 leading-[0.9]">
           Everything reading apps <br /> forgot to combine.
         </h2>
         
-        <div className="grid md:grid-cols-3 gap-12">
+        <div className="grid md:grid-cols-3 gap-8 md:gap-12">
           {[
             {
               num: "01",
@@ -233,14 +238,14 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
             <motion.div 
               key={i}
               whileHover={{ translate: "-8px -8px" }}
-              className={`p-10 border-4 border-black rounded-none ${item.color} shadow-[12px_12px_0px_black] flex flex-col gap-6 relative group`}
+              className={`p-8 md:p-10 border-4 border-black rounded-none ${item.color} shadow-[8px_8px_0px_black] md:shadow-[12px_12px_0px_black] flex flex-col gap-4 md:gap-6 relative group`}
             >
-              <div className="absolute -top-6 -left-6 w-16 h-16 bg-black text-white flex items-center justify-center font-black text-2xl border-4 border-white">
+              <div className="absolute -top-4 -left-4 md:-top-6 md:-left-6 w-12 h-12 md:w-16 md:h-16 bg-black text-white flex items-center justify-center font-black text-xl md:text-2xl border-4 border-white">
                 {item.num}
               </div>
-              <div className="text-6xl mt-4">{item.icon}</div>
-              <h3 className="text-3xl font-black uppercase tracking-tighter">{item.title}</h3>
-              <p className="text-black font-bold text-lg leading-tight">
+              <div className="text-5xl md:text-6xl mt-4">{item.icon}</div>
+              <h3 className="text-2xl md:text-3xl font-black uppercase tracking-tighter">{item.title}</h3>
+              <p className="text-black font-bold text-base md:text-lg leading-tight">
                 {item.desc}
               </p>
             </motion.div>
@@ -342,16 +347,17 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
       </section>
 
       {/* Final CTA */}
-      <section className="py-40 bg-black text-white text-center px-6 relative overflow-hidden">
+      <section className="py-24 md:py-40 bg-black text-white text-center px-6 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-4 bg-[#FF6321]" />
-        <div className="max-w-4xl mx-auto space-y-16">
-          <h2 className="text-6xl md:text-[9rem] font-black uppercase tracking-tighter leading-[0.8]">
+        <div className="max-w-4xl mx-auto space-y-12 md:space-y-16">
+          <h2 className="text-4xl sm:text-6xl md:text-[8rem] lg:text-[9rem] font-black uppercase tracking-tighter leading-[0.9] md:leading-[0.8]">
             If you’re going <br className="hidden md:block" /> to read, <br />
             you might as well <span className="text-[#FF6321]">remember.</span>
           </h2>
           <button 
             onClick={onEnter}
-            className="bg-[#FF6321] text-white px-16 py-8 border-4 border-white shadow-[12px_12px_0px_white] font-black text-3xl uppercase hover:translate-x-2 hover:translate-y-2 hover:shadow-none transition-all"
+            aria-label="Start reading now"
+            className="bg-[#FF6321] text-white px-10 md:px-16 py-6 md:py-8 border-4 border-white shadow-[8px_8px_0px_white] md:shadow-[12px_12px_0px_white] font-black text-xl md:text-3xl uppercase hover:translate-x-2 hover:translate-y-2 hover:shadow-none focus-visible:ring-4 focus-visible:ring-cyan-400 outline-none transition-all"
           >
             Start reading now
           </button>
