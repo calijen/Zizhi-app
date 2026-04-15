@@ -75,13 +75,13 @@ const NavItem = ({ tab, activeTab, icon: Icon, label, onSelect, collapsed }: { t
     const isActive = activeTab === tab;
     return (
         <Stack gap={4} align="center" className={`cursor-pointer transition-all duration-200 group ${isActive ? 'text-[var(--color-primary-text)]' : 'text-[var(--color-muted-text)] hover:text-[var(--color-primary-text)]'}`} onClick={() => onSelect(tab)}>
-            <Box className={`relative flex items-center justify-center w-10 h-10 md:w-full md:px-6 md:py-6 transition-all border-2 rounded-none ${isActive ? 'bg-[var(--color-primary)] border-black md:translate-x-1 shadow-[4px_4px_0px_black]' : 'border-transparent'}`}>
-                <Group gap="md" wrap="nowrap" className={`w-full justify-center ${collapsed ? 'md:justify-center' : 'md:justify-start'}`}>
+            <Box className={`relative flex items-center justify-center transition-all border-2 rounded-none ${collapsed ? 'w-12 h-12' : 'w-10 h-10 md:w-full md:px-6 md:py-6'} ${isActive ? 'bg-[var(--color-primary)] border-black md:translate-x-1 shadow-[4px_4px_0px_black]' : 'border-transparent'}`}>
+                <Group gap={collapsed ? 0 : "md"} wrap="nowrap" className={`w-full justify-center ${collapsed ? 'md:justify-center' : 'md:justify-start'}`}>
                     <Icon className={`w-5 h-5 transition-transform ${isActive ? 'scale-110 text-white' : ''}`} />
                     {!collapsed && <Text className={`hidden md:block text-[13px] font-black uppercase tracking-widest ${isActive ? 'text-white' : ''}`}>{label}</Text>}
                 </Group>
             </Box>
-            <Text className="md:hidden text-[9px] font-black uppercase tracking-wider">{label}</Text>
+            {!collapsed && <Text className="md:hidden text-[9px] font-black uppercase tracking-wider">{label}</Text>}
         </Stack>
     );
 };
@@ -379,14 +379,14 @@ const App: FC = () => {
                   </div>
                 )}
               </div>
-              <nav className="flex-1 p-6 space-y-4">
+              <nav className={`flex-1 ${isSidebarCollapsed ? 'p-2' : 'p-6'} space-y-4`}>
                   <NavItem tab="library" activeTab={activeTab} onSelect={setActiveTab} icon={IconLibrary} label="Library" collapsed={isSidebarCollapsed} />
                   <NavItem tab="quotes" activeTab={activeTab} onSelect={setActiveTab} icon={IconQuote} label="Quotes" collapsed={isSidebarCollapsed} />
                   <NavItem tab="notes" activeTab={activeTab} onSelect={setActiveTab} icon={IconNote} label="Notes" collapsed={isSidebarCollapsed} />
                   <NavItem tab="profile" activeTab={activeTab} onSelect={setActiveTab} icon={IconUser} label="Profile" collapsed={isSidebarCollapsed} />
                   <NavItem tab="settings" activeTab={activeTab} onSelect={setActiveTab} icon={IconSettings} label="Settings" collapsed={isSidebarCollapsed} />
               </nav>
-              <div className="p-8 border-t-2 border-black opacity-30 overflow-hidden whitespace-nowrap">
+              <div className={`${isSidebarCollapsed ? 'p-2' : 'p-8'} border-t-2 border-black opacity-30 overflow-hidden whitespace-nowrap`}>
                 <Text className="text-[10px] font-black uppercase text-[var(--color-primary-text)]">{isSidebarCollapsed ? 'v4.2' : 'Zizhi v4.2'}</Text>
               </div>
           </aside>
