@@ -92,9 +92,9 @@ const App: FC = () => {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [user, setUser] = useState<any>(null);
-  const [showAuth, setShowAuth] = useState(false);
   const [hasEntered, setHasEntered] = useState<boolean | null>(null);
-  const [activeTab, setActiveTab] = useState<'library' | 'quotes' | 'notes' | 'profile' | 'settings'>('library');
+  const [activeTab, setActiveTab] = useState<'library' | 'quotes' | 'notes' | 'profile' | 'settings' | 'auth'>('library');
+  const [streak, setStreak] = useState(1);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
@@ -106,8 +106,36 @@ const App: FC = () => {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const updateStreak = useCallback(() => {
+    const lastVisit = localStorage.getItem('zizhi-last-visit');
+    const savedStreak = localStorage.getItem('zizhi-streak');
+    const today = new Date().toISOString().split('T')[0];
+    
+    let currentStreak = savedStreak ? parseInt(savedStreak) : 1;
+    
+    if (lastVisit) {
+      const lastDate = new Date(lastVisit);
+      const todayDate = new Date(today);
+      const diffTime = Math.abs(todayDate.getTime() - lastDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 1) {
+        currentStreak += 1;
+      } else if (diffDays > 1) {
+        currentStreak = 1;
+      }
+    } else {
+      currentStreak = 1;
+    }
+    
+    setStreak(currentStreak);
+    localStorage.setItem('zizhi-last-visit', today);
+    localStorage.setItem('zizhi-streak', currentStreak.toString());
+  }, []);
+
   const loadData = useCallback(async () => {
     try {
+      updateStreak();
       let localBooks = await db.getBooks();
       const localQuotes = await db.getQuotes();
       const localNotes = await db.getNotes();
@@ -422,8 +450,9 @@ const App: FC = () => {
                               if (content) setSelectedBook({ ...meta, ...content });
                           }
                       }} />}
-                      {activeTab === 'profile' && <ProfileView user={user} streak={0} library={library} onShowAuth={() => setShowAuth(true)} activity={[]} onSignOut={async () => { await supabase.auth.signOut(); setUser(null); }} />}
+                      {activeTab === 'profile' && <ProfileView user={user} streak={streak} library={library} onShowAuth={() => setActiveTab('auth')} activity={[]} onSignOut={async () => { await supabase.auth.signOut(); setUser(null); }} />}
                       {activeTab === 'settings' && <SettingsView currentTheme={theme} onThemeChange={(t) => { setTheme(t); setColorScheme(t.id === 'nocturne' ? 'dark' : 'light'); localStorage.setItem('zizhi-theme', JSON.stringify(t)); }} themes={ATMOSPHERES} fonts={FONTS} textures={{}} />}
+                      {activeTab === 'auth' && <AuthView onClose={() => setActiveTab('profile')} onLogin={(u) => { setUser(u); setActiveTab('profile'); }} />}
                   </Box>
               </main>
               <Box className="hidden md:block fixed bottom-12 right-12 z-[250]"><input type="file" ref={fileInputRef} onChange={handleUpload} accept=".epub,.pdf" className="hidden" /><ActionIcon size={80} className="bg-yellow-400 border-4 border-black shadow-[8px_8px_0_black] hover:translate-y-[-2px] transition-all rounded-none" onClick={() => fileInputRef.current?.click()}>{isUploading ? <IconSpinner className="w-10 h-10 text-black" /> : <IconUpload className="w-10 h-10 text-black" />}</ActionIcon></Box>
@@ -455,7 +484,6 @@ const App: FC = () => {
               }
           }} onSaveQuote={async (t, c) => { const nq: Quote = { id: crypto.randomUUID(), text: t, bookTitle: selectedBook.title, author: selectedBook.author, bookId: selectedBook.id, location: c, createdAt: Date.now() }; await db.saveQuote(nq); setQuotes(prev => [nq, ...prev]); setToast({ message: "Quote archived." }); }} onSaveNote={async (t, n, c) => { const nn: Note = { id: crypto.randomUUID(), text: t, note: n, bookTitle: selectedBook.title, author: selectedBook.author, bookId: selectedBook.id, location: c, createdAt: Date.now() }; await db.saveNote(nn); setNotes(prev => [nn, ...prev]); setToast({ message: "Note saved." }); }} onSearch={() => {}} />}
           {summaryBook && <SummaryView book={summaryBook} onClose={() => setSummaryBook(null)} />}
-          {showAuth && <AuthView onClose={() => setShowAuth(false)} onLogin={(u) => setUser(u)} />}
           {toast && <Toast message={toast.message} action={toast.action} onClose={() => setToast(null)} />}
 
           {deleteConfirm && (

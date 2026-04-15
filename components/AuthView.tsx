@@ -131,7 +131,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
     };
 
     return (
-        <div className="fixed inset-0 z-[100] bg-[var(--color-background)] flex flex-col items-center p-6 animate-fade-in overflow-y-auto no-scrollbar">
+        <div className="w-full min-h-full bg-[var(--color-background)] flex flex-col items-center p-6 animate-fade-in overflow-y-auto no-scrollbar">
             <button onClick={onClose} className="absolute top-6 right-6 p-2 text-[var(--color-primary-text)] hover:bg-black/10 transition-colors rounded-none z-[110]" aria-label="Close auth">
                 <IconClose className="w-8 h-8" />
             </button>
