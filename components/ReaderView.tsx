@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { Box, Group, Stack, Text, ActionIcon, ScrollArea, Transition, Loader, Center } from '@mantine/core';
 import type { Book, Chapter, Theme } from '../types';
-import { IconChevronLeft, IconMenu, IconClose } from './icons';
+import { IconChevronLeft, IconMenu, IconClose, IconPlus, IconMinus } from './icons';
 import TextSelectionPopup from './TextSelectionPopup';
 import PdfPage from './PdfPage';
 import ShareDialog from './ShareDialog';
@@ -36,6 +36,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
     const [isInitialScrollDone, setIsInitialScrollDone] = useState(false);
     const [pdfDocument, setPdfDocument] = useState<any>(null);
     const [isPdfLoading, setIsPdfLoading] = useState(book.isPdf);
+    const [pdfScale, setPdfScale] = useState(window.innerWidth < 768 ? 1.2 : 1.5);
     
     const scrollViewportRef = useRef<HTMLDivElement>(null);
     const lastUpdateRef = useRef<number>(Date.now());
@@ -174,6 +175,28 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
                         </Box>
                     </Group>
 
+                    {book.isPdf && (
+                        <Group gap={4} className="hidden sm:flex">
+                            <ActionIcon 
+                                variant="subtle" 
+                                color="gray" 
+                                onClick={() => setPdfScale(prev => Math.max(0.5, prev - 0.1))}
+                                className="text-[var(--text-color)]"
+                            >
+                                <IconMinus size={16} />
+                            </ActionIcon>
+                            <Text className="text-[10px] font-black w-8 text-center">{Math.round(pdfScale * 100)}%</Text>
+                            <ActionIcon 
+                                variant="subtle" 
+                                color="gray" 
+                                onClick={() => setPdfScale(prev => Math.min(3, prev + 0.1))}
+                                className="text-[var(--text-color)]"
+                            >
+                                <IconPlus size={16} />
+                            </ActionIcon>
+                        </Group>
+                    )}
+
                     {!isDesktopTocPersistent && (
                         <ActionIcon variant="filled" color="yellow" size="lg" onClick={() => setShowToc(true)} className="border-2 border-black rounded-none shadow-[3px_3px_0_black] bg-[var(--bg-color)]"><IconMenu className="text-[var(--text-color)] w-5 h-5" /></ActionIcon>
                     )}
@@ -190,7 +213,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
                         ) : book.isPdf && pdfDocument ? (
                             book.chapters.map((chapter, idx) => (
                                 <section key={chapter.id} id={`pdf-page-${idx + 1}`} className="mb-8 last:mb-0">
-                                    <PdfPage pdfDocument={pdfDocument} pageNumber={idx + 1} />
+                                    <PdfPage pdfDocument={pdfDocument} pageNumber={idx + 1} scale={pdfScale} />
                                 </section>
                             ))
                         ) : (
@@ -206,6 +229,29 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
                 <Box className="md:hidden fixed bottom-0 left-0 right-0 h-1.5 bg-black/10 z-[1100]">
                     <Box className="h-full bg-cyan-400" style={{ width: `${scrollProgress * 100}%` }} />
                 </Box>
+
+                {book.isPdf && (
+                    <Box className="sm:hidden fixed bottom-8 right-6 z-[1200] flex flex-col gap-3">
+                        <ActionIcon 
+                            size={48}
+                            variant="filled" 
+                            color="cyan" 
+                            onClick={() => setPdfScale(prev => Math.min(3, prev + 0.2))}
+                            className="border-2 border-black rounded-none shadow-[4px_4px_0_black] active:translate-x-1 active:translate-y-1 active:shadow-none"
+                        >
+                            <IconPlus size={24} />
+                        </ActionIcon>
+                        <ActionIcon 
+                            size={48}
+                            variant="filled" 
+                            color="cyan" 
+                            onClick={() => setPdfScale(prev => Math.max(0.5, prev - 0.2))}
+                            className="border-2 border-black rounded-none shadow-[4px_4px_0_black] active:translate-x-1 active:translate-y-1 active:shadow-none"
+                        >
+                            <IconMinus size={24} />
+                        </ActionIcon>
+                    </Box>
+                )}
             </Box>
 
             {selection && (
