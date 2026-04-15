@@ -257,7 +257,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
                 </header>
 
                 <ScrollArea className={`flex-1 ${theme.texture === 'paper' ? 'printed-texture' : ''}`} viewportRef={scrollViewportRef} onScrollPositionChange={handleScroll}>
-                    <Box className={`relative w-full mx-auto min-h-screen pt-8 md:pt-16 pb-64 px-4 md:px-8 font-serif text-[var(--text-color)] overflow-x-auto`}>
+                    <Box className={`relative ${book.isPdf ? 'w-full' : 'max-w-3xl'} mx-auto min-h-screen pt-8 md:pt-16 pb-64 px-4 md:px-8 font-serif text-[var(--text-color)] overflow-x-auto`}>
                         {isPdfLoading ? (
                             <Center className="h-64 flex-col gap-4">
                                 <Loader color="cyan" size="xl" />
