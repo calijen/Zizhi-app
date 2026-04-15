@@ -56,23 +56,32 @@ const PdfPage: React.FC<PdfPageProps> = ({ pdfDocument, pageNumber, scale = 1.5 
         
         if (!isMounted) return;
 
+        const outputScale = window.devicePixelRatio || 1;
         const viewport = page.getViewport({ scale });
         const canvas = canvasRef.current;
         if (!canvas) return;
 
-        const context = canvas.getContext('2d');
+        const context = canvas.getContext('2d', { alpha: false });
         if (!context) return;
 
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
+        // Set canvas dimensions accounting for device pixel ratio for high quality
+        canvas.width = Math.floor(viewport.width * outputScale);
+        canvas.height = Math.floor(viewport.height * outputScale);
+        canvas.style.width = `${Math.floor(viewport.width)}px`;
+        canvas.style.height = `${Math.floor(viewport.height)}px`;
 
         if (renderTaskRef.current) {
           renderTaskRef.current.cancel();
         }
 
+        const transform = outputScale !== 1 
+          ? [outputScale, 0, 0, outputScale, 0, 0] 
+          : null;
+
         const renderContext = {
           canvasContext: context,
           viewport: viewport,
+          transform: transform
         };
 
         renderTaskRef.current = page.render(renderContext);
@@ -80,8 +89,14 @@ const PdfPage: React.FC<PdfPageProps> = ({ pdfDocument, pageNumber, scale = 1.5 
 
         if (textLayerRef.current) {
           textLayerRef.current.innerHTML = '';
+          textLayerRef.current.style.width = `${viewport.width}px`;
+          textLayerRef.current.style.height = `${viewport.height}px`;
+          
           try {
-            const textContent = await page.getTextContent();
+            const textContent = await page.getTextContent({
+              includeMarkedContent: true,
+              disableCombineTextItems: false
+            });
             const textLayerTask = pdfjs.renderTextLayer({
               textContent: textContent,
               container: textLayerRef.current,
@@ -118,7 +133,7 @@ const PdfPage: React.FC<PdfPageProps> = ({ pdfDocument, pageNumber, scale = 1.5 
       className="relative mx-auto shadow-2xl border border-black/10 bg-white" 
       style={{ 
         width: 'fit-content',
-        minHeight: isVisible ? 'auto' : '800px',
+        minHeight: isVisible ? 'auto' : `${800 * scale}px`,
         minWidth: '300px'
       }}
     >
@@ -127,7 +142,7 @@ const PdfPage: React.FC<PdfPageProps> = ({ pdfDocument, pageNumber, scale = 1.5 
           {error}
         </Center>
       )}
-      <canvas ref={canvasRef} className="block max-w-full h-auto" />
+      <canvas ref={canvasRef} className="block h-auto" />
       <div 
         ref={textLayerRef} 
         className="textLayer absolute inset-0 pointer-events-auto" 

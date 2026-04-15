@@ -36,10 +36,11 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
     const [isInitialScrollDone, setIsInitialScrollDone] = useState(false);
     const [pdfDocument, setPdfDocument] = useState<any>(null);
     const [isPdfLoading, setIsPdfLoading] = useState(book.isPdf);
-    const [pdfScale, setPdfScale] = useState(window.innerWidth < 768 ? 1.2 : 1.5);
+    const [pdfScale, setPdfScale] = useState(window.innerWidth < 768 ? 1.5 : 2.0);
     
     const scrollViewportRef = useRef<HTMLDivElement>(null);
     const lastUpdateRef = useRef<number>(Date.now());
+    const touchStartDistRef = useRef<number | null>(null);
 
     useEffect(() => {
         if (book.isPdf && book.pdfData && typeof pdfjsLib !== 'undefined') {
@@ -58,6 +59,58 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
             });
         }
     }, [book.isPdf, book.pdfData]);
+
+    useEffect(() => {
+        const viewport = scrollViewportRef.current;
+        if (!viewport || !book.isPdf) return;
+
+        const handleWheel = (e: WheelEvent) => {
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                setPdfScale(prev => Math.min(4, Math.max(0.5, prev + delta)));
+            }
+        };
+
+        const handleTouchStart = (e: TouchEvent) => {
+            if (e.touches.length === 2) {
+                const dist = Math.hypot(
+                    e.touches[0].pageX - e.touches[1].pageX,
+                    e.touches[0].pageY - e.touches[1].pageY
+                );
+                touchStartDistRef.current = dist;
+            }
+        };
+
+        const handleTouchMove = (e: TouchEvent) => {
+            if (e.touches.length === 2 && touchStartDistRef.current !== null) {
+                e.preventDefault();
+                const dist = Math.hypot(
+                    e.touches[0].pageX - e.touches[1].pageX,
+                    e.touches[0].pageY - e.touches[1].pageY
+                );
+                const delta = (dist - touchStartDistRef.current) / 100;
+                setPdfScale(prev => Math.min(4, Math.max(0.5, prev + delta)));
+                touchStartDistRef.current = dist;
+            }
+        };
+
+        const handleTouchEnd = () => {
+            touchStartDistRef.current = null;
+        };
+
+        viewport.addEventListener('wheel', handleWheel, { passive: false });
+        viewport.addEventListener('touchstart', handleTouchStart, { passive: false });
+        viewport.addEventListener('touchmove', handleTouchMove, { passive: false });
+        viewport.addEventListener('touchend', handleTouchEnd);
+
+        return () => {
+            viewport.removeEventListener('wheel', handleWheel);
+            viewport.removeEventListener('touchstart', handleTouchStart);
+            viewport.removeEventListener('touchmove', handleTouchMove);
+            viewport.removeEventListener('touchend', handleTouchEnd);
+        };
+    }, [book.isPdf]);
 
     useEffect(() => {
         const handleResize = () => {
@@ -180,7 +233,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
                             <ActionIcon 
                                 variant="subtle" 
                                 color="gray" 
-                                onClick={() => setPdfScale(prev => Math.max(0.5, prev - 0.1))}
+                                onClick={() => setPdfScale(prev => Math.max(0.5, prev - 0.25))}
                                 className="text-[var(--text-color)]"
                             >
                                 <IconMinus size={16} />
@@ -189,7 +242,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
                             <ActionIcon 
                                 variant="subtle" 
                                 color="gray" 
-                                onClick={() => setPdfScale(prev => Math.min(3, prev + 0.1))}
+                                onClick={() => setPdfScale(prev => Math.min(4, prev + 0.25))}
                                 className="text-[var(--text-color)]"
                             >
                                 <IconPlus size={16} />
@@ -204,7 +257,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
                 </header>
 
                 <ScrollArea className={`flex-1 ${theme.texture === 'paper' ? 'printed-texture' : ''}`} viewportRef={scrollViewportRef} onScrollPositionChange={handleScroll}>
-                    <Box className={`relative max-w-full ${book.isPdf ? 'md:max-w-4xl' : 'md:max-w-3xl lg:max-w-4xl'} mx-auto min-h-screen pt-8 md:pt-16 pb-64 px-6 md:px-24 font-serif text-[var(--text-color)]`}>
+                    <Box className={`relative w-full mx-auto min-h-screen pt-8 md:pt-16 pb-64 px-4 md:px-8 font-serif text-[var(--text-color)] overflow-x-auto`}>
                         {isPdfLoading ? (
                             <Center className="h-64 flex-col gap-4">
                                 <Loader color="cyan" size="xl" />
@@ -236,7 +289,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
                             size={48}
                             variant="filled" 
                             color="cyan" 
-                            onClick={() => setPdfScale(prev => Math.min(3, prev + 0.2))}
+                            onClick={() => setPdfScale(prev => Math.min(4, prev + 0.5))}
                             className="border-2 border-black rounded-none shadow-[4px_4px_0_black] active:translate-x-1 active:translate-y-1 active:shadow-none"
                         >
                             <IconPlus size={24} />
@@ -245,7 +298,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
                             size={48}
                             variant="filled" 
                             color="cyan" 
-                            onClick={() => setPdfScale(prev => Math.max(0.5, prev - 0.2))}
+                            onClick={() => setPdfScale(prev => Math.max(0.5, prev - 0.5))}
                             className="border-2 border-black rounded-none shadow-[4px_4px_0_black] active:translate-x-1 active:translate-y-1 active:shadow-none"
                         >
                             <IconMinus size={24} />
