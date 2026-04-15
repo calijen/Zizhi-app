@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
-import { Box, Group, Stack, Text, ActionIcon, ScrollArea, Transition } from '@mantine/core';
+import { Box, Group, Stack, Text, ActionIcon, ScrollArea, Transition, Loader, Center } from '@mantine/core';
 import type { Book, Chapter, Theme } from '../types';
 import { IconChevronLeft, IconMenu, IconClose } from './icons';
 import TextSelectionPopup from './TextSelectionPopup';
@@ -35,17 +35,25 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
     const [scrollProgress, setScrollProgress] = useState(book.progress || 0);
     const [isInitialScrollDone, setIsInitialScrollDone] = useState(false);
     const [pdfDocument, setPdfDocument] = useState<any>(null);
+    const [isPdfLoading, setIsPdfLoading] = useState(book.isPdf);
     
     const scrollViewportRef = useRef<HTMLDivElement>(null);
     const lastUpdateRef = useRef<number>(Date.now());
 
     useEffect(() => {
         if (book.isPdf && book.pdfData && typeof pdfjsLib !== 'undefined') {
-            const loadingTask = pdfjsLib.getDocument({ data: book.pdfData });
+            setIsPdfLoading(true);
+            const loadingTask = pdfjsLib.getDocument({ 
+                data: book.pdfData,
+                disableAutoFetch: true,
+                disableStream: true
+            });
             loadingTask.promise.then((pdf: any) => {
                 setPdfDocument(pdf);
+                setIsPdfLoading(false);
             }).catch((err: any) => {
                 console.error("Error loading PDF document:", err);
+                setIsPdfLoading(false);
             });
         }
     }, [book.isPdf, book.pdfData]);
@@ -174,7 +182,12 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
 
                 <ScrollArea className={`flex-1 ${theme.texture === 'paper' ? 'printed-texture' : ''}`} viewportRef={scrollViewportRef} onScrollPositionChange={handleScroll}>
                     <Box className={`relative max-w-full ${book.isPdf ? 'md:max-w-4xl' : 'md:max-w-3xl lg:max-w-4xl'} mx-auto min-h-screen pt-8 md:pt-16 pb-64 px-6 md:px-24 font-serif text-[var(--text-color)]`}>
-                        {book.isPdf && pdfDocument ? (
+                        {isPdfLoading ? (
+                            <Center className="h-64 flex-col gap-4">
+                                <Loader color="cyan" size="xl" />
+                                <Text className="font-black uppercase tracking-widest text-[var(--sec-text)]">Initializing PDF Engine...</Text>
+                            </Center>
+                        ) : book.isPdf && pdfDocument ? (
                             book.chapters.map((chapter, idx) => (
                                 <section key={chapter.id} id={`pdf-page-${idx + 1}`} className="mb-8 last:mb-0">
                                     <PdfPage pdfDocument={pdfDocument} pageNumber={idx + 1} />

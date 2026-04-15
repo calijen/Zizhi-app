@@ -13,17 +13,37 @@ interface PdfPageProps {
 const PdfPage: React.FC<PdfPageProps> = ({ pdfDocument, pageNumber, scale = 1.5 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textLayerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isVisible, setIsVisible] = useState(false);
   const renderTaskRef = useRef<any>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+        }
+      },
+      { rootMargin: '1000px' }
+    );
+
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
 
     const renderPage = async () => {
+      if (!isVisible) return;
+
       const pdfjs = (window as any).pdfjsLib;
       if (!pdfDocument || !pdfjs) {
         if (!pdfjs && isMounted) {
-          // Retry in a bit if pdfjs is not ready
           setTimeout(renderPage, 500);
         }
         return;
@@ -46,7 +66,6 @@ const PdfPage: React.FC<PdfPageProps> = ({ pdfDocument, pageNumber, scale = 1.5 
         canvas.height = viewport.height;
         canvas.width = viewport.width;
 
-        // Cancel previous render task if any
         if (renderTaskRef.current) {
           renderTaskRef.current.cancel();
         }
@@ -59,7 +78,6 @@ const PdfPage: React.FC<PdfPageProps> = ({ pdfDocument, pageNumber, scale = 1.5 
         renderTaskRef.current = page.render(renderContext);
         await renderTaskRef.current.promise;
 
-        // Render text layer
         if (textLayerRef.current) {
           textLayerRef.current.innerHTML = '';
           try {
@@ -72,7 +90,7 @@ const PdfPage: React.FC<PdfPageProps> = ({ pdfDocument, pageNumber, scale = 1.5 
             });
             await textLayerTask.promise;
           } catch (textErr) {
-            console.warn('Text layer rendering failed, but page image should be visible:', textErr);
+            console.warn('Text layer rendering failed:', textErr);
           }
         }
       } catch (err: any) {
@@ -92,10 +110,18 @@ const PdfPage: React.FC<PdfPageProps> = ({ pdfDocument, pageNumber, scale = 1.5 
         renderTaskRef.current.cancel();
       }
     };
-  }, [pdfDocument, pageNumber, scale]);
+  }, [pdfDocument, pageNumber, scale, isVisible]);
 
   return (
-    <Box className="relative mx-auto shadow-2xl border border-black/10 bg-white" style={{ width: 'fit-content' }}>
+    <Box 
+      ref={containerRef}
+      className="relative mx-auto shadow-2xl border border-black/10 bg-white" 
+      style={{ 
+        width: 'fit-content',
+        minHeight: isVisible ? 'auto' : '800px',
+        minWidth: '300px'
+      }}
+    >
       {error && (
         <Center className="absolute inset-0 z-10 bg-red-50 text-red-500 font-bold">
           {error}
