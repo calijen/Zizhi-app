@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { IconClose, IconSpinner, IconGoogle, IconEye, IconEyeOff } from './icons';
+import { IconClose, IconSpinner, IconEye, IconEyeOff } from './icons';
 import { supabase, isSupabaseConfigured } from '../supabase';
 
 interface AuthViewProps {
@@ -85,24 +85,6 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<{message: string; isWarning?: boolean} | null>(null);
 
-    const handleGoogleLogin = async () => {
-        if (!isSupabaseConfigured()) {
-            setError({ message: "Configuration error. Please check Supabase setup.", isWarning: false });
-            return;
-        }
-        setIsLoading(true);
-        try {
-            const { error: authError } = await supabase.auth.signInWithOAuth({
-                provider: 'google',
-                options: { redirectTo: window.location.origin }
-            });
-            if (authError) throw authError;
-        } catch (err: any) {
-            setError({ message: err.message || "Login failed.", isWarning: false });
-            setIsLoading(false);
-        }
-    };
-
     const handleEmailAuth = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
@@ -131,12 +113,12 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
     };
 
     return (
-        <div className="w-full min-h-full bg-[var(--color-background)] flex flex-col items-center p-6 animate-fade-in overflow-y-auto no-scrollbar">
+        <div className="w-full min-h-full bg-[var(--color-background)] flex flex-col items-center justify-center p-6 animate-fade-in overflow-y-auto no-scrollbar">
             <button onClick={onClose} className="absolute top-6 right-6 p-2 text-[var(--color-primary-text)] hover:bg-black/10 transition-colors rounded-none z-[110]" aria-label="Close auth">
                 <IconClose className="w-8 h-8" />
             </button>
             
-            <div className="w-full max-w-sm flex flex-col items-center pt-12 pb-48">
+            <div className="w-full max-w-sm flex flex-col items-center py-12">
                 <header className="text-center mb-8">
                     <LoginRobot />
                     <h1 className="text-3xl font-black mb-2 text-[var(--color-primary-text)] uppercase tracking-tight">{view === 'login' ? 'Welcome Back' : 'Get Started'}</h1>
@@ -150,21 +132,6 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
                 )}
 
                 <div className="w-full space-y-6">
-                    <button 
-                        onClick={handleGoogleLogin} 
-                        disabled={isLoading} 
-                        className="w-full flex items-center justify-center gap-4 py-4 bg-[var(--color-surface)] border-4 border-[var(--color-border-color)] font-black uppercase text-[12px] shadow-[4px_4px_0_var(--color-border-color)] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_var(--color-border-color)] active:translate-y-1 active:shadow-none transition-all disabled:opacity-50 text-[var(--color-primary-text)] rounded-none"
-                    >
-                        <IconGoogle className="w-6 h-6" />
-                        <span>Continue with Google</span>
-                    </button>
-
-                    <div className="relative flex items-center gap-4 py-4">
-                        <div className="flex-1 h-1 bg-[var(--color-border-color)] opacity-20" />
-                        <span className="text-[10px] font-black uppercase text-[var(--color-muted-text)] px-2">Identity Credentials</span>
-                        <div className="flex-1 h-1 bg-[var(--color-border-color)] opacity-20" />
-                    </div>
-
                     <form onSubmit={handleEmailAuth} className="w-full space-y-6">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black uppercase text-[var(--color-secondary-text)] ml-1 tracking-widest">Email Identity</label>
