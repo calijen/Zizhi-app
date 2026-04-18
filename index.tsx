@@ -1,7 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { MantineProvider, createTheme } from '@mantine/core';
-import { Analytics } from '@vercel/analytics/react';
 import App from './App.tsx';
 import ErrorBoundary from './components/ErrorBoundary.tsx';
 import './index.css';
@@ -33,7 +32,6 @@ root.render(
     <ErrorBoundary>
       <MantineProvider theme={theme}>
         <App />
-        <Analytics />
       </MantineProvider>
     </ErrorBoundary>
   </React.StrictMode>
