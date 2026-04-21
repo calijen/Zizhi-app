@@ -2,8 +2,9 @@
 import { FC, useState, useMemo } from 'react';
 import { Text, Group, ActionIcon, Box, Stack } from '@mantine/core';
 import type { Quote, Theme, BookMetadata } from '../types';
-import { IconTrash, IconSearch, IconShare } from './icons';
+import { IconTrash, IconSearch, IconShare, IconSparkles } from './icons';
 import ShareDialog from './ShareDialog';
+import QuoteChat from './QuoteChat';
 
 interface QuotesViewProps {
   quotes: Quote[];
@@ -97,16 +98,31 @@ const QuoteCard: FC<{ quote: Quote; onDelete: (id: string) => void; onGoToQuote:
 const QuotesView: FC<QuotesViewProps> = ({ quotes, library = [], theme, onDelete, onGoToQuote }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeShare, setActiveShare] = useState<Quote | null>(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  
   const filteredQuotes = useMemo(() => quotes.filter(q => q.text.toLowerCase().includes(searchQuery.toLowerCase()) || q.author.toLowerCase().includes(searchQuery.toLowerCase()) || q.bookTitle.toLowerCase().includes(searchQuery.toLowerCase())), [quotes, searchQuery]);
   const activeBookCover = useMemo(() => activeShare ? (library.find(b => b.id === activeShare.bookId)?.coverImageUrl || null) : null, [activeShare, library]);
+  
   return (
-    <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-10 pb-40 animate-fade-in">
-      <header className="border-b-4 border-black pb-6"><h2 className="text-3xl font-black text-[var(--color-primary-text)] uppercase">Quotes</h2></header>
+    <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-10 pb-40 animate-fade-in relative">
+      <header className="border-b-4 border-black pb-6 flex justify-between items-end">
+        <h2 className="text-3xl font-black text-[var(--color-primary-text)] uppercase">Quotes</h2>
+        {quotes.length > 0 && (
+          <button 
+            onClick={() => setIsChatOpen(true)}
+            className="flex items-center gap-2 bg-yellow-300 border-4 border-black px-4 py-2 shadow-[4px_4px_0_black] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all"
+          >
+            <IconSparkles size={18} className="text-black" />
+            <Text className="text-[12px] font-black uppercase tracking-widest text-black">Ask Oracle</Text>
+          </button>
+        )}
+      </header>
       <div className="relative"><IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--color-muted-text)]" /><input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-[var(--color-surface)] border-4 border-black p-4 pl-12 text-[14px] font-black text-[var(--color-primary-text)] outline-none shadow-[4px_4px_0_black] focus:translate-x-[-1px] transition-all" /></div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 auto-rows-min">
         {filteredQuotes.length === 0 ? (<div className="col-span-full py-12 flex flex-col items-center justify-center text-center"><EmptyQuotesGraphic /><h2 className="text-2xl font-black mt-4 text-[var(--color-primary-text)] uppercase">No Quotes</h2><p className="text-[12px] font-black text-[var(--color-muted-text)] uppercase">Save text in a book to see it here.</p></div>) : (filteredQuotes.map(quote => <QuoteCard key={quote.id} quote={quote} onDelete={onDelete} onGoToQuote={onGoToQuote} onShare={setActiveShare} />))}
       </div>
        {activeShare && <ShareDialog text={activeShare.text} bookTitle={activeShare.bookTitle} author={activeShare.author} coverImageUrl={activeBookCover} theme={theme} onClose={() => setActiveShare(null)} />}
+       {isChatOpen && <QuoteChat quotes={quotes} onClose={() => setIsChatOpen(false)} />}
     </div>
   );
 };
