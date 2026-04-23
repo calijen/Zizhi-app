@@ -46,6 +46,20 @@ export interface ReadingActivity {
     seconds: number;
 }
 
+export interface ChatMessage {
+  role: 'user' | 'model';
+  content: string;
+  timestamp: number;
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: number;
+  lastUpdatedAt: number;
+}
+
 export interface BookMetadata {
     id: string;
     title: string;

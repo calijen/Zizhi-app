@@ -1,41 +1,92 @@
 
-import { FC, useState, useRef, useEffect } from 'react';
-import { Box, Stack, Text, Group, ActionIcon, Loader, ScrollArea } from '@mantine/core';
+import { FC, useState, useRef, useEffect, useCallback } from 'react';
+import { Box, Stack, Text, Group, ActionIcon, Loader, ScrollArea, Avatar, Divider, Badge } from '@mantine/core';
 import { GoogleGenAI } from "@google/genai";
 import { motion, AnimatePresence } from 'framer-motion';
-import { IconSend, IconSparkles, IconClose } from './icons';
-import type { Quote } from '../types';
+import { IconSend, IconSparkles, IconClose, IconTrash, IconPlus, IconChevronLeft } from './icons';
+import type { Quote, ChatMessage, ChatSession } from '../types';
+import * as db from '../db';
 
 interface QuoteChatProps {
   quotes: Quote[];
   onClose: () => void;
 }
 
-interface Message {
-  role: 'user' | 'model';
-  content: string;
-}
-
 const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isHistoryView, setIsHistoryView] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+  const loadSessions = useCallback(async () => {
+    const data = await db.getChatSessions();
+    setSessions(data);
+  }, []);
+
+  useEffect(() => {
+    loadSessions();
+  }, [loadSessions]);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
     }
-  }, [messages]);
+  }, [currentSession?.messages, isHistoryView]);
+
+  const startNewSession = () => {
+    setCurrentSession(null);
+    setIsHistoryView(false);
+    setInput('');
+  };
+
+  const selectSession = (session: ChatSession) => {
+    setCurrentSession(session);
+    setIsHistoryView(false);
+  };
+
+  const handleDeleteSession = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    await db.deleteChatSession(id);
+    if (currentSession?.id === id) {
+      setCurrentSession(null);
+    }
+    loadSessions();
+  };
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
-    const userMessage = input.trim();
+    const userMessageText = input.trim();
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    
+    const userMessage: ChatMessage = {
+      role: 'user',
+      content: userMessageText,
+      timestamp: Date.now()
+    };
+
+    let session = currentSession;
+    if (!session) {
+      session = {
+        id: crypto.randomUUID(),
+        title: userMessageText.slice(0, 40) + (userMessageText.length > 40 ? '...' : ''),
+        messages: [userMessage],
+        createdAt: Date.now(),
+        lastUpdatedAt: Date.now()
+      };
+    } else {
+      session = {
+        ...session,
+        messages: [...session.messages, userMessage],
+        lastUpdatedAt: Date.now()
+      };
+    }
+
+    setCurrentSession(session);
     setIsLoading(true);
 
     try {
@@ -50,8 +101,7 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: [
-          ...messages.map(m => ({ role: m.role, parts: [{ text: m.content }] })),
-          { role: 'user', parts: [{ text: userMessage }] }
+          ...session.messages.map(m => ({ role: m.role, parts: [{ text: m.content }] })),
         ],
         config: {
           systemInstruction,
@@ -59,11 +109,35 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
         }
       });
 
-      const modelResponse = response.text || "I'm sorry, I couldn't process that request.";
-      setMessages(prev => [...prev, { role: 'model', content: modelResponse }]);
+      const modelResponseText = response.text || "I'm sorry, I couldn't process that request.";
+      const modelMessage: ChatMessage = {
+        role: 'model',
+        content: modelResponseText,
+        timestamp: Date.now()
+      };
+
+      const updatedSession = {
+        ...session,
+        messages: [...session.messages, modelMessage],
+        lastUpdatedAt: Date.now()
+      };
+
+      setCurrentSession(updatedSession);
+      await db.saveChatSession(updatedSession);
+      await loadSessions();
     } catch (error) {
       console.error("Chat error:", error);
-      setMessages(prev => [...prev, { role: 'model', content: "Error connecting to the AI service. Please try again." }]);
+      const errorMessage: ChatMessage = {
+        role: 'model',
+        content: "Error connecting to the AI service. Please try again.",
+        timestamp: Date.now()
+      };
+      const errorSession = {
+        ...session,
+        messages: [...session.messages, errorMessage],
+        lastUpdatedAt: Date.now()
+      };
+      setCurrentSession(errorSession);
     } finally {
       setIsLoading(false);
     }
@@ -71,7 +145,6 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-[2500] pointer-events-none">
-      {/* Backdrop */}
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -80,91 +153,168 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
         className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-auto"
       />
 
-      {/* Drawer Container */}
       <motion.div
         initial={{ y: '100%', x: 0 }}
         animate={{ y: 0, x: 0 }}
         exit={{ y: '100%', x: 0 }}
         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-        className="absolute bottom-0 inset-x-0 top-[20%] md:top-0 md:left-auto md:right-0 md:w-[450px] bg-[var(--color-background)] border-t-[8px] md:border-t-0 md:border-l-[8px] border-black flex flex-col pointer-events-auto rounded-t-[40px] md:rounded-t-none shadow-[-20px_0_60px_rgba(0,0,0,0.2)]"
+        className="absolute bottom-0 inset-x-0 h-full md:inset-x-auto md:top-0 md:right-0 md:w-[450px] bg-[var(--color-background)] border-black flex flex-col pointer-events-auto border-t-[8px] md:border-t-0 md:border-l-[8px] md:rounded-t-none shadow-none md:shadow-[-20px_0_60px_rgba(0,0,0,0.2)]"
       >
-        <Box className="p-6 bg-yellow-300 border-b-4 border-black flex justify-between items-center rounded-t-[32px] md:rounded-t-none">
+        <Box className="p-4 md:p-6 bg-yellow-300 border-b-4 border-black flex justify-between items-center shrink-0">
           <Group gap="xs">
-            <div className="w-10 h-10 bg-black flex items-center justify-center">
-              <IconSparkles className="w-6 h-6 text-yellow-300" />
-            </div>
+            {isHistoryView ? (
+              <ActionIcon variant="transparent" color="black" onClick={() => setIsHistoryView(false)}>
+                <IconChevronLeft size={24} />
+              </ActionIcon>
+            ) : (
+                <div className="w-10 h-10 bg-black flex items-center justify-center">
+                    <IconSparkles className="w-6 h-6 text-yellow-300" />
+                </div>
+            )}
             <Stack gap={0}>
-              <Text className="font-black uppercase tracking-widset text-[18px] leading-none">Phoebe</Text>
-              <Text className="text-[10px] font-black uppercase tracking-widest opacity-60">Zizhi Librarian</Text>
+              <Text className="font-black uppercase tracking-widset text-[18px] leading-none">
+                {isHistoryView ? 'History' : 'Phoebe'}
+              </Text>
+              <Text className="text-[10px] font-black uppercase tracking-widest opacity-60">
+                {isHistoryView ? 'Previous Chats' : 'Zizhi Librarian'}
+              </Text>
             </Stack>
           </Group>
-          <ActionIcon 
-            variant="filled" 
-            onClick={onClose} 
-            color="black" 
-            size="xl" 
-            className="rounded-none border-2 border-white shadow-[4px_4px_0_white] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all"
-          >
-            <IconClose size={24} />
-          </ActionIcon>
-        </Box>
-
-        <ScrollArea className="flex-1 p-6" viewportRef={scrollRef}>
-          <Stack gap="xl" pb="xl">
-            {messages.length === 0 && (
-              <Box className="p-8 bg-[var(--color-surface)] border-4 border-black border-dashed text-center">
-                <Text className="text-[14px] font-black uppercase text-black mb-4">Hello! I'm Phoebe.</Text>
-                <Text className="text-[12px] font-medium leading-relaxed opacity-70 mb-6">
-                  I've read through all your highlights. Ask me to find connections, summarize themes, or explore the wisdom you've collected.
-                </Text>
-                <div className="space-y-2">
-                  <button onClick={() => setInput("What are the recurring themes in my highlights?")} className="w-full p-2 text-[10px] uppercase font-black border-2 border-black hover:bg-black hover:text-white transition-colors"> Recurring Themes </button>
-                  <button onClick={() => setInput("Can you summarize the sentiment of my library?")} className="w-full p-2 text-[10px] uppercase font-black border-2 border-black hover:bg-black hover:text-white transition-colors"> Library Sentiment </button>
-                </div>
-              </Box>
+          <Group gap="xs">
+            {!isHistoryView && (
+                <ActionIcon 
+                    variant="filled" 
+                    onClick={() => setIsHistoryView(true)} 
+                    color="black" 
+                    size="xl" 
+                    className="rounded-none border-2 border-white shadow-[4px_4px_0_white] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all"
+                >
+                    <Badge variant="filled" color="yellow" size="xs" circle className="absolute -top-1 -right-1 border-2 border-black font-black text-black">{sessions.length}</Badge>
+                    <IconPlus size={24} className="rotate-45" /> {/* History icon substitute */}
+                </ActionIcon>
             )}
-            {messages.map((msg, i) => (
-              <Box 
-                key={i} 
-                className={`p-5 max-w-[90%] border-4 border-black shadow-[6px_6px_0_black] ${
-                  msg.role === 'user' 
-                    ? 'ml-auto bg-cyan-400 text-black' 
-                    : 'bg-white text-black'
-                }`}
-              >
-                <Text className="text-[15px] font-bold leading-relaxed whitespace-pre-wrap">{msg.content}</Text>
-              </Box>
-            ))}
-            {isLoading && (
-              <Box className="bg-white p-5 self-start border-4 border-black shadow-[6px_6px_0_black]">
-                <Loader size="sm" color="black" variant="dots" />
-              </Box>
-            )}
-          </Stack>
-        </ScrollArea>
-
-        <Box className="p-6 border-t-[6px] border-black bg-[var(--color-surface)]">
-          <Group gap="md">
-            <input 
-              className="flex-1 bg-white border-4 border-black p-4 text-[16px] font-black placeholder:text-black/30 placeholder:uppercase text-black outline-none focus:ring-4 focus:ring-yellow-300 transition-all shadow-[6px_6px_0_black]"
-              placeholder="Query your collection..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              autoFocus
-            />
             <ActionIcon 
-              onClick={handleSend}
-              variant="filled" 
-              color="yellow" 
-              size={56} 
-              className={`rounded-none border-4 border-black shadow-[6px_6px_0_black] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all disabled:grayscale disabled:opacity-50`}
-              disabled={isLoading || !input.trim()}
+                variant="filled" 
+                onClick={onClose} 
+                color="black" 
+                size="xl" 
+                className="rounded-none border-2 border-white shadow-[4px_4px_0_white] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all"
             >
-              <IconSend className="text-black w-6 h-6" />
+                <IconClose size={24} />
             </ActionIcon>
           </Group>
         </Box>
+
+        <ScrollArea className="flex-1 p-4 md:p-6" viewportRef={scrollRef}>
+          {isHistoryView ? (
+            <Stack gap="md" py="md">
+              <button 
+                onClick={startNewSession}
+                className="w-full p-4 bg-white border-4 border-black border-dashed flex items-center gap-3 hover:bg-yellow-50 transition-colors"
+                id="new-chat-btn"
+              >
+                <IconPlus className="w-5 h-5 text-black" />
+                <Text className="font-black uppercase text-[14px]">Start New Chat</Text>
+              </button>
+              
+              <Divider label="Previous Conversations" labelPosition="center" color="black" className="my-4 font-black" />
+              
+              {sessions.length === 0 ? (
+                <Text className="text-center italic opacity-50 py-10">No history yet.</Text>
+              ) : (
+                sessions.map(s => (
+                  <Box 
+                    key={s.id} 
+                    onClick={() => selectSession(s)}
+                    className="p-4 bg-[var(--color-surface)] border-4 border-black shadow-[4px_4px_0_black] hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_black] transition-all cursor-pointer group"
+                  >
+                    <Group justify="space-between" wrap="nowrap">
+                      <Stack gap={2}>
+                        <Text className="font-bold text-[14px] line-clamp-1">{s.title}</Text>
+                        <Text className="text-[10px] opacity-60">{new Date(s.lastUpdatedAt).toLocaleDateString()}</Text>
+                      </Stack>
+                      <ActionIcon 
+                         variant="transparent" 
+                         color="red" 
+                         onClick={(e) => handleDeleteSession(e, s.id)}
+                         className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <IconTrash size={18} />
+                      </ActionIcon>
+                    </Group>
+                  </Box>
+                ))
+              )}
+            </Stack>
+          ) : (
+            <Stack gap="xl" pb="xl" pt="md">
+              {(currentSession?.messages || []).length === 0 && (
+                <Box className="p-8 bg-[var(--color-surface)] border-4 border-black border-dashed text-center mt-10">
+                  <Avatar size="xl" src="/phoebe-avatar.png" className="mx-auto mb-4 border-4 border-black shadow-[4px_4px_0_black]" />
+                  <Text className="text-[16px] font-black uppercase text-black mb-2">Hello! I'm Phoebe.</Text>
+                  <Text className="text-[12px] font-medium leading-relaxed opacity-70 mb-8">
+                    Query your library of wisdom. I can find patterns, summarize authors, or just talk about the themes you love.
+                  </Text>
+                  <Stack gap="sm">
+                    <button onClick={() => setInput("Identify the most recurring themes in my quotes.")} className="w-full p-3 text-[11px] uppercase font-black border-2 border-black hover:bg-black hover:text-white transition-colors bg-white"> 🔍 Recurring Themes </button>
+                    <button onClick={() => setInput("Which book has the most impactful quotes according to my highlights?")} className="w-full p-3 text-[11px] uppercase font-black border-2 border-black hover:bg-black hover:text-white transition-colors bg-white"> 📚 Impactful Books </button>
+                  </Stack>
+                </Box>
+              )}
+              {(currentSession?.messages || []).map((msg, i) => (
+                <Box 
+                  key={i} 
+                  className={`p-5 max-w-[90%] border-4 border-black shadow-[6px_6px_0_black] relative ${
+                    msg.role === 'user' 
+                      ? 'ml-auto bg-cyan-400 text-black' 
+                      : 'bg-white text-black'
+                  }`}
+                >
+                  <Text className="text-[15px] font-bold leading-relaxed whitespace-pre-wrap">{msg.content}</Text>
+                  <Text className="text-[9px] mt-2 opacity-40 uppercase font-black">{new Date(msg.timestamp).toLocaleTimeString()}</Text>
+                </Box>
+              ))}
+              {isLoading && (
+                <Box className="bg-white p-5 self-start border-4 border-black shadow-[6px_6px_0_black]">
+                  <Loader size="sm" color="black" variant="dots" />
+                </Box>
+              )}
+            </Stack>
+          )}
+        </ScrollArea>
+
+        {!isHistoryView && (
+            <Box className="p-4 md:p-6 border-t-[6px] border-black bg-[var(--color-surface)] shrink-0">
+                <Group gap="md" wrap="nowrap">
+                    <div className="flex-1 relative">
+                        <input 
+                            className="w-full bg-white border-4 border-black p-4 pr-14 text-[16px] font-black placeholder:text-black/30 placeholder:uppercase text-black outline-none focus:ring-4 focus:ring-yellow-300 transition-all shadow-[6px_6px_0_black]"
+                            placeholder="Zizhi Oracle..."
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                            autoFocus
+                        />
+                        {/* Hidden Send icon just in case the button disappears */}
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 md:hidden pointer-events-none opacity-20">
+                            <IconSend size={20} className="text-black" />
+                        </div>
+                    </div>
+                    <ActionIcon 
+                        onClick={handleSend}
+                        variant="filled" 
+                        color="yellow" 
+                        size={56} 
+                        className={`rounded-none border-4 border-black shadow-[6px_6px_0_black] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all shrink-0 z-10`}
+                        disabled={isLoading || !input.trim()}
+                        id="phoebe-send-btn"
+                        aria-label="Send message"
+                    >
+                        <IconSend className="text-black w-6 h-6" />
+                    </ActionIcon>
+                </Group>
+            </Box>
+        )}
       </motion.div>
     </div>
   );

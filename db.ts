@@ -1,12 +1,13 @@
-import type { Book, BookMetadata, BookContent, Quote, Note, ReadingActivity } from './types';
+import type { Book, BookMetadata, BookContent, Quote, Note, ReadingActivity, ChatSession } from './types';
 
 const DB_NAME = 'ZizhiDB';
-const DB_VERSION = 7; 
+const DB_VERSION = 8; 
 const BOOK_STORE = 'books';
 const CONTENT_STORE = 'book_contents';
 const QUOTE_STORE = 'quotes';
 const NOTE_STORE = 'notes';
 const ACTIVITY_STORE = 'reading_activity';
+const CHAT_STORE = 'chat_sessions';
 
 let db: IDBDatabase;
 
@@ -35,6 +36,9 @@ export const initDB = (): Promise<IDBDatabase> => {
       }
       if (!dbInstance.objectStoreNames.contains(ACTIVITY_STORE)) {
         dbInstance.createObjectStore(ACTIVITY_STORE, { keyPath: 'date' });
+      }
+      if (!dbInstance.objectStoreNames.contains(CHAT_STORE)) {
+        dbInstance.createObjectStore(CHAT_STORE, { keyPath: 'id' });
       }
     };
   });
@@ -191,5 +195,37 @@ export const getActivity = async (): Promise<ReadingActivity[]> => {
     return new Promise((resolve) => {
         const transaction = db.transaction(ACTIVITY_STORE, 'readonly');
         transaction.objectStore(ACTIVITY_STORE).getAll().onsuccess = (e) => resolve((e.target as any).result);
+    });
+};
+
+export const saveChatSession = async (session: ChatSession): Promise<void> => {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(CHAT_STORE, 'readwrite');
+        const request = transaction.objectStore(CHAT_STORE).put(session);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject();
+    });
+};
+
+export const getChatSessions = async (): Promise<ChatSession[]> => {
+    const db = await initDB();
+    return new Promise((resolve) => {
+        const transaction = db.transaction(CHAT_STORE, 'readonly');
+        const request = transaction.objectStore(CHAT_STORE).getAll();
+        request.onsuccess = (e) => {
+            const sessions = (e.target as any).result as ChatSession[];
+            resolve(sessions.sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt));
+        };
+    });
+};
+
+export const deleteChatSession = async (id: string): Promise<void> => {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(CHAT_STORE, 'readwrite');
+        const request = transaction.objectStore(CHAT_STORE).delete(id);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject();
     });
 };
