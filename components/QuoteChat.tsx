@@ -154,11 +154,12 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
       />
 
       <motion.div
-        initial={{ y: '100%', x: 0 }}
-        animate={{ y: 0, x: 0 }}
-        exit={{ y: '100%', x: 0 }}
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-        className="absolute bottom-0 inset-x-0 h-full md:inset-x-auto md:top-0 md:right-0 md:w-[450px] bg-[var(--color-background)] border-black flex flex-col pointer-events-auto border-t-[8px] md:border-t-0 md:border-l-[8px] md:rounded-t-none shadow-none md:shadow-[-20px_0_60px_rgba(0,0,0,0.2)]"
+        className="fixed inset-0 md:inset-auto md:top-0 md:right-0 md:bottom-0 md:w-[450px] md:border-l-[8px] md:border-black bg-[var(--color-background)] flex flex-col pointer-events-auto shadow-none md:shadow-[-20px_0_60px_rgba(0,0,0,0.2)]"
+        style={{ height: '100dvh' }}
       >
         <Box className="p-4 md:p-6 bg-yellow-300 border-b-4 border-black flex justify-between items-center shrink-0">
           <Group gap="xs">
