@@ -1,6 +1,7 @@
 
 import { FC, useState, useMemo } from 'react';
 import { Text, Group, ActionIcon, Box, Stack } from '@mantine/core';
+import { AnimatePresence } from 'framer-motion';
 import type { Quote, Theme, BookMetadata } from '../types';
 import { IconTrash, IconSearch, IconShare, IconSparkles } from './icons';
 import ShareDialog from './ShareDialog';
@@ -113,7 +114,7 @@ const QuotesView: FC<QuotesViewProps> = ({ quotes, library = [], theme, onDelete
             className="flex items-center gap-2 bg-yellow-300 border-4 border-black px-4 py-2 shadow-[4px_4px_0_black] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all"
           >
             <IconSparkles size={18} className="text-black" />
-            <Text className="text-[12px] font-black uppercase tracking-widest text-black">Ask Oracle</Text>
+            <Text className="text-[12px] font-black uppercase tracking-widest text-black">Ask Phoebe</Text>
           </button>
         )}
       </header>
@@ -122,7 +123,9 @@ const QuotesView: FC<QuotesViewProps> = ({ quotes, library = [], theme, onDelete
         {filteredQuotes.length === 0 ? (<div className="col-span-full py-12 flex flex-col items-center justify-center text-center"><EmptyQuotesGraphic /><h2 className="text-2xl font-black mt-4 text-[var(--color-primary-text)] uppercase">No Quotes</h2><p className="text-[12px] font-black text-[var(--color-muted-text)] uppercase">Save text in a book to see it here.</p></div>) : (filteredQuotes.map(quote => <QuoteCard key={quote.id} quote={quote} onDelete={onDelete} onGoToQuote={onGoToQuote} onShare={setActiveShare} />))}
       </div>
        {activeShare && <ShareDialog text={activeShare.text} bookTitle={activeShare.bookTitle} author={activeShare.author} coverImageUrl={activeBookCover} theme={theme} onClose={() => setActiveShare(null)} />}
-       {isChatOpen && <QuoteChat quotes={quotes} onClose={() => setIsChatOpen(false)} />}
+       <AnimatePresence>
+         {isChatOpen && <QuoteChat quotes={quotes} onClose={() => setIsChatOpen(false)} />}
+       </AnimatePresence>
     </div>
   );
 };
