@@ -1,17 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { 
-  BookOpen, 
-  Brain, 
-  Zap, 
-  ArrowRight, 
-  CheckCircle2, 
-  XCircle,
-  Quote as QuoteIcon,
-  Sparkles,
-  Layers,
-  MousePointer2
-} from 'lucide-react';
+import { ArrowRight, Sparkles } from 'lucide-react';
+import { Logo } from './icons';
 
 interface LandingViewProps {
   onEnter: () => void;
@@ -19,363 +9,245 @@ interface LandingViewProps {
 
 const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
   return (
-    <div className="min-h-screen bg-[#F5F5F0] text-[#1A1A1A] font-sans selection:bg-[#FF6321] selection:text-white overflow-x-hidden">
+    <div className="min-h-screen bg-[#fbf6e1] text-[#1a110a] font-body selection:bg-pink-400 selection:text-white overflow-x-hidden">
       {/* Navigation */}
-      <nav className="fixed top-0 w-full z-50 bg-[#F5F5F0] border-b-4 border-black px-6 py-4 flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <div className="w-10 h-10 bg-black flex items-center justify-center rounded-none shadow-[4px_4px_0px_#FF6321]">
-            <span className="text-white font-black text-2xl">Z</span>
-          </div>
-          <span className="font-black uppercase tracking-tighter text-2xl">Zizhi</span>
+      <nav className="fixed top-0 w-full z-50 bg-[#fbf6e1]/80 backdrop-blur-md px-6 py-4 flex justify-between items-center max-w-7xl mx-auto left-0 right-0">
+        <div className="flex items-center gap-3">
+          <Logo className="h-6 w-auto text-black" />
         </div>
+        
+        <div className="hidden md:flex items-center gap-8 text-[13px] font-bold uppercase tracking-wider">
+          <a href="#how-it-works" className="hover:text-pink-500 transition-colors">How it works</a>
+          <a href="#philosophy" className="hover:text-pink-500 transition-colors">The philosophy</a>
+          <a href="#features" className="hover:text-pink-500 transition-colors">Features</a>
+        </div>
+
         <button 
           onClick={onEnter}
-          aria-label="Start reading"
-          className="bg-[#FF6321] text-white px-6 py-2 border-2 border-black shadow-[4px_4px_0px_black] font-black uppercase text-sm hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none focus-visible:ring-4 focus-visible:ring-cyan-400 outline-none transition-all"
+          className="bg-yellow-400 text-black px-5 py-2 border-2 border-black shadow-[4px_4px_0px_black] font-heading text-[11px] uppercase hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all"
         >
           Start Reading
         </button>
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-32 md:pt-40 pb-16 md:pb-20 px-6 max-w-7xl mx-auto">
-        <div className="flex flex-col items-center text-center mb-12 md:mb-16">
+      <section className="pt-32 md:pt-48 pb-20 px-6 max-w-5xl mx-auto relative">
+        {/* Doodle 1: Reading doesn't have to be boring */}
+        <div className="absolute left-[-20px] md:left-[-150px] top-[40%] md:top-[60%] rotate-[-20deg] font-doodle text-lg md:text-2xl text-black/60 max-w-[150px] pointer-events-none hidden md:block">
+          Reading doesn't have to be boring ;-)
+        </div>
+
+        {/* Doodle 2: Cat with bubble */}
+        <div className="absolute right-[-40px] md:right-[-200px] top-[60%] rotate-[10deg] pointer-events-none hidden md:block">
+          <div className="relative">
+             <div className="bg-white border-2 border-black p-3 rounded-2xl font-doodle text-sm mb-4 shadow-[4px_4px_0px_black]">
+               I couldn't help but notice that...
+               <div className="absolute bottom-[-10px] left-4 w-4 h-4 bg-white border-r-2 border-b-2 border-black rotate-45" />
+             </div>
+             <img src="https://api.dicebear.com/7.x/bottts/svg?seed=Phoebe&backgroundColor=ffdfbf" alt="Cat Icon" className="w-16 h-16 ml-8 grayscale" />
+          </div>
+        </div>
+
+        <div className="text-center">
           <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: "easeOut" }}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
           >
-            <div className="inline-block bg-yellow-300 border-2 border-black px-4 py-1 mb-6 rotate-[-2deg] font-black uppercase tracking-widest text-[10px] md:text-xs">
-              The future of reading is here
-            </div>
-            <h1 className="text-5xl sm:text-7xl md:text-[9rem] lg:text-[10rem] font-black uppercase tracking-tighter leading-[0.9] md:leading-[0.8] mb-8 break-words">
-              Turn books <br />
-              <span className="text-[#FF6321] bg-black px-2 md:px-4 inline-block rotate-[1deg]">into ideas</span>
+            <h1 className="text-5xl md:text-[6rem] lg:text-[7.5rem] font-heading leading-[0.9] uppercase mb-8">
+              Turn <span className="text-pink-500">Books</span> <br />
+              Into <span className="text-pink-500">Ideas</span>
             </h1>
-            <p className="text-xl md:text-3xl font-bold text-black max-w-2xl mx-auto mb-10 md:mb-12 leading-tight">
-              Zizhi turns everything you read into something you actually remember. No more lost highlights.
+            
+            <p className="text-lg md:text-xl font-body max-w-2xl mx-auto mb-10 leading-relaxed opacity-80">
+              Zizhi helps you make sense of what you read and remember the core concepts long after you’ve turned the last page.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 md:gap-6 justify-center">
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mb-16">
               <button 
                 onClick={onEnter}
-                aria-label="Start reading now"
-                className="bg-black text-white px-8 md:px-12 py-4 md:py-5 border-4 border-black shadow-[6px_6px_0px_#FF6321] md:shadow-[10px_10px_0px_#FF6321] font-black text-lg md:text-xl flex items-center justify-center gap-3 hover:translate-x-[4px] hover:translate-y-[4px] hover:shadow-none focus-visible:ring-4 focus-visible:ring-cyan-400 outline-none transition-all uppercase group"
+                className="bg-cyan-400 text-black px-10 md:px-14 py-4 md:py-5 border-4 border-black shadow-[6px_6px_0px_black] font-heading text-lg md:text-xl uppercase hover:translate-x-[4px] hover:translate-y-[4px] hover:shadow-none transition-all group"
               >
                 Start Reading
-                <ArrowRight className="w-5 h-5 md:w-6 md:h-6 group-hover:translate-x-2 transition-transform" />
               </button>
               <button 
-                aria-label="Learn how it works"
-                className="bg-white border-4 border-black text-black px-8 md:px-12 py-4 md:py-5 shadow-[6px_6px_0px_black] md:shadow-[10px_10px_0px_black] font-black text-lg md:text-xl hover:translate-x-[4px] hover:translate-y-[4px] hover:shadow-none focus-visible:ring-4 focus-visible:ring-cyan-400 outline-none transition-all uppercase"
+                className="flex items-center gap-2 font-heading text-[12px] uppercase tracking-widest hover:text-pink-500 group transition-colors"
               >
-                How it works
+                See how it works <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </button>
+            </div>
+
+            <div className="flex flex-col items-center gap-3">
+              <div className="flex -space-x-3">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <img 
+                    key={i}
+                    src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${i * 123}`} 
+                    alt="Reader" 
+                    className="w-10 h-10 rounded-full border-2 border-black bg-white"
+                  />
+                ))}
+              </div>
+              <p className="text-[11px] font-bold uppercase tracking-wider opacity-60">
+                1200+ readers are already using this
+              </p>
             </div>
           </motion.div>
         </div>
+      </section>
 
-        {/* Marquee */}
-        <div className="w-full border-y-4 border-black py-4 overflow-hidden bg-cyan-400 mb-16 md:mb-20 rotate-[-1deg]">
-          <div className="flex whitespace-nowrap animate-marquee motion-reduce:animate-none">
-            {[...Array(10)].map((_, i) => (
-              <span key={i} className="text-xl md:text-2xl font-black uppercase mx-8 flex items-center gap-4">
-                <Sparkles className="w-5 h-5 md:w-6 md:h-6" />
-                Stop Forgetting
-                <Sparkles className="w-5 h-5 md:w-6 md:h-6" />
-                Read Better
-                <Sparkles className="w-5 h-5 md:w-6 md:h-6" />
-                Think Deeper
-              </span>
+      {/* Section: Reading Problem */}
+      <section className="py-24 md:py-40 border-t-4 border-black bg-white overflow-hidden">
+        <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-16 items-start">
+          <div className="space-y-4">
+            <h2 className="text-5xl md:text-8xl font-heading leading-none uppercase">
+              You don't have <br className="hidden lg:block" /> a reading <br className="hidden lg:block" /> problem...
+            </h2>
+          </div>
+
+          <div className="pt-4 md:pt-12 space-y-8">
+            <div className="space-y-1">
+              <h3 className="text-xl md:text-3xl font-heading leading-tight mb-6">
+                Your best ideas are buried inside books you already read
+              </h3>
+              <p className="text-lg md:text-xl">
+                <span className="text-pink-500">You highlight</span>, <span className="text-yellow-500">You screenshot</span>, <span className="text-cyan-500">you bookmark</span>,<br />
+                you tell yourself you'll come back to it.
+              </p>
+            </div>
+            
+            <h4 className="text-4xl md:text-6xl font-heading text-pink-500 uppercase rotate-[2deg]">
+              You don't!
+            </h4>
+
+            {/* Doodle Arrow */}
+            <div className="relative py-12 md:py-24">
+               <svg className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-visible" viewBox="0 0 400 150">
+                 <path 
+                    d="M100,20 C150,20 200,80 150,120 C100,160 50,100 80,40 C110,-20 300,100 350,110" 
+                    fill="none" 
+                    stroke="black" 
+                    strokeWidth="3" 
+                    strokeLinecap="round"
+                    className="animate-[draw_2s_ease-out_forwards]"
+                    strokeDasharray="1000"
+                    strokeDashoffset="1000"
+                 />
+                 <path d="M340,100 L355,112 L340,125" fill="none" stroke="black" strokeWidth="3" strokeLinecap="round" />
+               </svg>
+               <div className="pt-20 pl-20 md:pt-32 md:pl-64">
+                  <div className="font-doodle text-2xl md:text-4xl rotate-[-5deg]">
+                    Zizhi fixes that!
+                  </div>
+               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Section: Combine */}
+      <section className="py-24 bg-[#fbf6e1] border-y-4 border-black">
+        <div className="max-w-7xl mx-auto px-6">
+          <p className="font-bold text-[13px] uppercase tracking-[0.2em] mb-4 opacity-70">Zizhi puts together</p>
+          <h2 className="text-4xl md:text-7xl font-heading leading-[0.9] uppercase mb-16 md:mb-24">
+            Everything reading apps <br className="hidden md:block" /> forgot to combine
+          </h2>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                title: "Need to read a new book?",
+                desc: "We've got a beautiful built-in e-reader that you can easily customize to fit your reading preferences",
+                color: "bg-yellow-400"
+              },
+              {
+                title: "Need to remember what you read?",
+                desc: "Zizhi has a dedicated quoting and notes taking functionality that allows users to highlight the important stuff and revisit them whenever they need to",
+                color: "bg-cyan-400"
+              },
+              {
+                title: "Can't remember what you read?",
+                desc: "Inside Zizhi there exists a personal AI assistant... 'phoebe' whom is always ready to talk about the things you read. What's more? you can easily generate AI audio summaries that help you grasp the 'big idea'",
+                color: "bg-pink-400"
+              }
+            ].map((card, i) => (
+              <div key={i} className={`p-8 border-4 border-black shadow-[8px_8px_0px_black] ${card.color} h-full flex flex-col gap-4 hover:translate-x-[-4px] hover:translate-y-[-4px] hover:shadow-[12px_12px_0px_black] transition-all`}>
+                <h3 className="text-xl md:text-2xl font-heading uppercase leading-tight">{card.title}</h3>
+                <p className="text-base font-body leading-relaxed">{card.desc}</p>
+              </div>
             ))}
           </div>
         </div>
+      </section>
 
-        {/* Split Screen Visual */}
-        <div className="grid md:grid-cols-2 gap-0 border-4 border-black overflow-hidden shadow-[12px_12px_0px_black] md:shadow-[24px_24px_0px_black]">
-          {/* Left: Chaos */}
-          <div className="bg-[#E5E5E0] p-6 md:p-12 relative overflow-hidden min-h-[300px] md:min-h-[400px] flex flex-col justify-center items-center border-b md:border-b-0 md:border-r-2 border-black">
-            <div className="absolute top-4 left-4 uppercase text-[8px] md:text-[10px] font-black tracking-widest opacity-40">The Chaos</div>
-            <div className="relative w-full h-full flex items-center justify-center scale-75 md:scale-100">
-              {/* Stack of messy books representation */}
-              <div className="relative w-64 h-80">
-                <div className="absolute top-0 left-0 w-48 h-64 bg-white border-2 border-black rotate-[-15deg] shadow-md flex flex-col p-4 gap-2">
-                  <div className="h-2 w-full bg-yellow-200" />
-                  <div className="h-2 w-3/4 bg-yellow-200" />
-                  <div className="h-2 w-full bg-gray-100" />
-                </div>
-                <div className="absolute top-10 left-10 w-48 h-64 bg-white border-2 border-black rotate-[5deg] shadow-md p-4 flex flex-col gap-2">
-                  <div className="h-2 w-full bg-pink-200" />
-                  <div className="h-2 w-1/2 bg-pink-200" />
-                  <div className="h-2 w-full bg-gray-100" />
-                </div>
-                <div className="absolute top-20 left-[-20px] w-48 h-64 bg-white border-2 border-black rotate-[-5deg] shadow-lg p-4">
-                  <div className="h-2 w-full bg-cyan-200 mb-2" />
-                  <div className="space-y-1">
-                    <div className="h-1 w-full bg-gray-100" />
-                    <div className="h-1 w-full bg-gray-100" />
-                    <div className="h-1 w-3/4 bg-gray-100" />
+      {/* Section: Compound */}
+      <section className="py-24 md:py-40">
+        <div className="max-w-7xl mx-auto px-6">
+          <p className="font-bold text-[13px] uppercase tracking-[0.2em] mb-4 opacity-70 text-center">Zizhi app was built because we believe that....</p>
+          <h2 className="text-4xl md:text-[6rem] font-heading leading-[0.9] uppercase text-center mb-20 md:mb-32">
+            Reading should <br className="hidden md:block" /> compound
+          </h2>
+
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div className="p-10 border-2 border-black/10 bg-white/50 backdrop-blur-sm space-y-8">
+              <h3 className="text-3xl font-heading uppercase tracking-tighter">Before Zizhi</h3>
+              <div className="space-y-6">
+                {[
+                  { text: "10 unfinished books", emoji: "🙃" },
+                  { text: "500 forgotten highlights", emoji: "😶" },
+                  { text: "Zero applied insights", emoji: "🙃" }
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-4 text-xl md:text-2xl font-body opacity-60 italic">
+                    <span className="text-3xl grayscale opacity-50">{item.emoji}</span>
+                    <span>{item.text}</span>
                   </div>
-                </div>
-                {/* Scattered highlights */}
-                <div className="absolute -top-10 -right-10 w-32 h-12 bg-yellow-300 border border-black rotate-[20deg] flex items-center justify-center text-[8px] font-bold px-2">
-                  FORGOTTEN HIGHLIGHT
-                </div>
-                <div className="absolute bottom-0 -left-20 w-32 h-12 bg-pink-300 border border-black rotate-[-10deg] flex items-center justify-center text-[8px] font-bold px-2">
-                  LOST SCREENSHOT
-                </div>
+                ))}
               </div>
             </div>
-          </div>
 
-          {/* Right: Zizhi Clean */}
-          <div className="bg-white p-8 md:p-12 relative overflow-hidden min-h-[400px] flex flex-col justify-center">
-            <div className="absolute top-4 left-4 uppercase text-[10px] font-black tracking-widest text-[#FF6321]">Zizhi Interface</div>
-            <div className="space-y-6">
-              {/* Mock UI */}
-              <div className="border-2 border-black rounded-xl p-4 shadow-[4px_4px_0px_black]">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-2 h-2 rounded-full bg-green-500" />
-                  <div className="text-[10px] font-black uppercase tracking-wider">AI Summary Active</div>
-                </div>
-                <div className="space-y-2">
-                  <div className="h-3 w-full bg-gray-100 rounded-full" />
-                  <div className="h-3 w-5/6 bg-gray-100 rounded-full" />
-                  <div className="h-3 w-4/6 bg-gray-100 rounded-full" />
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="border-2 border-black rounded-xl p-3 bg-[#F5F5F0]">
-                  <div className="text-[10px] font-black uppercase mb-2">Highlights</div>
-                  <div className="h-2 w-full bg-[#FF6321]/20 mb-1" />
-                  <div className="h-2 w-3/4 bg-[#FF6321]/20" />
-                </div>
-                <div className="border-2 border-black rounded-xl p-3 bg-black text-white">
-                  <div className="text-[10px] font-black uppercase mb-2">Reader</div>
-                  <div className="space-y-1">
-                    <div className="h-1 w-full bg-white/20" />
-                    <div className="h-1 w-full bg-white/20" />
+            <div className="p-10 border-4 border-black bg-[#2eb67d] shadow-[12px_12px_0px_black] space-y-8">
+              <h3 className="text-3xl font-heading uppercase tracking-tighter text-white">After Zizhi</h3>
+              <div className="space-y-6">
+                {[
+                  { text: "Build a library that works for you.", emoji: "🙂" },
+                  { text: "Retain 10x more of what you read.", emoji: "🙂" },
+                  { text: "AI-driven patterns that connect the dots.", emoji: "🙂" }
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-4 text-xl md:text-2xl font-heading tracking-tight text-black">
+                    <span className="text-3xl">{item.emoji}</span>
+                    <span>{item.text}</span>
                   </div>
-                </div>
-              </div>
-
-              <div className="flex justify-center">
-                <div className="px-4 py-2 border-2 border-black rounded-full text-[10px] font-black uppercase flex items-center gap-2">
-                  <Sparkles className="w-3 h-3 text-[#FF6321]" />
-                  Insights Resurfacing
-                </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Section 2: Forgetting Problem */}
-      <section className="py-20 md:py-32 bg-black text-white overflow-hidden border-y-8 border-[#FF6321]">
-        <div className="max-w-5xl mx-auto px-6">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            className="space-y-8 md:space-y-12"
-          >
-            <h2 className="text-4xl sm:text-5xl md:text-8xl font-black uppercase tracking-tighter leading-[0.9] md:leading-[0.8] text-center">
-              You don’t have a <br />
-              <span className="bg-[#FF6321] text-black px-2 md:px-4 inline-block mt-2">reading problem.</span>
-            </h2>
-            
-            <div className="grid md:grid-cols-2 gap-10 md:gap-16 items-center pt-8 md:pt-12">
-              <div className="space-y-4 md:space-y-6 text-xl sm:text-2xl md:text-4xl font-black uppercase italic">
-                <p className="text-white/40 hover:text-white transition-colors">You highlight.</p>
-                <p className="text-white/40 hover:text-white transition-colors">You screenshot.</p>
-                <p className="text-white/40 hover:text-white transition-colors">You bookmark.</p>
-                <p className="text-white/40 hover:text-white transition-colors">You tell yourself you’ll come back to it.</p>
-                <p className="text-[#FF6321] text-4xl sm:text-5xl md:text-7xl mt-6 md:mt-8 not-italic underline decoration-4 md:decoration-8 underline-offset-4">You don’t.</p>
-              </div>
-              <div className="space-y-6 md:space-y-8">
-                <p className="text-xl md:text-3xl font-bold leading-tight">
-                  Your best ideas are buried inside books you already read. They are dead weight.
-                </p>
-                <div className="inline-block bg-cyan-400 text-black px-6 md:px-8 py-3 md:py-4 border-2 md:border-4 border-white font-black text-xl md:text-3xl uppercase rotate-[-3deg] shadow-[6px_6px_0px_white] md:shadow-[8px_8px_0px_white]">
-                  Zizhi fixes that.
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Section 3: 3 Columns */}
-      <section className="py-20 md:py-32 px-6 max-w-7xl mx-auto">
-        <h2 className="text-4xl md:text-7xl font-black uppercase tracking-tighter text-center mb-16 md:mb-24 leading-[0.9]">
-          Everything reading apps <br /> forgot to combine.
+      {/* Footer CTA */}
+      <section className="py-24 md:py-48 px-6 text-center">
+        <h2 className="text-4xl md:text-[6rem] lg:text-[7rem] font-heading leading-[0.85] uppercase mb-12">
+          If you're going to read... <br />
+          <span className="text-pink-500">You might as well remember</span>
         </h2>
         
-        <div className="grid md:grid-cols-3 gap-8 md:gap-12">
-          {[
-            {
-              num: "01",
-              icon: "📚",
-              title: "Read",
-              color: "bg-pink-400",
-              desc: "A beautiful eBook reader built in. Highlight as you go. No exporting. No syncing headaches."
-            },
-            {
-              num: "02",
-              icon: "🧠",
-              title: "Remember",
-              color: "bg-yellow-300",
-              desc: "All your highlights live in one place. Revisit them daily. Turn them into posts. Notes. Ideas."
-            },
-            {
-              num: "03",
-              icon: "⚡",
-              title: "Understand",
-              color: "bg-cyan-400",
-              desc: "AI summaries when you’re short on time. Audiobook-style breakdowns for busy days."
-            }
-          ].map((item, i) => (
-            <motion.div 
-              key={i}
-              whileHover={{ translate: "-8px -8px" }}
-              className={`p-8 md:p-10 border-4 border-black rounded-none ${item.color} shadow-[8px_8px_0px_black] md:shadow-[12px_12px_0px_black] flex flex-col gap-4 md:gap-6 relative group`}
-            >
-              <div className="absolute -top-4 -left-4 md:-top-6 md:-left-6 w-12 h-12 md:w-16 md:h-16 bg-black text-white flex items-center justify-center font-black text-xl md:text-2xl border-4 border-white">
-                {item.num}
-              </div>
-              <div className="text-5xl md:text-6xl mt-4">{item.icon}</div>
-              <h3 className="text-2xl md:text-3xl font-black uppercase tracking-tighter">{item.title}</h3>
-              <p className="text-black font-bold text-base md:text-lg leading-tight">
-                {item.desc}
-              </p>
-            </motion.div>
-          ))}
-        </div>
+        <button 
+          onClick={onEnter}
+          className="bg-pink-500 text-white px-12 md:px-20 py-5 md:py-6 border-4 border-black shadow-[8px_8px_0px_black] font-heading text-xl md:text-2xl uppercase hover:translate-x-[4px] hover:translate-y-[4px] hover:shadow-none transition-all mb-20"
+        >
+          Start Reading
+        </button>
+
+        <footer className="text-[11px] font-bold uppercase tracking-[0.2em] flex flex-col md:flex-row items-center justify-center gap-4 opacity-60">
+          <div>Built with ❤ and ☕ for all the book lovers out there!</div>
+        </footer>
       </section>
 
-      {/* Section 4: Before vs After */}
-      <section className="py-32 bg-[#1A1A1A] text-white border-y-4 border-black">
-        <div className="max-w-7xl mx-auto px-6">
-          <h2 className="text-5xl md:text-8xl font-black uppercase tracking-tighter text-center mb-24">
-            Reading should <br className="md:hidden" /> <span className="text-cyan-400 italic">compound.</span>
-          </h2>
-          
-          <div className="grid md:grid-cols-2 gap-0 border-4 border-white shadow-[20px_20px_0px_#FF6321]">
-            {/* Before */}
-            <div className="bg-white text-black p-12 space-y-10 border-b-4 md:border-b-0 md:border-r-4 border-black">
-              <div className="flex items-center gap-4">
-                <XCircle className="w-10 h-10 text-red-600" />
-                <h3 className="text-3xl font-black uppercase tracking-tighter">Before Zizhi</h3>
-              </div>
-              <ul className="space-y-8">
-                {[
-                  "10 unfinished books",
-                  "500 forgotten highlights",
-                  "Zero applied ideas"
-                ].map((item, i) => (
-                  <li key={i} className="flex items-center gap-6 text-2xl font-black uppercase opacity-40">
-                    <div className="w-4 h-4 bg-black" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* After */}
-            <div className="bg-[#FF6321] p-12 space-y-10">
-              <div className="flex items-center gap-4">
-                <CheckCircle2 className="w-10 h-10 text-white" />
-                <h3 className="text-3xl font-black uppercase tracking-tighter">After Zizhi</h3>
-              </div>
-              <ul className="space-y-8">
-                {[
-                  "1 organized brain",
-                  "Insights resurfacing daily",
-                  "Reading that compounds"
-                ].map((item, i) => (
-                  <li key={i} className="flex items-center gap-6 text-2xl font-black uppercase">
-                    <div className="w-4 h-4 bg-white shadow-[4px_4px_0px_black]" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Section 5: Social Proof */}
-      <section className="py-32 bg-yellow-300 border-y-4 border-black relative overflow-hidden">
-        {/* Decorative dots */}
-        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(black 2px, transparent 0)', backgroundSize: '24px 24px' }} />
-        <div className="max-w-4xl mx-auto px-6 text-center relative z-10">
-          <QuoteIcon className="w-16 h-16 mx-auto mb-10 text-black" />
-          <h2 className="text-4xl md:text-6xl font-black uppercase tracking-tighter leading-tight mb-8">
-            “For people who don’t read to look smart. <br />
-            They read to <span className="bg-black text-white px-4">think better.</span>”
-          </h2>
-          <div className="font-black uppercase tracking-widest text-sm">— The Zizhi Philosophy</div>
-        </div>
-      </section>
-
-      {/* Section 6: Philosophy */}
-      <section className="py-32 px-6 max-w-7xl mx-auto">
-        <div className="grid md:grid-cols-2 gap-20 items-center">
-          <div>
-            <h2 className="text-6xl md:text-9xl font-black uppercase tracking-tighter leading-[0.8] mb-10">
-              The internet <br />
-              rewards <span className="text-pink-500">noise.</span> <br />
-              <span className="text-[#FF6321]">Zizhi rewards thinking.</span>
-            </h2>
-          </div>
-          <div className="space-y-12">
-            <p className="text-3xl font-bold text-black leading-tight">
-              Less scrolling. More depth. Memory as a superpower. We build tools for the deep thinkers.
-            </p>
-            <div className="grid grid-cols-2 gap-8">
-              <div className="p-8 border-4 border-black rounded-none bg-white shadow-[8px_8px_0px_black] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all">
-                <Layers className="w-10 h-10 mb-6 text-[#FF6321]" />
-                <div className="font-black uppercase text-xl tracking-tighter">Depth First</div>
-              </div>
-              <div className="p-8 border-4 border-black rounded-none bg-white shadow-[8px_8px_0px_black] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all">
-                <MousePointer2 className="w-10 h-10 mb-6 text-cyan-400" />
-                <div className="font-black uppercase text-xl tracking-tighter">Active Recall</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Final CTA */}
-      <section className="py-24 md:py-40 bg-black text-white text-center px-6 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-4 bg-[#FF6321]" />
-        <div className="max-w-4xl mx-auto space-y-12 md:space-y-16">
-          <h2 className="text-4xl sm:text-6xl md:text-[8rem] lg:text-[9rem] font-black uppercase tracking-tighter leading-[0.9] md:leading-[0.8]">
-            If you’re going <br className="hidden md:block" /> to read, <br />
-            you might as well <span className="text-[#FF6321]">remember.</span>
-          </h2>
-          <button 
-            onClick={onEnter}
-            aria-label="Start reading now"
-            className="bg-[#FF6321] text-white px-10 md:px-16 py-6 md:py-8 border-4 border-white shadow-[8px_8px_0px_white] md:shadow-[12px_12px_0px_white] font-black text-xl md:text-3xl uppercase hover:translate-x-2 hover:translate-y-2 hover:shadow-none focus-visible:ring-4 focus-visible:ring-cyan-400 outline-none transition-all"
-          >
-            Start reading now
-          </button>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="py-20 px-6 border-t-4 border-black bg-[#F5F5F0] flex flex-col md:flex-row justify-between items-center gap-12">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-black flex items-center justify-center rounded-none shadow-[4px_4px_0px_#FF6321]">
-            <span className="text-white font-black text-2xl">Z</span>
-          </div>
-          <span className="font-black uppercase tracking-tighter text-2xl">Zizhi</span>
-        </div>
-        <div className="text-black font-black uppercase tracking-widest text-sm">
-          © 2026 Zizhi — Built for the deep thinkers
-        </div>
-      </footer>
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes draw {
+          to { stroke-dashoffset: 0; }
+        }
+      `}} />
     </div>
   );
 };
