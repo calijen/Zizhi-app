@@ -1,40 +1,42 @@
+import './src/index.css';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { MantineProvider, createTheme } from '@mantine/core';
-import { Analytics } from '@vercel/analytics/react';
-import App from './App.tsx';
-import ErrorBoundary from './components/ErrorBoundary.tsx';
-import './index.css';
+import App from './src/App';
+import ErrorBoundary from './src/components/ErrorBoundary';
 
 const theme = createTheme({
-  primaryColor: 'dark',
+  primaryColor: 'cyan', // Changed from 'dark' for better default visibility
   fontFamily: 'Inter, sans-serif',
+  fontFamilyMonospace: 'JetBrains Mono, monospace',
+  headings: {
+    fontFamily: 'Lora, serif',
+  },
 });
+
+if (typeof window !== 'undefined') {
+  window.onerror = (message, source, lineno, colno, error) => {
+    console.error('Global Error Captured:', { message, source, lineno, colno, error });
+    return false;
+  };
+  
+  window.onunhandledrejection = (event) => {
+    console.error('Unhandled Promise Rejection:', event.reason);
+  };
+}
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
-// Register Service Worker for PWA capabilities
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then(registration => {
-      console.log('SW registered: ', registration);
-    }).catch(registrationError => {
-      console.log('SW registration failed: ', registrationError);
-    });
-  });
-}
-
 const root = createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <ErrorBoundary>
-      <MantineProvider theme={theme}>
+    <MantineProvider theme={theme} defaultColorScheme="light">
+      <ErrorBoundary>
         <App />
-        <Analytics />
-      </MantineProvider>
-    </ErrorBoundary>
+      </ErrorBoundary>
+    </MantineProvider>
   </React.StrictMode>
 );

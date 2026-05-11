@@ -206,7 +206,7 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
           </Group>
         </Box>
 
-        <ScrollArea className="flex-1 p-4 md:p-6" viewportRef={scrollRef}>
+        <ScrollArea className="flex-1 px-2 md:px-6 py-4 md:py-6" viewportRef={scrollRef}>
           {isHistoryView ? (
             <Stack gap="md" py="md">
               <button 
@@ -285,33 +285,29 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
         </ScrollArea>
 
         {!isHistoryView && (
-            <Box className="p-4 md:p-6 border-t-[6px] border-black bg-[var(--color-surface)] shrink-0">
-                <Group gap="md" wrap="nowrap">
+            <Box className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:pb-6 md:p-6 border-t-[6px] border-black bg-[var(--color-surface)] shrink-0">
+                <Group gap="xs" wrap="nowrap">
                     <div className="flex-1 relative">
                         <input 
                             className="w-full bg-white border-4 border-black p-4 pr-14 text-[16px] font-black placeholder:text-black/30 placeholder:uppercase text-black outline-none focus:ring-4 focus:ring-yellow-300 transition-all shadow-[6px_6px_0_black]"
-                            placeholder="Zizhi Oracle..."
+                            placeholder="Message Phoebe..."
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                             autoFocus
                         />
-                        {/* Hidden Send icon just in case the button disappears */}
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2 md:hidden pointer-events-none opacity-20">
-                            <IconSend size={20} className="text-black" />
-                        </div>
                     </div>
                     <ActionIcon 
                         onClick={handleSend}
                         variant="filled" 
                         color="yellow" 
                         size={56} 
-                        className={`rounded-none border-4 border-black shadow-[6px_6px_0_black] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all shrink-0 z-10`}
+                        className="rounded-none border-4 border-black shadow-[6px_6px_0_black] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all shrink-0 z-10"
                         disabled={isLoading || !input.trim()}
                         id="phoebe-send-btn"
                         aria-label="Send message"
                     >
-                        <IconSend className="text-black w-6 h-6" />
+                        <IconSend className="text-black w-6 h-6 stroke-[3]" />
                     </ActionIcon>
                 </Group>
             </Box>

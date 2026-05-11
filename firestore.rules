@@ -1,0 +1,110 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // -------------------------------------------------------------------------
+    // HELPERS
+    // -------------------------------------------------------------------------
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // -------------------------------------------------------------------------
+    // VALIDATORS
+    // -------------------------------------------------------------------------
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email']) &&
+             data.uid == request.auth.uid &&
+             data.email is string && data.email.size() <= 256;
+    }
+
+    function isValidBook(data) {
+      return data.keys().hasAll(['id', 'title', 'author']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.title is string && data.title.size() <= 512 &&
+             data.author is string && data.author.size() <= 512;
+    }
+
+    function isValidQuote(data) {
+      return data.keys().hasAll(['id', 'text', 'bookId']) &&
+             data.id is string &&
+             data.text is string && data.text.size() <= 5000 &&
+             data.bookId is string;
+    }
+
+    // -------------------------------------------------------------------------
+    // RULES
+    // -------------------------------------------------------------------------
+
+    // Deny all by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // User Profiles
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && isValidUser(incoming()) && 
+                    incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'lastLogin']);
+      
+      // Books Subcollection
+      match /books/{bookId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidBook(incoming());
+        allow update: if isOwner(userId) && isValidBook(incoming());
+        allow delete: if isOwner(userId);
+      }
+
+      // Quotes Subcollection
+      match /quotes/{quoteId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidQuote(incoming());
+        allow update: if isOwner(userId) && isValidQuote(incoming());
+        allow delete: if isOwner(userId);
+      }
+
+      // Notes Subcollection
+      match /notes/{noteId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && incoming().bookId is string;
+        allow update: if isOwner(userId);
+        allow delete: if isOwner(userId);
+      }
+
+      // Activity Subcollection
+      match /activity/{date} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow write: if isOwner(userId);
+      }
+
+      // Chats Subcollection
+      match /chats/{chatId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow write: if isOwner(userId);
+      }
+    }
+  }
+}

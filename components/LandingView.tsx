@@ -1,13 +1,16 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowRight, X } from 'lucide-react';
 import { Logo } from './icons';
+import AuthView from './AuthView';
 
 interface LandingViewProps {
   onEnter: () => void;
 }
 
 const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-[#fbf6e1] text-[#1a110a] font-body selection:bg-pink-400 selection:text-white overflow-x-hidden">
       {/* Navigation */}
@@ -23,10 +26,10 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
         </div>
 
         <button 
-          onClick={onEnter}
+          onClick={() => setIsAuthOpen(true)}
           className="bg-yellow-400 text-black px-5 py-2 border-2 border-black shadow-[4px_4px_0px_black] font-heading text-[11px] uppercase hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all"
         >
-          Start Reading
+          Sign In
         </button>
       </nav>
 
@@ -54,9 +57,18 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
           >
-            <h1 className="text-5xl md:text-[6rem] lg:text-[7.5rem] font-heading leading-[0.9] uppercase mb-8">
-              Turn <span className="text-pink-500">Books</span> <br />
-              Into <span className="text-pink-500">Ideas</span>
+            <h1 className="text-4xl md:text-[72px] md:leading-[96px] font-heading uppercase mb-4">
+              Turn <span className="text-pink-500 relative inline-block">
+                <span className="relative z-10 font-doodle normal-case tracking-normal">Books</span>
+                <svg className="absolute -bottom-2 -left-2 w-[120%] h-full text-pink-500/30 pointer-events-none" viewBox="0 0 100 40" preserveAspectRatio="none">
+                  <path d="M5,30 Q50,45 95,30 Q50,15 5,30" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+                </svg>
+              </span> Into <span className="text-pink-500 relative inline-block">
+                <span className="relative z-10 font-doodle normal-case tracking-normal">Ideas</span>
+                <svg className="absolute -bottom-2 -left-2 w-[120%] h-full text-pink-500/30 pointer-events-none" viewBox="0 0 100 40" preserveAspectRatio="none">
+                  <path d="M5,30 Q50,45 95,30 Q50,15 5,30" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+                </svg>
+              </span>
             </h1>
             
             <p className="text-lg md:text-xl font-body max-w-2xl mx-auto mb-10 leading-relaxed opacity-80">
@@ -65,13 +77,14 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mb-16">
               <button 
-                onClick={onEnter}
+                onClick={() => setIsAuthOpen(true)}
                 className="bg-cyan-400 text-black px-10 md:px-14 py-4 md:py-5 border-4 border-black shadow-[6px_6px_0px_black] font-heading text-lg md:text-xl uppercase hover:translate-x-[4px] hover:translate-y-[4px] hover:shadow-none transition-all group"
               >
                 Start Reading
               </button>
               <button 
                 className="flex items-center gap-2 font-heading text-[12px] uppercase tracking-widest hover:text-pink-500 group transition-colors"
+                onClick={() => setIsAuthOpen(true)}
               >
                 See how it works <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </button>
@@ -97,10 +110,10 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
       </section>
 
       {/* Section: Reading Problem */}
-      <section className="py-24 md:py-40 border-t-4 border-black bg-white overflow-hidden">
+      <section id="how-it-works" className="py-24 md:py-40 border-t-4 border-black bg-white overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-16 items-start">
           <div className="space-y-4">
-            <h2 className="text-5xl md:text-8xl font-heading leading-none uppercase">
+            <h2 className="text-4xl md:text-[72px] md:leading-[96px] font-heading uppercase">
               You don't have <br className="hidden lg:block" /> a reading <br className="hidden lg:block" /> problem...
             </h2>
           </div>
@@ -129,9 +142,8 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
                     stroke="black" 
                     strokeWidth="3" 
                     strokeLinecap="round"
-                    className="animate-[draw_2s_ease-out_forwards]"
                     strokeDasharray="1000"
-                    strokeDashoffset="1000"
+                    strokeDashoffset="0"
                  />
                  <path d="M340,100 L355,112 L340,125" fill="none" stroke="black" strokeWidth="3" strokeLinecap="round" />
                </svg>
@@ -146,10 +158,10 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
       </section>
 
       {/* Section: Combine */}
-      <section className="py-24 bg-[#fbf6e1] border-y-4 border-black">
+      <section id="features" className="py-24 bg-[#fbf6e1] border-y-4 border-black">
         <div className="max-w-7xl mx-auto px-6">
           <p className="font-bold text-[13px] uppercase tracking-[0.2em] mb-4 opacity-70">Zizhi puts together</p>
-          <h2 className="text-4xl md:text-7xl font-heading leading-[0.9] uppercase mb-16 md:mb-24">
+          <h2 className="text-4xl md:text-[72px] md:leading-[96px] font-heading uppercase mb-16 md:mb-24">
             Everything reading apps <br className="hidden md:block" /> forgot to combine
           </h2>
 
@@ -181,10 +193,10 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
       </section>
 
       {/* Section: Compound */}
-      <section className="py-24 md:py-40">
+      <section id="philosophy" className="py-24 md:py-40">
         <div className="max-w-7xl mx-auto px-6">
           <p className="font-bold text-[13px] uppercase tracking-[0.2em] mb-4 opacity-70 text-center">Zizhi app was built because we believe that....</p>
-          <h2 className="text-4xl md:text-[6rem] font-heading leading-[0.9] uppercase text-center mb-20 md:mb-32">
+          <h2 className="text-4xl md:text-[72px] md:leading-[96px] font-heading uppercase text-center mb-20 md:mb-32">
             Reading should <br className="hidden md:block" /> compound
           </h2>
 
@@ -225,23 +237,59 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter }) => {
       </section>
 
       {/* Footer CTA */}
-      <section className="py-24 md:py-48 px-6 text-center">
-        <h2 className="text-4xl md:text-[6rem] lg:text-[7rem] font-heading leading-[0.85] uppercase mb-12">
+      <footer className="py-24 md:py-48 px-6 text-center border-t-4 border-black">
+        <h2 className="text-4xl md:text-[72px] md:leading-[96px] font-heading uppercase mb-12">
           If you're going to read... <br />
-          <span className="text-pink-500">You might as well remember</span>
+          <span className="text-pink-500 relative inline-block">
+            <span className="relative z-10 font-doodle normal-case tracking-normal">You might as well remember</span>
+            <svg className="absolute -bottom-4 -left-4 w-[110%] h-full text-pink-500/30 pointer-events-none" viewBox="0 0 100 40" preserveAspectRatio="none">
+              <path d="M2,35 Q50,45 98,35 Q50,25 2,35" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </span>
         </h2>
         
         <button 
-          onClick={onEnter}
+          onClick={() => setIsAuthOpen(true)}
           className="bg-pink-500 text-white px-12 md:px-20 py-5 md:py-6 border-4 border-black shadow-[8px_8px_0px_black] font-heading text-xl md:text-2xl uppercase hover:translate-x-[4px] hover:translate-y-[4px] hover:shadow-none transition-all mb-20"
         >
-          Start Reading
+          Get Started Now
         </button>
 
-        <footer className="text-[11px] font-bold uppercase tracking-[0.2em] flex flex-col md:flex-row items-center justify-center gap-4 opacity-60">
+        <div className="text-[11px] font-bold uppercase tracking-[0.2em] flex flex-col md:flex-row items-center justify-center gap-4 opacity-60">
           <div>Built with ❤ and ☕ for all the book lovers out there!</div>
-        </footer>
-      </section>
+        </div>
+      </footer>
+
+      {/* Auth Modal */}
+      <AnimatePresence>
+        {isAuthOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-6"
+          >
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsAuthOpen(false)} />
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="relative w-full max-w-lg bg-[#fbf6e1] border-4 border-black shadow-[16px_16px_0px_black] p-1 overflow-hidden"
+            >
+              <button 
+                onClick={() => setIsAuthOpen(false)}
+                className="absolute top-4 right-4 z-10 p-2 hover:bg-black/5 transition-colors"
+                aria-label="Close"
+              >
+                <X className="w-6 h-6" />
+              </button>
+              <div className="p-8">
+                <AuthView onClose={() => setIsAuthOpen(false)} onLogin={onEnter} hideClose />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes draw {

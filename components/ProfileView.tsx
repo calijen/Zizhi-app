@@ -193,26 +193,24 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShow
         getRecs();
     }, [library]);
 
-    if (!user) {
-        return (
-            <div className="p-6 h-full flex flex-col items-center justify-center text-center max-w-sm mx-auto animate-fade-in">
-                <Box className="p-12 bg-[var(--color-surface)] border-8 border-[var(--color-border-color)] shadow-[16px_16px_0_var(--color-border-color)] w-full">
-                    <h2 className="text-3xl font-black mb-6 uppercase text-[var(--color-primary-text)]">Private Library</h2>
-                    <p className="text-[12px] text-[var(--color-muted-text)] mb-10 font-bold uppercase tracking-widest leading-relaxed">Sign in to sync your profile, though books remain local for privacy.</p>
-                    <button onClick={onShowAuth} className="w-full py-5 bg-yellow-400 text-black border-4 border-black font-black uppercase shadow-[8px_8px_0_black] active:translate-y-1 transition-all text-xs rounded-none">Log In</button>
-                </Box>
-            </div>
-        );
-    }
-
     return (
-        <div className="space-y-20 animate-fade-in max-w-5xl mx-auto pb-80 px-4 md:px-0">
-            <header className="flex flex-col md:flex-row justify-between items-start md:items-end border-b-8 border-[var(--color-border-color)] pb-10">
+        <div className="space-y-20 animate-fade-in max-w-5xl mx-auto pb-80 px-4 md:px-0 font-body">
+            <header className="flex flex-col md:flex-row justify-between items-start md:items-end border-b-8 border-black pb-10">
                 <Stack gap={0}>
                     <Text className="text-[10px] font-black uppercase tracking-[0.5em] text-pink-500 mb-2">The Archive of</Text>
-                    <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tighter leading-none text-[var(--color-primary-text)]">{user.email.split('@')[0]}</h2>
+                    <h2 className="text-4xl md:text-5xl font-heading uppercase tracking-tighter leading-none text-black">
+                        {user.displayName || user.email?.split('@')[0]}
+                    </h2>
+                    <Box className="mt-2 bg-green-100 border-2 border-green-600 px-3 py-1 inline-block">
+                        <Text className="text-[10px] font-bold text-green-700 uppercase">Cloud Sync Enabled</Text>
+                    </Box>
                 </Stack>
-                <button onClick={onSignOut} className="mt-8 md:mt-0 bg-[var(--color-surface)] border-4 border-[var(--color-border-color)] px-8 py-4 text-[11px] font-black uppercase tracking-[0.3em] shadow-[6px_6px_0_var(--color-border-color)] hover:translate-y-[-2px] transition-all text-[var(--color-primary-text)] rounded-none">Sign Out</button>
+                <button 
+                  onClick={onSignOut} 
+                  className="mt-8 md:mt-0 bg-white border-4 border-black px-8 py-4 text-[11px] font-heading uppercase tracking-[0.2em] shadow-[6px_6px_0_black] hover:translate-y-[-2px] hover:shadow-[8px_8px_0_black] transition-all text-black active:translate-y-1 active:shadow-none rounded-none"
+                >
+                  Sign Out
+                </button>
             </header>
 
             <section className="flex flex-col md:flex-row items-center gap-12 bg-[var(--color-surface)] border-8 border-[var(--color-border-color)] p-8 md:p-16 shadow-[20px_20px_0_var(--color-border-color)] relative overflow-hidden">
