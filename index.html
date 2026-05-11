@@ -4,6 +4,7 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <link rel="manifest" href="/manifest.json" />
     
     <!-- PWA & Mobile Optimization -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -21,9 +22,11 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Lora:ital,wght@0,400;0,700;1,400;1,700&family=EB+Garamond:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     
+    <!-- Mantine Core Styles -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mantine/core@7.16.2/styles.css" />
+    
     <!-- PDF.js Text Layer Styles -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css" />
-    <link rel="stylesheet" href="https://unpkg.com/@mantine/core@7.16.2/styles.css" />
 
     <style>
       :root {
@@ -35,7 +38,7 @@
         margin: 0;
         padding: 0;
         font-family: var(--font-sans);
-        background-color: #fbf6e1;
+        background-color: #000000;
         -webkit-tap-highlight-color: transparent;
       }
 
@@ -55,27 +58,7 @@
     </style>
 </head>
   <body>
-    <div id="root">
-      <div style="display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #fbf6e1; color: #a0522d; font-family: system-ui;">
-        <div style="text-align: center;">
-          <h2 style="margin: 0;">Initializing Zizhi...</h2>
-          <p style="opacity: 0.7;">If this persists, please try refreshing.</p>
-        </div>
-      </div>
-    </div>
-    <script>
-      console.log('Zizhi Bootstrap: Starting...');
-      window.addEventListener('error', function(e) {
-        console.error('Initial Load Error:', e.message);
-        if (e.message.includes('MIME type')) {
-          document.body.innerHTML += '<div style="position:fixed;bottom:0;left:0;right:0;padding:10px;background:red;color:white;font-size:10px;z-index:9999">MIME Error: Please try opening in a new tab or allowing cookies.</div>';
-        }
-      });
-      // Check for redirect loop
-      if (window.location.href.includes('__cookie_check')) {
-        console.warn('Cookie check redirect detected.');
-      }
-    </script>
-    <script type="module" src="/index.tsx?v=5"></script>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
 </body>
 </html>

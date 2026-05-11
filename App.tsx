@@ -11,10 +11,10 @@ import SummaryView from './components/TrailerView';
 import ProfileView from './components/ProfileView';
 import LandingView from './components/LandingView';
 import Toast from './components/Toast';
+import ReloadPrompt from './components/ReloadPrompt';
 import { Logo, IconSettings, IconUser, IconLibrary, IconQuote, IconUpload, IconLayoutGrid, IconLayoutList, IconSpinner, IconMenu, IconNote } from './components/icons';
 import * as db from './db';
-import { auth } from './firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { supabase } from './supabase';
 import type { Book, BookMetadata, BookContent, Quote, Note, Theme, ThemeFont, GenerationStatus } from './types';
 import { parseEpub } from './epubParser';
 import { parsePdf } from './pdfParser';
@@ -87,12 +87,12 @@ const NavItem = ({ tab, activeTab, icon: Icon, label, onSelect, collapsed }: { t
 };
 
 const App: FC = () => {
-    const { colorScheme, setColorScheme } = useMantineColorScheme();
-    const [library, setLibrary] = useState<BookMetadata[]>([]);
+  const { colorScheme, setColorScheme } = useMantineColorScheme();
+  const [library, setLibrary] = useState<BookMetadata[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [user, setUser] = useState<any>(null);
-  const [hasEntered, setHasEntered] = useState<boolean>(false);
+  const [hasEntered, setHasEntered] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState<'library' | 'quotes' | 'notes' | 'profile' | 'settings' | 'auth'>('library');
   const [streak, setStreak] = useState(1);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
@@ -158,17 +158,15 @@ const App: FC = () => {
       setQuotes(localQuotes);
       setNotes(localNotes);
       
-      const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-        if (firebaseUser) {
-          setUser(firebaseUser);
-          setHasEntered(true);
-        } else {
-          setUser(null);
-          setHasEntered(false);
-          setActiveTab('library'); // Reset tab for next login
-        }
-      });
-      return unsubscribe;
+      const savedHasEntered = localStorage.getItem('zizhi-entered');
+      if (localBooks.length > 0 || savedHasEntered === 'true') {
+        setHasEntered(true);
+      } else {
+        setHasEntered(false);
+      }
+
+      const { data } = await supabase.auth.getUser();
+      if (data.user) setUser(data.user);
     } catch (e) { 
         console.error("Load failed", e); 
         setHasEntered(false); // Ensure we don't stay in null state
@@ -176,14 +174,11 @@ const App: FC = () => {
   }, []);
 
   useEffect(() => { 
-    const setup = async () => {
-      const unsub = await loadData();
-      return unsub;
-    };
-    const promise = setup();
-    return () => {
-      promise.then(unsub => unsub?.());
-    };
+    let isMounted = true;
+    loadData().then(() => {
+      if (!isMounted) return;
+    }); 
+    return () => { isMounted = false; };
   }, [loadData]);
 
   useEffect(() => {
@@ -206,11 +201,8 @@ const App: FC = () => {
   const sortedLibrary = useMemo(() => [...library].sort((a, b) => (b.lastOpened || 0) - (a.lastOpened || 0)), [library]);
 
   const handleEnterApp = () => {
-    // If user is not logged in, we stay on landing but might scroll to auth
-    // The LandingView handles the interaction
-    if (user) {
-        setHasEntered(true);
-    }
+    setHasEntered(true);
+    localStorage.setItem('zizhi-entered', 'true');
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -277,7 +269,7 @@ const App: FC = () => {
     setGenerationStatuses(prev => ({ ...prev, [bookId]: { stage: 'Checking', progress: 0.1, currentAction: 'Authenticating...' } }));
     
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         setGenerationStatuses(prev => ({ ...prev, [bookId]: { stage: 'Thinking', progress: 0.2, currentAction: 'Distilling content...' } }));
 
         const summaryPrompt = `Synthesize a focused audio summary of the book "${book.title}" by ${book.author}. 
@@ -345,12 +337,12 @@ const App: FC = () => {
     '--font-sans': theme.font.sans 
   } as React.CSSProperties;
 
-  // Removed the null check to prevent blank screen
-  // if (hasEntered === null) return null;
+  if (hasEntered === null) return null;
 
   return (
     <>
-      {!user ? (
+      <ReloadPrompt />
+      {!hasEntered ? (
         <LandingView onEnter={handleEnterApp} />
       ) : (
         <Box style={appStyles} className="relative h-[100dvh] w-full overflow-hidden transition-colors duration-300 flex flex-col md:flex-row text-[var(--color-primary-text)]" bg="var(--color-background)">
@@ -458,15 +450,9 @@ const App: FC = () => {
                               if (content) setSelectedBook({ ...meta, ...content });
                           }
                       }} />}
-                      {activeTab === 'profile' && <ProfileView user={user} streak={streak} library={library} onShowAuth={() => setActiveTab('auth')} activity={[]} onSignOut={async () => { await auth.signOut(); }} />}
+                      {activeTab === 'profile' && <ProfileView user={user} streak={streak} library={library} onShowAuth={() => setActiveTab('auth')} activity={[]} onSignOut={async () => { await supabase.auth.signOut(); setUser(null); }} />}
                       {activeTab === 'settings' && <SettingsView currentTheme={theme} onThemeChange={(t) => { setTheme(t); setColorScheme(t.id === 'nocturne' ? 'dark' : 'light'); localStorage.setItem('zizhi-theme', JSON.stringify(t)); }} themes={ATMOSPHERES} fonts={FONTS} textures={{}} />}
-                      {activeTab === 'auth' && <AuthView onClose={() => {
-                        if (user) {
-                          setActiveTab('library');
-                        } else {
-                          setHasEntered(false);
-                        }
-                      }} onLogin={(u) => { setUser(u); setActiveTab('library'); }} />}
+                      {activeTab === 'auth' && <AuthView onClose={() => setActiveTab('profile')} onLogin={(u) => { setUser(u); setActiveTab('profile'); }} />}
                   </Box>
               </main>
               <Box className="hidden md:block fixed bottom-12 right-12 z-[250]"><input type="file" ref={fileInputRef} onChange={handleUpload} accept=".epub,.pdf" className="hidden" /><ActionIcon size={80} className="bg-yellow-400 border-4 border-black shadow-[8px_8px_0_black] hover:translate-y-[-2px] transition-all rounded-none" onClick={() => fileInputRef.current?.click()}>{isUploading ? <IconSpinner className="w-10 h-10 text-black" /> : <IconUpload className="w-10 h-10 text-black" />}</ActionIcon></Box>

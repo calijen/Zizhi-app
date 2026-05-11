@@ -3,13 +3,12 @@ export default {
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
+    "./App.tsx",
+    "./components/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {
       fontFamily: {
-        heading: ["Alfa Slab One", "serif"],
-        body: ["Gentium Book Plus", "serif"],
-        doodle: ["Architects Daughter", "cursive"],
         sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
         serif: ["EB Garamond", "Lora", "serif"],
         mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "monospace"],

@@ -1,6 +1,4 @@
 import type { Book, BookMetadata, BookContent, Quote, Note, ReadingActivity, ChatSession } from './types';
-import * as firebase from './firebase';
-import { auth } from './firebase';
 
 const DB_NAME = 'ZizhiDB';
 const DB_VERSION = 8; 
@@ -47,23 +45,16 @@ export const initDB = (): Promise<IDBDatabase> => {
 };
 
 export const saveBook = async (book: Book): Promise<void> => {
-  // Sync to Cloud
-  if (auth.currentUser) {
-    try {
-      await firebase.saveBookToCloud(book);
-    } catch (e) {
-      console.error("Cloud sync failed (saveBook)", e);
-    }
-  }
-
   const db = await initDB();
   return new Promise((resolve, reject) => {
     try {
         const transaction = db.transaction([BOOK_STORE, CONTENT_STORE], 'readwrite');
         
+        // Extract metadata
         const { chapters, toc, summaryScript, audioSummaryUrl, audioDuration, pdfData, ...metadata } = book;
         const content = { id: book.id, chapters, toc, summaryScript, audioSummaryUrl, audioDuration, pdfData };
         
+        // Add flags to metadata
         const metadataWithFlags = {
             ...metadata,
             hasSummary: !!summaryScript,
@@ -76,26 +67,26 @@ export const saveBook = async (book: Book): Promise<void> => {
         bookStore.put(metadataWithFlags);
         contentStore.put(content);
         
-        transaction.oncomplete = () => resolve();
-        transaction.onerror = (event) => reject((event.target as any).error);
+        transaction.oncomplete = () => {
+            console.log(`Book ${book.id} saved successfully`);
+            resolve();
+        };
+        transaction.onerror = (event) => {
+            console.error(`Transaction error saving book ${book.id}:`, (event.target as any).error);
+            reject((event.target as any).error);
+        };
+        transaction.onabort = (event) => {
+            console.error(`Transaction aborted saving book ${book.id}:`, (event.target as any).error);
+            reject((event.target as any).error);
+        };
     } catch (err) {
+        console.error(`Error in saveBook for ${book.id}:`, err);
         reject(err);
     }
   });
 };
 
 export const getBooks = async (): Promise<BookMetadata[]> => {
-    // If logged in, we could merge or take cloud as truth. 
-    // For simplicity, we try cloud if online, otherwise local.
-    if (auth.currentUser) {
-        try {
-            const cloudBooks = await firebase.getBooksFromCloud();
-            if (cloudBooks.length > 0) return cloudBooks;
-        } catch (e) {
-            console.error("Cloud fetch failed (getBooks)", e);
-        }
-    }
-
     const db = await initDB();
     return new Promise((resolve) => {
         const transaction = db.transaction(BOOK_STORE, 'readonly');
@@ -104,15 +95,6 @@ export const getBooks = async (): Promise<BookMetadata[]> => {
 };
 
 export const getBookContent = async (id: string): Promise<BookContent | null> => {
-    if (auth.currentUser) {
-        try {
-            const cloudContent = await firebase.getBookContentFromCloud(id);
-            if (cloudContent) return cloudContent;
-        } catch (e) {
-            console.error("Cloud fetch failed (getBookContent)", e);
-        }
-    }
-
     const db = await initDB();
     return new Promise((resolve) => {
         const transaction = db.transaction(CONTENT_STORE, 'readonly');
@@ -123,14 +105,6 @@ export const getBookContent = async (id: string): Promise<BookContent | null> =>
 };
 
 export const deleteBook = async (id: string): Promise<void> => {
-    if (auth.currentUser) {
-        try {
-            await firebase.deleteBookFromCloud(id);
-        } catch (e) {
-            console.error("Cloud sync failed (deleteBook)", e);
-        }
-    }
-
     const db = await initDB();
     return new Promise((resolve, reject) => {
         const transaction = db.transaction([BOOK_STORE, CONTENT_STORE], 'readwrite');
@@ -142,14 +116,6 @@ export const deleteBook = async (id: string): Promise<void> => {
 };
 
 export const saveQuote = async (quote: Quote): Promise<void> => {
-    if (auth.currentUser) {
-        try {
-            await firebase.saveQuoteToCloud(quote);
-        } catch (e) {
-            console.error("Cloud sync failed (saveQuote)", e);
-        }
-    }
-
     const db = await initDB();
     return new Promise((resolve, reject) => {
         const transaction = db.transaction(QUOTE_STORE, 'readwrite');
@@ -160,15 +126,6 @@ export const saveQuote = async (quote: Quote): Promise<void> => {
 };
 
 export const getQuotes = async (): Promise<Quote[]> => {
-    if (auth.currentUser) {
-        try {
-            const cloudQuotes = await firebase.getQuotesFromCloud();
-            if (cloudQuotes.length > 0) return cloudQuotes;
-        } catch (e) {
-            console.error("Cloud fetch failed (getQuotes)", e);
-        }
-    }
-
     const db = await initDB();
     return new Promise((resolve) => {
         const transaction = db.transaction(QUOTE_STORE, 'readonly');
@@ -177,14 +134,6 @@ export const getQuotes = async (): Promise<Quote[]> => {
 };
 
 export const deleteQuote = async (id: string): Promise<void> => {
-    if (auth.currentUser) {
-        try {
-            await firebase.deleteQuoteFromCloud(id);
-        } catch (e) {
-            console.error("Cloud sync failed (deleteQuote)", e);
-        }
-    }
-
     const db = await initDB();
     return new Promise((resolve, reject) => {
         const transaction = db.transaction(QUOTE_STORE, 'readwrite');
@@ -195,14 +144,6 @@ export const deleteQuote = async (id: string): Promise<void> => {
 };
 
 export const saveNote = async (note: Note): Promise<void> => {
-    if (auth.currentUser) {
-        try {
-            await firebase.saveNoteToCloud(note);
-        } catch (e) {
-            console.error("Cloud sync failed (saveNote)", e);
-        }
-    }
-
     const db = await initDB();
     return new Promise((resolve, reject) => {
         const transaction = db.transaction(NOTE_STORE, 'readwrite');
@@ -213,15 +154,6 @@ export const saveNote = async (note: Note): Promise<void> => {
 };
 
 export const getNotes = async (): Promise<Note[]> => {
-    if (auth.currentUser) {
-        try {
-            const cloudNotes = await firebase.getNotesFromCloud();
-            if (cloudNotes.length > 0) return cloudNotes;
-        } catch (e) {
-            console.error("Cloud fetch failed (getNotes)", e);
-        }
-    }
-
     const db = await initDB();
     return new Promise((resolve) => {
         const transaction = db.transaction(NOTE_STORE, 'readonly');
@@ -230,14 +162,6 @@ export const getNotes = async (): Promise<Note[]> => {
 };
 
 export const deleteNote = async (id: string): Promise<void> => {
-    if (auth.currentUser) {
-        try {
-            await firebase.deleteNoteFromCloud(id);
-        } catch (e) {
-            console.error("Cloud sync failed (deleteNote)", e);
-        }
-    }
-
     const db = await initDB();
     return new Promise((resolve, reject) => {
         const transaction = db.transaction(NOTE_STORE, 'readwrite');
@@ -248,14 +172,6 @@ export const deleteNote = async (id: string): Promise<void> => {
 };
 
 export const logActivity = async (seconds: number): Promise<void> => {
-    if (auth.currentUser) {
-        try {
-            await firebase.logActivityToCloud(seconds);
-        } catch (e) {
-            console.error("Cloud sync failed (logActivity)", e);
-        }
-    }
-
     const db = await initDB();
     const date = new Date().toISOString().split('T')[0];
     return new Promise((resolve) => {
@@ -275,15 +191,6 @@ export const logActivity = async (seconds: number): Promise<void> => {
 };
 
 export const getActivity = async (): Promise<ReadingActivity[]> => {
-    if (auth.currentUser) {
-        try {
-            const cloudActivity = await firebase.getActivityFromCloud();
-            if (cloudActivity.length > 0) return cloudActivity;
-        } catch (e) {
-            console.error("Cloud fetch failed (getActivity)", e);
-        }
-    }
-
     const db = await initDB();
     return new Promise((resolve) => {
         const transaction = db.transaction(ACTIVITY_STORE, 'readonly');
@@ -292,14 +199,6 @@ export const getActivity = async (): Promise<ReadingActivity[]> => {
 };
 
 export const saveChatSession = async (session: ChatSession): Promise<void> => {
-    if (auth.currentUser) {
-        try {
-            await firebase.saveChatSessionToCloud(session);
-        } catch (e) {
-            console.error("Cloud sync failed (saveChatSession)", e);
-        }
-    }
-
     const db = await initDB();
     return new Promise((resolve, reject) => {
         const transaction = db.transaction(CHAT_STORE, 'readwrite');
@@ -310,15 +209,6 @@ export const saveChatSession = async (session: ChatSession): Promise<void> => {
 };
 
 export const getChatSessions = async (): Promise<ChatSession[]> => {
-    if (auth.currentUser) {
-        try {
-            const cloudChats = await firebase.getChatSessionsFromCloud();
-            if (cloudChats.length > 0) return cloudChats;
-        } catch (e) {
-            console.error("Cloud fetch failed (getChatSessions)", e);
-        }
-    }
-
     const db = await initDB();
     return new Promise((resolve) => {
         const transaction = db.transaction(CHAT_STORE, 'readonly');
@@ -331,14 +221,6 @@ export const getChatSessions = async (): Promise<ChatSession[]> => {
 };
 
 export const deleteChatSession = async (id: string): Promise<void> => {
-    if (auth.currentUser) {
-        try {
-            await firebase.deleteChatSessionFromCloud(id);
-        } catch (e) {
-            console.error("Cloud sync failed (deleteChatSession)", e);
-        }
-    }
-
     const db = await initDB();
     return new Promise((resolve, reject) => {
         const transaction = db.transaction(CHAT_STORE, 'readwrite');
