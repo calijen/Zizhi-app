@@ -1,19 +1,20 @@
 import { FC } from 'react';
 
-export const Logo: FC<{ className?: string }> = ({ className }) => (
-    <svg 
-        className={className} 
-        viewBox="0 0 100 32" 
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        aria-label="Zizhi Logo"
-        role="img"
-    >
-        <path d="M8 6V26" stroke="currentColor" strokeWidth="4" strokeLinecap="round"/>
-        <path d="M18 6V26" stroke="currentColor" strokeWidth="4" strokeLinecap="round"/>
-        <path d="M32 26L24 8" stroke="currentColor" strokeWidth="4" strokeLinecap="round"/>
-        <text x="42" y="24" fontFamily="'Lora', serif" fontSize="22" fontWeight="700" fill="currentColor">Zizhi</text>
+export const LogoIcon: FC<{ className?: string; size?: number }> = ({ className, size = 32 }) => (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+        <path d="M8 8V24" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+        <path d="M14 8V24" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+        <path d="M24 24L18 8" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
     </svg>
+);
+
+export const Logo: FC<{ className?: string }> = ({ className }) => (
+    <div className={`flex items-center gap-0 select-none ${className}`} style={{ height: '42px' }}>
+        <div className="w-[42px] h-[42px] flex items-center justify-center shrink-0">
+            <LogoIcon className="w-[42px] h-[42px] text-[var(--color-primary)]" />
+        </div>
+        <span className="font-display text-[30px] leading-[36px] whitespace-nowrap text-[var(--color-primary-text)]">ZIZHI</span>
+    </div>
 );
 
 export const IconSettings: FC<{ className?: string; size?: number }> = ({ className, size = 24 }) => (

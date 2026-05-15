@@ -1,0 +1,92 @@
+
+{
+  "entities": {
+    "Book": {
+      "title": "Book",
+      "description": "Metadata for a book uploaded by the user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "author": { "type": "string" },
+        "cover": { "type": "string" },
+        "progress": { "type": "number" },
+        "lastOpened": { "type": "number" },
+        "readingTime": { "type": "number" },
+        "hasSummary": { "type": "boolean" },
+        "hasAudio": { "type": "boolean" },
+        "fileUrl": { "type": "string" },
+        "storagePath": { "type": "string" },
+        "type": { "type": "string", "enum": ["pdf", "epub"] },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "title", "userId"]
+    },
+    "Quote": {
+      "title": "Quote",
+      "description": "A highlight or quote from a book",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "text": { "type": "string" },
+        "bookTitle": { "type": "string" },
+        "author": { "type": "string" },
+        "bookId": { "type": "string" },
+        "location": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "text", "bookId", "userId"]
+    },
+    "Note": {
+      "title": "Note",
+      "description": "A user-written note attached to a book location",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "text": { "type": "string" },
+        "note": { "type": "string" },
+        "bookTitle": { "type": "string" },
+        "author": { "type": "string" },
+        "bookId": { "type": "string" },
+        "location": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "text", "note", "bookId", "userId"]
+    },
+    "User": {
+        "title": "User",
+        "description": "User profile and streak information",
+        "type": "object",
+        "properties": {
+            "uid": { "type": "string" },
+            "email": { "type": "string" },
+            "displayName": { "type": "string" },
+            "photoURL": { "type": "string" },
+            "streak": { "type": "number" },
+            "lastVisit": { "type": "string" }
+        },
+        "required": ["uid"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile data"
+    },
+    "/users/{userId}/books/{bookId}": {
+      "schema": "Book",
+      "description": "Collection of books belonging to the user"
+    },
+    "/users/{userId}/quotes/{quoteId}": {
+      "schema": "Quote",
+      "description": "Collection of quotes belonging to the user"
+    },
+    "/users/{userId}/notes/{noteId}": {
+      "schema": "Note",
+      "description": "Collection of notes belonging to the user"
+    }
+  }
+}

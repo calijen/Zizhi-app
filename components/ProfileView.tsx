@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Box, Group, Stack, Text, SimpleGrid } from '@mantine/core';
 import type { BookMetadata, ReadingActivity } from '../types';
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { IconSpinner } from './icons';
 
 interface ProfileViewProps {
@@ -158,30 +158,15 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShow
             setError(null);
             
             try {
-                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+                const genAI = new GoogleGenerativeAI(process.env.API_KEY || "");
+                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                
                 // We limit the number of titles to avoid context bloat
                 const titles = library.slice(0, 5).map(b => b.title).join(', ');
-                const response = await ai.models.generateContent({
-                    model: 'gemini-3-flash-preview',
-                    contents: `User library contains: ${titles}. Based on these books, recommend 3 similar must-read titles. Return valid JSON only.`,
-                    config: { 
-                        responseMimeType: 'application/json',
-                        responseSchema: {
-                            type: Type.ARRAY,
-                            items: {
-                                type: Type.OBJECT,
-                                properties: {
-                                    title: { type: Type.STRING },
-                                    author: { type: Type.STRING },
-                                    coverUrl: { type: Type.NULL }
-                                },
-                                required: ["title", "author"]
-                            }
-                        }
-                    }
-                });
+                const result = await model.generateContent(`User library contains: ${titles}. Based on these books, recommend 3 similar must-read titles. Return valid JSON only.`);
+                const text = result.response.text();
                 
-                const recs = safeJsonParse(response.text);
+                const recs = safeJsonParse(text);
                 setRecommendations(recs);
             } catch (e: any) {
                 console.error("Recs failed", e);

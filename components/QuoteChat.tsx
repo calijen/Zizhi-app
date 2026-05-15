@@ -1,9 +1,9 @@
 
 import { FC, useState, useRef, useEffect, useCallback } from 'react';
 import { Box, Stack, Text, Group, ActionIcon, Loader, ScrollArea, Avatar, Divider, Badge } from '@mantine/core';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { motion, AnimatePresence } from 'framer-motion';
-import { IconSend, IconSparkles, IconClose, IconTrash, IconPlus, IconChevronLeft } from './icons';
+import { IconSend, IconSparkles, IconClose, IconTrash, IconPlus, IconChevronLeft, IconQuote, IconLayoutList } from './icons';
 import type { Quote, ChatMessage, ChatSession } from '../types';
 import * as db from '../db';
 
@@ -20,7 +20,7 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
   const [isHistoryView, setIsHistoryView] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
   const loadSessions = useCallback(async () => {
     const data = await db.getChatSessions();
@@ -91,25 +91,28 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
 
     try {
       const context = quotes.map(q => `Book: ${q.bookTitle} by ${q.author}\nQuote: "${q.text}"`).join('\n\n');
-      const systemInstruction = `You are Phoebe, an insightful AI librarian for the Zizhi app. You have access to the following collection of highlights from the user's books. 
+      const systemInstruction = `You are Zizhi, an insightful AI librarian for the Zizhi app. You have access to the following collection of highlights from the user's books. 
       Your goal is to help the user identify themes, answer questions, and explore their personal library of quotes. 
       Be sophisticated, warm, and encourage deep thinking. If the user's question cannot be answered by the quotes, let them know, but try to offer related wisdom from the authors present in their library.
       
       USER'S QUOTES:
       ${context}`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+      const model = genAI.getGenerativeModel({ 
+        model: "gemini-1.5-flash",
+        systemInstruction,
+      });
+
+      const response = await model.generateContent({
         contents: [
           ...session.messages.map(m => ({ role: m.role, parts: [{ text: m.content }] })),
         ],
-        config: {
-          systemInstruction,
+        generationConfig: {
           temperature: 0.7,
         }
       });
 
-      const modelResponseText = response.text || "I'm sorry, I couldn't process that request.";
+      const modelResponseText = response.response.text() || "I'm sorry, I couldn't process that request.";
       const modelMessage: ChatMessage = {
         role: 'model',
         content: modelResponseText,
@@ -144,40 +147,31 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[2500] pointer-events-none">
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-auto"
-      />
-
+    <div className="fixed inset-0 z-[2500] pointer-events-none flex items-end justify-end md:p-6 lg:p-10">
       <motion.div
-        initial={{ y: '100%' }}
-        animate={{ y: 0 }}
-        exit={{ y: '100%' }}
+        initial={{ x: '100%', opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        exit={{ x: '100%', opacity: 0 }}
         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-        className="fixed inset-0 md:inset-auto md:top-0 md:right-0 md:bottom-0 md:w-[450px] md:border-l-[8px] md:border-black bg-[var(--color-background)] flex flex-col pointer-events-auto shadow-none md:shadow-[-20px_0_60px_rgba(0,0,0,0.2)]"
-        style={{ height: '100dvh' }}
+        className="w-full max-w-[450px] h-[95vh] md:h-auto md:max-h-[min(850px,90dvh)] bg-[var(--color-background)] border-t-8 border-x-4 md:border-4 border-black flex flex-col pointer-events-auto shadow-[0_-15px_50px_rgba(0,0,0,0.3),20px_20px_0_rgba(0,0,0,0.1)] relative md:rounded-[32px] overflow-hidden"
       >
-        <Box className="p-4 md:p-6 bg-yellow-300 border-b-4 border-black flex justify-between items-center shrink-0">
+        <Box className="p-4 md:p-5 bg-yellow-300 border-b-4 border-black flex justify-between items-center shrink-0">
           <Group gap="xs">
             {isHistoryView ? (
               <ActionIcon variant="transparent" color="black" onClick={() => setIsHistoryView(false)}>
                 <IconChevronLeft size={24} />
               </ActionIcon>
             ) : (
-                <div className="w-10 h-10 bg-black flex items-center justify-center">
-                    <IconSparkles className="w-6 h-6 text-yellow-300" />
+                <div className="w-10 h-10 bg-black flex items-center justify-center rounded-full overflow-hidden border-2 border-black shadow-[2px_2px_0_black]">
+                    <img src="/phoebe.png" alt="Zizhi" className="w-full h-full object-contain" />
                 </div>
             )}
             <Stack gap={0}>
-              <Text className="font-black uppercase tracking-widset text-[18px] leading-none">
-                {isHistoryView ? 'History' : 'Phoebe'}
+              <Text className="font-black uppercase tracking-widest text-[18px] leading-none">
+                {isHistoryView ? 'History' : 'Zizhi'}
               </Text>
               <Text className="text-[10px] font-black uppercase tracking-widest opacity-60">
-                {isHistoryView ? 'Previous Chats' : 'Zizhi Librarian'}
+                {isHistoryView ? 'Previous Chats' : 'AI Librarian'}
               </Text>
             </Stack>
           </Group>
@@ -188,10 +182,10 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
                     onClick={() => setIsHistoryView(true)} 
                     color="black" 
                     size="xl" 
-                    className="rounded-none border-2 border-white shadow-[4px_4px_0_white] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all"
+                    className="rounded-none border-2 border-black shadow-[4px_4px_0_black] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all relative overflow-visible"
                 >
-                    <Badge variant="filled" color="yellow" size="xs" circle className="absolute -top-1 -right-1 border-2 border-black font-black text-black">{sessions.length}</Badge>
-                    <IconPlus size={24} className="rotate-45" /> {/* History icon substitute */}
+                    <Badge variant="filled" color="yellow" size="xs" circle className="absolute -top-2 -right-2 border-2 border-black font-black text-black z-10">{sessions.length}</Badge>
+                    <IconLayoutList size={22} className="text-yellow-300" />
                 </ActionIcon>
             )}
             <ActionIcon 
@@ -199,9 +193,9 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
                 onClick={onClose} 
                 color="black" 
                 size="xl" 
-                className="rounded-none border-2 border-white shadow-[4px_4px_0_white] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all"
+                className="rounded-none border-2 border-black shadow-[4px_4px_0_black] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all"
             >
-                <IconClose size={24} />
+                <IconClose size={22} className="text-yellow-300" />
             </ActionIcon>
           </Group>
         </Box>
@@ -250,9 +244,11 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
           ) : (
             <Stack gap="xl" pb="xl" pt="md">
               {(currentSession?.messages || []).length === 0 && (
-                <Box className="p-8 bg-[var(--color-surface)] border-4 border-black border-dashed text-center mt-10">
-                  <Avatar size="xl" src="/phoebe-avatar.png" className="mx-auto mb-4 border-4 border-black shadow-[4px_4px_0_black]" />
-                  <Text className="text-[16px] font-black uppercase text-black mb-2">Hello! I'm Phoebe.</Text>
+                <Box className="p-8 bg-[var(--color-surface)] border-4 border-black border-dashed text-center mt-10 rounded-2xl">
+                  <div className="w-20 h-20 mx-auto mb-4 border-4 border-black shadow-[4px_4px_0_black] rounded-full bg-yellow-300 overflow-hidden">
+                    <img src="/phoebe.png" alt="Zizhi" className="w-full h-full object-contain" onError={(e) => { e.currentTarget.src = 'https://api.dicebear.com/7.x/bottts/svg?seed=phoebe&backgroundColor=FACC15'; }} />
+                  </div>
+                  <Text className="text-[16px] font-black uppercase text-black mb-2">Hello! I'm Zizhi.</Text>
                   <Text className="text-[12px] font-medium leading-relaxed opacity-70 mb-8">
                     Query your library of wisdom. I can find patterns, summarize authors, or just talk about the themes you love.
                   </Text>

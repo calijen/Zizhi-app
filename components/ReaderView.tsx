@@ -18,13 +18,14 @@ interface ReaderViewProps {
     onSaveQuote: (text: string, chapterId: string) => void;
     onSaveNote: (text: string, note: string, chapterId: string) => void;
     onSearch: (query: string) => void;
+    onFontSizeChange?: (newSize: number) => void;
 }
 
 const ChapterContent = memo(({ html, id, className }: { html: string, id: string, className: string }) => (
     <div dangerouslySetInnerHTML={{ __html: html }} className={className} />
 ));
 
-const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateProgress, onSaveQuote, onSaveNote, onSearch }) => {
+const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateProgress, onSaveQuote, onSaveNote, onSearch, onFontSizeChange }) => {
     const [currentChapterIndex, setCurrentChapterIndex] = useState(0);
     const [showToc, setShowToc] = useState(false);
     const [isDesktopTocPersistent, setIsDesktopTocPersistent] = useState(window.innerWidth > 1400);
@@ -62,13 +63,18 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
 
     useEffect(() => {
         const viewport = scrollViewportRef.current;
-        if (!viewport || !book.isPdf) return;
+        if (!viewport) return;
 
         const handleWheel = (e: WheelEvent) => {
             if (e.ctrlKey || e.metaKey) {
                 e.preventDefault();
-                const delta = e.deltaY > 0 ? -0.1 : 0.1;
-                setPdfScale(prev => Math.min(4, Math.max(0.5, prev + delta)));
+                if (book.isPdf) {
+                    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                    setPdfScale(prev => Math.min(4, Math.max(0.5, prev + delta)));
+                } else {
+                    const delta = e.deltaY > 0 ? -0.05 : 0.05;
+                    onFontSizeChange?.(Math.min(3, Math.max(0.5, theme.fontSize + delta)));
+                }
             }
         };
 
@@ -89,8 +95,15 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
                     e.touches[0].pageX - e.touches[1].pageX,
                     e.touches[0].pageY - e.touches[1].pageY
                 );
-                const delta = (dist - touchStartDistRef.current) / 100;
-                setPdfScale(prev => Math.min(4, Math.max(0.5, prev + delta)));
+                
+                const ratio = dist / touchStartDistRef.current;
+                
+                if (book.isPdf) {
+                    setPdfScale(prev => Math.min(4, Math.max(0.5, prev * ratio)));
+                } else {
+                    onFontSizeChange?.(Math.min(3, Math.max(0.5, theme.fontSize * ratio)));
+                }
+                
                 touchStartDistRef.current = dist;
             }
         };
@@ -110,7 +123,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
             viewport.removeEventListener('touchmove', handleTouchMove);
             viewport.removeEventListener('touchend', handleTouchEnd);
         };
-    }, [book.isPdf]);
+    }, [book.isPdf, theme.fontSize, onFontSizeChange]);
 
     useEffect(() => {
         const handleResize = () => {

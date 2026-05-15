@@ -9,8 +9,9 @@ export default {
   theme: {
     extend: {
       fontFamily: {
+        display: ["Alfa Slab One", "serif"],
+        serif: ["Gentium Book Plus", "serif"],
         sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
-        serif: ["EB Garamond", "Lora", "serif"],
         mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "monospace"],
       },
       colors: {

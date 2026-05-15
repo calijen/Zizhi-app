@@ -13,6 +13,8 @@ interface QuotesViewProps {
   theme: Theme;
   onDelete: (id: string) => void;
   onGoToQuote: (quote: Quote) => void;
+  isChatOpen: boolean;
+  setIsChatOpen: (open: boolean) => void;
 }
 
 const EmptyQuotesGraphic = () => (
@@ -96,10 +98,9 @@ const QuoteCard: FC<{ quote: Quote; onDelete: (id: string) => void; onGoToQuote:
     );
 };
 
-const QuotesView: FC<QuotesViewProps> = ({ quotes, library = [], theme, onDelete, onGoToQuote }) => {
+const QuotesView: FC<QuotesViewProps> = ({ quotes, library = [], theme, onDelete, onGoToQuote, isChatOpen, setIsChatOpen }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeShare, setActiveShare] = useState<Quote | null>(null);
-  const [isChatOpen, setIsChatOpen] = useState(false);
   
   const filteredQuotes = useMemo(() => quotes.filter(q => q.text.toLowerCase().includes(searchQuery.toLowerCase()) || q.author.toLowerCase().includes(searchQuery.toLowerCase()) || q.bookTitle.toLowerCase().includes(searchQuery.toLowerCase())), [quotes, searchQuery]);
   const activeBookCover = useMemo(() => activeShare ? (library.find(b => b.id === activeShare.bookId)?.coverImageUrl || null) : null, [activeShare, library]);
@@ -108,15 +109,6 @@ const QuotesView: FC<QuotesViewProps> = ({ quotes, library = [], theme, onDelete
     <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-10 pb-40 animate-fade-in relative">
       <header className="border-b-4 border-black pb-6 flex justify-between items-end">
         <h2 className="text-3xl font-black text-[var(--color-primary-text)] uppercase">Quotes</h2>
-        {quotes.length > 0 && (
-          <button 
-            onClick={() => setIsChatOpen(true)}
-            className="flex items-center gap-2 bg-yellow-300 border-4 border-black px-4 py-2 shadow-[4px_4px_0_black] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all"
-          >
-            <IconSparkles size={18} className="text-black" />
-            <Text className="text-[12px] font-black uppercase tracking-widest text-black">Ask Phoebe</Text>
-          </button>
-        )}
       </header>
       <div className="relative"><IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--color-muted-text)]" /><input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-[var(--color-surface)] border-4 border-black p-4 pl-12 text-[14px] font-black text-[var(--color-primary-text)] outline-none shadow-[4px_4px_0_black] focus:translate-x-[-1px] transition-all" /></div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 auto-rows-min">

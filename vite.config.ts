@@ -13,13 +13,13 @@ export default defineConfig(({ mode }) => {
       plugins: [
         react(), 
         VitePWA({
-          registerType: 'prompt',
-          includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+          registerType: 'autoUpdate',
+          includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
           manifest: {
-            name: 'Zizhi - AI Book Insights',
-            short_name: 'Zizhi',
-            description: 'AI-powered book insights and summaries',
-            theme_color: '#fdf6e3',
+            name: 'Zizhi Reading Academy',
+            short_name: 'ZIZHI',
+            description: 'AI-Powered Scholarly Reading Environment',
+            theme_color: '#FACC15',
             icons: [
               {
                 src: 'pwa-192x192.png',
@@ -32,37 +32,16 @@ export default defineConfig(({ mode }) => {
                 type: 'image/png'
               }
             ]
-          },
-          workbox: {
-            globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
-            cleanupOutdatedCaches: true,
-            clientsClaim: true,
-            skipWaiting: true
           }
-        }),
-        {
-          name: 'no-cache-plugin',
-          configureServer(server) {
-            server.middlewares.use((req, res, next) => {
-              res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-              res.setHeader('Pragma', 'no-cache');
-              res.setHeader('Expires', '0');
-              res.setHeader('Surrogate-Control', 'no-store');
-              next();
-            });
-          }
-        }
+        })
       ],
       define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || ""),
+        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || "")
       },
       resolve: {
-        dedupe: ['react', 'react-dom', '@mantine/core', '@mantine/hooks'],
         alias: {
           '@': path.resolve(__dirname, '.'),
-          'react': path.resolve(__dirname, 'node_modules/react'),
-          'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
         }
       }
     };

@@ -15,6 +15,7 @@ interface LibraryProps {
   generationStatuses: Record<string, GenerationStatus>;
   onViewSummary: (bookId: string) => void;
   viewMode: 'grid' | 'list';
+  isCloudSynced?: boolean;
 }
 
 const EmptyLibraryGraphic = () => (
@@ -142,13 +143,13 @@ const BookCard: FC<{
     );
 };
 
-const LibraryView: FC<LibraryProps> = ({ books, theme, onBookSelect, isLoading, onDelete, onGenerateSummary, generationStatuses, onViewSummary, viewMode }) => {
+const LibraryView: FC<LibraryProps> = ({ books, theme, onBookSelect, isLoading, onDelete, onGenerateSummary, generationStatuses, onViewSummary, viewMode, isCloudSynced }) => {
   return (
     <Box className="py-4 md:py-8 animate-fade-in pb-32">
         <header className="mb-10 border-b-4 border-[var(--color-border-color)] pb-6 flex justify-between items-end">
             <h2 className="text-2xl md:text-3xl font-black text-[var(--color-primary-text)] uppercase">{books.length} Books</h2>
-            <Box className="hidden sm:block px-3 py-1 bg-yellow-400 border-2 border-black shadow-[2px_2px_0_black] mb-1">
-                <Text className="text-[9px] font-black uppercase text-black">Local Storage Device Only</Text>
+            <Box className={`hidden sm:block px-3 py-1 ${isCloudSynced ? 'bg-cyan-400' : 'bg-yellow-400'} border-2 border-black shadow-[2px_2px_0_black] mb-1`}>
+                <Text className="text-[9px] font-black uppercase text-black">{isCloudSynced ? 'Cloud Sync Active' : 'Local Storage Device Only'}</Text>
             </Box>
         </header>
         {isLoading && (

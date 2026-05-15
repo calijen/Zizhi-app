@@ -7,8 +7,11 @@ import ErrorBoundary from './components/ErrorBoundary.tsx';
 import './index.css';
 
 const theme = createTheme({
-  primaryColor: 'dark',
-  fontFamily: 'Inter, sans-serif',
+  primaryColor: 'blue',
+  fontFamily: '"Gentium Book Plus", serif',
+  headings: {
+    fontFamily: '"Alfa Slab One", serif',
+  }
 });
 
 const rootElement = document.getElementById('root');
@@ -16,22 +19,14 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
-// Register Service Worker for PWA capabilities
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then(registration => {
-      console.log('SW registered: ', registration);
-    }).catch(registrationError => {
-      console.log('SW registration failed: ', registrationError);
-    });
-  });
-}
+// Registration handled by vite-plugin-pwa in production
+// Only manual registration should be here if VitePWA is not used
 
 const root = createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <ErrorBoundary>
-      <MantineProvider theme={theme}>
+      <MantineProvider theme={theme} defaultColorScheme="light">
         <App />
         <Analytics />
       </MantineProvider>
