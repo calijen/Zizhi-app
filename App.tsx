@@ -529,18 +529,21 @@ const App: FC = () => {
                         initial={{ scale: 0, opacity: 0, y: 50 }}
                         animate={{ scale: 1, opacity: 1, y: 0 }}
                         exit={{ scale: 0, opacity: 0, y: 50 }}
-                        className="hidden md:flex fixed bottom-12 right-12 z-[250] items-end gap-3 group translate-x-4"
+                        className="fixed bottom-24 right-6 md:bottom-12 md:right-12 z-[250] flex items-end gap-3 group translate-x-1 md:translate-x-4"
                       >
-                          <div className="bg-white border-4 border-black p-3 shadow-[8px_8px_0_black] opacity-0 group-hover:opacity-100 transition-opacity mb-8 mr-[-20px] pointer-events-none">
+                          <div className="hidden md:block bg-white border-4 border-black p-3 shadow-[8px_8px_0_black] opacity-0 group-hover:opacity-100 transition-opacity mb-8 mr-[-20px] pointer-events-none">
                               <Text className="text-[11px] font-black uppercase tracking-widest text-black">Ask Zizhi</Text>
                           </div>
                           <button 
                             onClick={() => setIsChatOpen(true)}
-                            className="w-32 h-32 relative hover:scale-110 active:scale-95 transition-all duration-300 outline-none group/phoebe"
+                            className="w-20 h-20 md:w-32 md:h-32 relative hover:scale-110 active:scale-95 transition-all duration-300 outline-none group/phoebe"
                           >
                               <div className="absolute inset-0 rounded-full border-4 border-black bg-yellow-300 shadow-[4px_4px_0_rgba(0,0,0,1)] overflow-hidden">
-                                <img src="/phoebe.png" alt="Ask Zizhi" className="w-full h-full object-contain p-2" onError={(e) => { e.currentTarget.src = 'https://api.dicebear.com/7.x/bottts/svg?seed=phoebe&backgroundColor=FACC15'; }} />
+                                <img src="/phoebe.png" alt="Ask Zizhi" className="w-full h-full object-contain p-1 md:p-2" onError={(e) => { e.currentTarget.src = 'https://api.dicebear.com/7.x/bottts/svg?seed=phoebe&backgroundColor=FACC15'; }} />
                               </div>
+                              <div className="md:hidden absolute -top-2 -left-2 bg-white border-2 border-black p-1 px-2 shadow-[2px_2px_0_black] pointer-events-none">
+                                <Text className="text-[8px] font-black uppercase text-black">Ask Zizhi</Text>
+                             </div>
                           </button>
                       </motion.div>
                     )}
@@ -551,42 +554,23 @@ const App: FC = () => {
               <NavItem tab="library" activeTab={activeTab} onSelect={setActiveTab} icon={IconLibrary} label="Library" />
               <NavItem tab="quotes" activeTab={activeTab} onSelect={setActiveTab} icon={IconQuote} label="Quotes" />
                   <Box className="relative -top-6">
-                  {activeTab === 'library' ? (
                       <>
                         <input type="file" ref={fileInputRef} onChange={handleUpload} accept=".epub,.pdf" className="hidden" />
                         <ActionIcon size={72} className="bg-yellow-400 border-4 border-black shadow-[6px_6px_0_black] rounded-none" onClick={() => fileInputRef.current?.click()}>
                             {isUploading ? <IconSpinner className="w-8 h-8 text-black" /> : <IconUpload className="w-10 h-10 text-black" />}
                         </ActionIcon>
                       </>
-                  ) : activeTab === 'quotes' ? (
-                    <AnimatePresence>
-                      {!isChatOpen && (
-                        <motion.button 
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          exit={{ scale: 0 }}
-                          onClick={() => setIsChatOpen(true)}
-                          className="w-24 h-24 relative hover:scale-105 transition-transform outline-none group/phoebe"
-                        >
-                          <div className="absolute inset-0 rounded-full border-2 border-black bg-yellow-300 shadow-[2px_2px_0_black] overflow-hidden">
-                              <img src="/phoebe.png" alt="Ask Zizhi" className="w-full h-full object-contain p-1" onError={(e) => { e.currentTarget.src = 'https://api.dicebear.com/7.x/bottts/svg?seed=phoebe&backgroundColor=FACC15'; }} />
-                          </div>
-                          <div className="absolute -top-4 -right-12 bg-white border-2 border-black p-1 px-2 shadow-[2px_2px_0_black] pointer-events-none">
-                              <Text className="text-[7px] font-black uppercase text-black">Ask Zizhi</Text>
-                          </div>
-                        </motion.button>
-                      )}
-                    </AnimatePresence>
-                  ) : (
-                      <div className="w-16 h-16 bg-black/5 border-2 border-black/10 flex items-center justify-center">
-                          <LogoIcon className="w-8 h-8 opacity-20" />
-                      </div>
-                  )}
-              </Box>
+                  </Box>
               <NavItem tab="notes" activeTab={activeTab} onSelect={setActiveTab} icon={IconNote} label="Notes" />
               <NavItem tab="profile" activeTab={activeTab} onSelect={setActiveTab} icon={IconUser} label="Profile" />
           </nav>
-          {selectedBook && <ReaderView book={selectedBook} theme={theme} onClose={() => setSelectedBook(null)} onUpdateProgress={async (bid, ci, st, ts, gp) => { 
+          {selectedBook && <ReaderView 
+            book={selectedBook} 
+            theme={theme} 
+            quotes={quotes.filter(q => q.bookId === selectedBook.id)}
+            notes={notes.filter(n => n.bookId === selectedBook.id)}
+            onClose={() => setSelectedBook(null)} 
+            onUpdateProgress={async (bid, ci, st, ts, gp) => { 
               const bidx = library.findIndex(b => b.id === bid); 
               if (bidx === -1) return; 
               const updatedMeta = { 

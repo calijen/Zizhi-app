@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { Box, Group, Stack, Text, ActionIcon, ScrollArea, Transition, Loader, Center } from '@mantine/core';
-import type { Book, Chapter, Theme } from '../types';
+import type { Book, Chapter, Theme, Quote, Note } from '../types';
 import { IconChevronLeft, IconMenu, IconClose, IconPlus, IconMinus } from './icons';
 import TextSelectionPopup from './TextSelectionPopup';
 import PdfPage from './PdfPage';
@@ -12,6 +12,8 @@ declare const pdfjsLib: any;
 interface ReaderViewProps {
     book: Book;
     theme: Theme;
+    quotes: Quote[];
+    notes: Note[];
     initialChapterId?: string | null;
     onClose: () => void;
     onUpdateProgress: (bookId: string, chapterIndex: number, scrollTop: number, timeSpent: number, granularProgress: number) => void;
@@ -25,9 +27,10 @@ const ChapterContent = memo(({ html, id, className }: { html: string, id: string
     <div dangerouslySetInnerHTML={{ __html: html }} className={className} />
 ));
 
-const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateProgress, onSaveQuote, onSaveNote, onSearch, onFontSizeChange }) => {
+const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, onClose, onUpdateProgress, onSaveQuote, onSaveNote, onSearch, onFontSizeChange }) => {
     const [currentChapterIndex, setCurrentChapterIndex] = useState(0);
     const [showToc, setShowToc] = useState(false);
+    const [sidebarTab, setSidebarTab] = useState<'chapters' | 'highlights'>('chapters');
     const [isDesktopTocPersistent, setIsDesktopTocPersistent] = useState(window.innerWidth > 1400);
     const [selection, setSelection] = useState<{ text: string, rect: DOMRect } | null>(null);
     const [noteInput, setNoteInput] = useState<{ text: string } | null>(null);
@@ -39,9 +42,12 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
     const [isPdfLoading, setIsPdfLoading] = useState(book.isPdf);
     const [pdfScale, setPdfScale] = useState(window.innerWidth < 768 ? 1.5 : 2.0);
     
+    const [ephemeralFontSize, setEphemeralFontSize] = useState<number | null>(null);
+    
     const scrollViewportRef = useRef<HTMLDivElement>(null);
     const lastUpdateRef = useRef<number>(Date.now());
     const touchStartDistRef = useRef<number | null>(null);
+    const initialTouchFontSizeRef = useRef<number>(theme.fontSize);
 
     useEffect(() => {
         if (book.isPdf && book.pdfData && typeof pdfjsLib !== 'undefined') {
@@ -85,6 +91,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
                     e.touches[0].pageY - e.touches[1].pageY
                 );
                 touchStartDistRef.current = dist;
+                initialTouchFontSizeRef.current = ephemeralFontSize ?? theme.fontSize;
             }
         };
 
@@ -99,31 +106,37 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
                 const ratio = dist / touchStartDistRef.current;
                 
                 if (book.isPdf) {
-                    setPdfScale(prev => Math.min(4, Math.max(0.5, prev * ratio)));
+                    const newScale = Math.min(4, Math.max(0.5, pdfScale * ratio));
+                    setPdfScale(newScale);
                 } else {
-                    onFontSizeChange?.(Math.min(3, Math.max(0.5, theme.fontSize * ratio)));
+                    const newSize = Math.min(3, Math.max(0.5, initialTouchFontSizeRef.current * ratio));
+                    setEphemeralFontSize(newSize);
                 }
-                
-                touchStartDistRef.current = dist;
             }
         };
 
         const handleTouchEnd = () => {
+            if (touchStartDistRef.current !== null && ephemeralFontSize !== null) {
+                onFontSizeChange?.(ephemeralFontSize);
+            }
             touchStartDistRef.current = null;
+            setEphemeralFontSize(null);
         };
 
         viewport.addEventListener('wheel', handleWheel, { passive: false });
         viewport.addEventListener('touchstart', handleTouchStart, { passive: false });
         viewport.addEventListener('touchmove', handleTouchMove, { passive: false });
         viewport.addEventListener('touchend', handleTouchEnd);
+        viewport.addEventListener('touchcancel', handleTouchEnd);
 
         return () => {
             viewport.removeEventListener('wheel', handleWheel);
             viewport.removeEventListener('touchstart', handleTouchStart);
             viewport.removeEventListener('touchmove', handleTouchMove);
             viewport.removeEventListener('touchend', handleTouchEnd);
+            viewport.removeEventListener('touchcancel', handleTouchEnd);
         };
-    }, [book.isPdf, theme.fontSize, onFontSizeChange]);
+    }, [book.isPdf, theme.fontSize, onFontSizeChange, pdfScale, ephemeralFontSize]);
 
     useEffect(() => {
         const handleResize = () => {
@@ -187,6 +200,18 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
         }
     };
 
+    const navigateToHighlight = (locationId: string) => {
+        const elementId = book.isPdf ? `pdf-page-${parseInt(locationId.split('-').pop() || '1')}` : `chapter-${locationId.replace(/[^a-zA-Z0-9]/g, '-')}`;
+        const element = document.getElementById(elementId);
+        if (element && scrollViewportRef.current) {
+            scrollViewportRef.current.scrollTo({ top: element.offsetTop - 20, behavior: 'smooth' });
+            // Approximate the chapter index
+            const idx = book.chapters.findIndex(c => c.id === locationId);
+            if (idx !== -1) setCurrentChapterIndex(idx);
+            setShowToc(false);
+        }
+    };
+
     const styleVariables = {
         '--font-serif': theme.font.serif,
         '--font-sans': theme.font.sans,
@@ -197,6 +222,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
         '--font-size': `${theme.fontSize}rem`,
         '--line-height': theme.lineHeight,
         '--border-color': theme.colors['border-color'],
+        '--fontSize': `${ephemeralFontSize ?? theme.fontSize}rem`,
         '--para-indent': theme.id === 'warm' ? '1.5em' : '0',
         '--para-spacing': theme.id === 'quiet' ? '2.5rem' : (theme.id === 'nocturne' ? '0.8rem' : '0'),
         '--text-align': theme.id === 'quiet' ? 'left' : 'justify'
@@ -208,21 +234,66 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
             <Transition mounted={isDesktopTocPersistent} transition="slide-right" duration={300}>
                 {(styles) => (
                     <Box style={styles} className="hidden xl:flex w-80 bg-[var(--bg-color)] border-r-4 border-black flex-col h-full z-[1100]">
-                        <div className="p-10 border-b-4 border-black">
-                            <Text className="text-[12px] font-black uppercase tracking-widest text-[var(--sec-text)]">Chapters</Text>
+                        <div className="border-b-4 border-black flex">
+                            <Box 
+                                className={`flex-1 p-5 cursor-pointer border-r-4 border-black text-center transition-all ${sidebarTab === 'chapters' ? 'bg-cyan-400' : 'bg-transparent'}`}
+                                onClick={() => setSidebarTab('chapters')}
+                            >
+                                <Text className="text-[11px] font-black uppercase tracking-widest text-black">Chapters</Text>
+                            </Box>
+                            <Box 
+                                className={`flex-1 p-5 cursor-pointer text-center transition-all ${sidebarTab === 'highlights' ? 'bg-yellow-300' : 'bg-transparent'}`}
+                                onClick={() => setSidebarTab('highlights')}
+                            >
+                                <Text className="text-[11px] font-black uppercase tracking-widest text-black">Highlights</Text>
+                            </Box>
                         </div>
                         <ScrollArea className="flex-1 p-6">
-                            <Stack gap={4}>
-                                {book.chapters.map((item, idx) => (
-                                    <Box key={idx} 
-                                        className={`p-5 cursor-pointer border-4 transition-all ${idx === currentChapterIndex ? 'bg-cyan-400 border-black shadow-[4px_4px_0_black] -translate-y-1' : 'bg-transparent border-transparent hover:border-black'}`}
-                                        style={{ borderRadius: '0px' }}
-                                        onClick={() => navigateToChapter(idx)}
-                                    >
-                                        <Text className="text-[11px] font-black leading-relaxed line-clamp-2" style={{ color: 'var(--text-color)' }}>{item.label}</Text>
-                                    </Box>
-                                ))}
-                            </Stack>
+                            {sidebarTab === 'chapters' ? (
+                                <Stack gap={4}>
+                                    {book.chapters.map((item, idx) => (
+                                        <Box key={idx} 
+                                            className={`p-5 cursor-pointer border-4 transition-all ${idx === currentChapterIndex ? 'bg-cyan-400 border-black shadow-[4px_4px_0_black] -translate-y-1' : 'bg-transparent border-transparent hover:border-black'}`}
+                                            style={{ borderRadius: '0px' }}
+                                            onClick={() => navigateToChapter(idx)}
+                                        >
+                                            <Text className="text-[11px] font-black leading-relaxed line-clamp-2" style={{ color: 'var(--text-color)' }}>{item.label}</Text>
+                                        </Box>
+                                    ))}
+                                </Stack>
+                            ) : (
+                                <Stack gap="xl">
+                                    {notes.length === 0 && quotes.length === 0 ? (
+                                        <Center className="h-40 opacity-40">
+                                            <Text className="text-[10px] font-black uppercase text-[var(--sec-text)]">No highlights yet</Text>
+                                        </Center>
+                                    ) : (
+                                        <>
+                                            {notes.map(note => (
+                                                <Box 
+                                                    key={note.id} 
+                                                    className="border-l-4 border-yellow-300 pl-4 py-1 cursor-pointer hover:bg-black/5 transition-colors"
+                                                    onClick={() => note.location && navigateToHighlight(note.location)}
+                                                >
+                                                    <Text className="text-[11px] font-serif italic mb-2 line-clamp-3 opacity-80">"{note.text}"</Text>
+                                                    <Box className="bg-black/5 p-3 border-l-2 border-black">
+                                                        <Text className="text-[10px] font-black">{note.note}</Text>
+                                                    </Box>
+                                                </Box>
+                                            ))}
+                                            {quotes.map(quote => (
+                                                <Box 
+                                                    key={quote.id} 
+                                                    className="border-l-4 border-cyan-400 pl-4 py-1 cursor-pointer hover:bg-black/5 transition-colors"
+                                                    onClick={() => quote.location && navigateToHighlight(quote.location)}
+                                                >
+                                                    <Text className="text-[11px] font-serif italic mb-2 line-clamp-4">"{quote.text}"</Text>
+                                                </Box>
+                                            ))}
+                                        </>
+                                    )}
+                                </Stack>
+                            )}
                         </ScrollArea>
                     </Box>
                 )}
@@ -370,22 +441,70 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
                 {(styles) => (
                     <Box style={styles} className="fixed inset-0 z-[1500] flex">
                         <Box className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowToc(false)} />
-                        <Box className="relative w-72 bg-[var(--bg-color)] h-full border-r-4 border-black p-8 flex flex-col gap-6 shadow-[8px_0_0_black]">
-                            <Group justify="space-between">
-                                <Text className="text-[14px] font-black uppercase text-[var(--text-color)]">Chapters</Text>
+                        <Box className="relative w-80 bg-[var(--bg-color)] h-full border-r-4 border-black flex flex-col shadow-[8px_0_0_black]">
+                            <Box className="p-4 border-b-2 border-black flex justify-between items-center">
+                                <Box className="flex border-2 border-black">
+                                    <button 
+                                        className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest ${sidebarTab === 'chapters' ? 'bg-cyan-400' : ''}`}
+                                        onClick={() => setSidebarTab('chapters')}
+                                    >
+                                        Chapters
+                                    </button>
+                                    <button 
+                                        className={`border-l-2 border-black px-4 py-2 text-[10px] font-black uppercase tracking-widest ${sidebarTab === 'highlights' ? 'bg-yellow-300' : ''}`}
+                                        onClick={() => setSidebarTab('highlights')}
+                                    >
+                                        Highlights
+                                    </button>
+                                </Box>
                                 <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => setShowToc(false)}><IconClose className="text-[var(--text-color)]" /></ActionIcon>
-                            </Group>
-                            <ScrollArea className="flex-1">
-                                <Stack gap={4}>
-                                    {book.chapters.map((item, idx) => (
-                                        <Box key={idx} 
-                                            className={`p-4 cursor-pointer border-2 transition-all ${idx === currentChapterIndex ? 'bg-cyan-400 border-black shadow-[3px_3px_0_black]' : 'border-transparent'}`}
-                                            onClick={() => navigateToChapter(idx)}
-                                        >
-                                            <Text className="text-[11px] font-bold text-[var(--text-color)] line-clamp-2">{item.label}</Text>
-                                        </Box>
-                                    ))}
-                                </Stack>
+                            </Box>
+                            
+                            <ScrollArea className="flex-1 p-6">
+                                {sidebarTab === 'chapters' ? (
+                                    <Stack gap={4}>
+                                        {book.chapters.map((item, idx) => (
+                                            <Box key={idx} 
+                                                className={`p-4 cursor-pointer border-2 transition-all ${idx === currentChapterIndex ? 'bg-cyan-400 border-black shadow-[3px_3px_0_black]' : 'border-transparent'}`}
+                                                onClick={() => navigateToChapter(idx)}
+                                            >
+                                                <Text className="text-[11px] font-bold text-[var(--text-color)] line-clamp-2">{item.label}</Text>
+                                            </Box>
+                                        ))}
+                                    </Stack>
+                                ) : (
+                                    <Stack gap="xl">
+                                        {notes.length === 0 && quotes.length === 0 ? (
+                                            <Center className="h-40 opacity-40">
+                                                <Text className="text-[10px] font-black uppercase text-[var(--sec-text)]">No highlights yet</Text>
+                                            </Center>
+                                        ) : (
+                                            <>
+                                                {notes.map(note => (
+                                                    <Box 
+                                                        key={note.id} 
+                                                        className="border-l-4 border-yellow-300 pl-4 py-1 cursor-pointer hover:bg-black/5 transition-colors"
+                                                        onClick={() => note.location && navigateToHighlight(note.location)}
+                                                    >
+                                                        <Text className="text-[11px] font-serif italic mb-2 line-clamp-3 opacity-80">"{note.text}"</Text>
+                                                        <Box className="bg-black/5 p-3 border-l-2 border-black">
+                                                            <Text className="text-[10px] font-black">{note.note}</Text>
+                                                        </Box>
+                                                    </Box>
+                                                ))}
+                                                {quotes.map(quote => (
+                                                    <Box 
+                                                        key={quote.id} 
+                                                        className="border-l-4 border-cyan-400 pl-4 py-1 cursor-pointer hover:bg-black/5 transition-colors"
+                                                        onClick={() => quote.location && navigateToHighlight(quote.location)}
+                                                    >
+                                                        <Text className="text-[11px] font-serif italic mb-2 line-clamp-4">"{quote.text}"</Text>
+                                                    </Box>
+                                                ))}
+                                            </>
+                                        )}
+                                    </Stack>
+                                )}
                             </ScrollArea>
                         </Box>
                     </Box>
@@ -399,7 +518,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, onClose, onUpdateP
                     word-break: break-word; 
                     overflow-wrap: break-word;
                     max-width: 100% !important;
-                    font-size: var(--font-size);
+                    font-size: var(--fontSize, var(--font-size));
                     line-height: var(--line-height);
                     text-align: var(--text-align);
                     color: var(--text-color);
