@@ -9,11 +9,11 @@ export const LogoIcon: FC<{ className?: string; size?: number }> = ({ className,
 );
 
 export const Logo: FC<{ className?: string }> = ({ className }) => (
-    <div className={`flex items-center gap-0 select-none ${className}`} style={{ height: '42px' }}>
-        <div className="w-[42px] h-[42px] flex items-center justify-center shrink-0">
-            <LogoIcon className="w-[42px] h-[42px] text-[var(--color-primary)]" />
+    <div className={`flex items-center gap-0 select-none ${className}`} style={{ height: '32px' }}>
+        <div className="w-[32px] h-[32px] flex items-center justify-center shrink-0">
+            <LogoIcon className="w-[32px] h-[32px] text-[var(--color-primary)]" />
         </div>
-        <span className="font-display text-[30px] leading-[36px] whitespace-nowrap text-[var(--color-primary-text)]">ZIZHI</span>
+        <span className="font-display text-[24px] leading-[32px] whitespace-nowrap text-[var(--color-primary-text)]">ZIZHI</span>
     </div>
 );
 
@@ -155,6 +155,12 @@ export const IconEye: FC<{ className?: string; size?: number }> = ({ className, 
 export const IconEyeOff: FC<{ className?: string; size?: number }> = ({ className, size = 24 }) => (
     <svg aria-hidden="true" className={className} width={size} height={size} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+    </svg>
+);
+
+export const IconHistory: FC<{ className?: string; size?: number }> = ({ className, size = 24 }) => (
+    <svg aria-hidden="true" className={className} width={size} height={size} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
 );
 

@@ -3,7 +3,7 @@ import { FC, useState, useRef, useEffect, useCallback } from 'react';
 import { Box, Stack, Text, Group, ActionIcon, Loader, ScrollArea, Avatar, Divider, Badge } from '@mantine/core';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { motion, AnimatePresence } from 'framer-motion';
-import { IconSend, IconSparkles, IconClose, IconTrash, IconPlus, IconChevronLeft, IconQuote, IconLayoutList } from './icons';
+import { IconSend, IconSparkles, IconClose, IconTrash, IconPlus, IconChevronLeft, IconQuote, IconHistory } from './icons';
 import type { Quote, ChatMessage, ChatSession } from '../types';
 import * as db from '../db';
 
@@ -147,30 +147,30 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[2500] pointer-events-none flex items-end justify-end md:p-6 lg:p-10">
+    <div className="fixed inset-0 z-[2500] pointer-events-none flex items-end justify-end md:pr-10">
       <motion.div
         initial={{ x: '100%', opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         exit={{ x: '100%', opacity: 0 }}
         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-        className="w-full max-w-[450px] h-[95vh] md:h-auto md:max-h-[min(850px,90dvh)] bg-[var(--color-background)] border-t-8 border-x-4 md:border-4 border-black flex flex-col pointer-events-auto shadow-[0_-15px_50px_rgba(0,0,0,0.3),20px_20px_0_rgba(0,0,0,0.1)] relative md:rounded-[32px] overflow-hidden"
+        className="w-full max-w-[450px] h-[95vh] md:h-auto md:max-h-[min(850px,95dvh)] bg-[var(--color-background)] border-t-8 border-x-4 md:border-4 border-black flex flex-col pointer-events-auto shadow-[0_-15px_50px_rgba(0,0,0,0.3),20px_20px_0_rgba(0,0,0,0.1)] relative overflow-hidden"
       >
         <Box className="p-4 md:p-5 bg-yellow-300 border-b-4 border-black flex justify-between items-center shrink-0">
-          <Group gap="xs">
+          <Group gap="sm" align="center" wrap="nowrap">
             {isHistoryView ? (
               <ActionIcon variant="transparent" color="black" onClick={() => setIsHistoryView(false)}>
                 <IconChevronLeft size={24} />
               </ActionIcon>
             ) : (
-                <div className="w-10 h-10 bg-black flex items-center justify-center rounded-full overflow-hidden border-2 border-black shadow-[2px_2px_0_black]">
+                <div className="w-10 h-10 bg-black flex items-center justify-center rounded-full overflow-hidden border-2 border-black shadow-[2px_2px_0_black] shrink-0">
                     <img src="/phoebe.png" alt="Zizhi" className="w-full h-full object-contain" />
                 </div>
             )}
-            <Stack gap={0}>
-              <Text className="font-black uppercase tracking-widest text-[18px] leading-none">
+            <Stack gap={0} className="overflow-hidden">
+              <Text className="font-black uppercase tracking-widest text-[18px] leading-tight truncate">
                 {isHistoryView ? 'History' : 'Zizhi'}
               </Text>
-              <Text className="text-[10px] font-black uppercase tracking-widest opacity-60">
+              <Text className="text-[10px] font-black uppercase tracking-widest opacity-60 leading-none">
                 {isHistoryView ? 'Previous Chats' : 'AI Librarian'}
               </Text>
             </Stack>
@@ -185,7 +185,7 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
                     className="rounded-none border-2 border-black shadow-[4px_4px_0_black] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all relative overflow-visible"
                 >
                     <Badge variant="filled" color="yellow" size="xs" circle className="absolute -top-2 -right-2 border-2 border-black font-black text-black z-10">{sessions.length}</Badge>
-                    <IconLayoutList size={22} className="text-yellow-300" />
+                    <IconHistory size={22} className="text-yellow-300" />
                 </ActionIcon>
             )}
             <ActionIcon 
@@ -244,7 +244,7 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
           ) : (
             <Stack gap="xl" pb="xl" pt="md">
               {(currentSession?.messages || []).length === 0 && (
-                <Box className="p-8 bg-[var(--color-surface)] border-4 border-black border-dashed text-center mt-10 rounded-2xl">
+                <Box className="p-8 bg-[var(--color-surface)] border-4 border-black border-dashed text-center mt-10">
                   <div className="w-20 h-20 mx-auto mb-4 border-4 border-black shadow-[4px_4px_0_black] rounded-full bg-yellow-300 overflow-hidden">
                     <img src="/phoebe.png" alt="Zizhi" className="w-full h-full object-contain" onError={(e) => { e.currentTarget.src = 'https://api.dicebear.com/7.x/bottts/svg?seed=phoebe&backgroundColor=FACC15'; }} />
                   </div>
