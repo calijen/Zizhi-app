@@ -104,6 +104,24 @@ export const getBookContent = async (id: string): Promise<BookContent | null> =>
     });
 };
 
+export const updateBookMetadata = async (id: string, updates: Partial<BookMetadata>): Promise<void> => {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(BOOK_STORE, 'readwrite');
+        const store = transaction.objectStore(BOOK_STORE);
+        const request = store.get(id);
+        request.onsuccess = () => {
+            const existing = request.result;
+            if (existing) {
+                store.put({ ...existing, ...updates });
+            }
+            resolve();
+        };
+        request.onerror = () => reject();
+        transaction.oncomplete = () => resolve();
+    });
+};
+
 export const deleteBook = async (id: string): Promise<void> => {
     const db = await initDB();
     return new Promise((resolve, reject) => {

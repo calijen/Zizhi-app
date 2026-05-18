@@ -59,14 +59,20 @@ export const parsePdf = async (file: File): Promise<Book> => {
     let coverImageUrl = null;
     try {
         const firstPage = await pdf.getPage(1);
-        const viewport = firstPage.getViewport({ scale: 0.5 });
+        const originalViewport = firstPage.getViewport({ scale: 1.0 });
+        
+        // Limit cover dimensions to prevent massive base64 strings
+        const maxCoverDim = 600;
+        const scale = Math.min(maxCoverDim / originalViewport.width, maxCoverDim / originalViewport.height, 1.0);
+        const viewport = firstPage.getViewport({ scale });
+
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d');
         if (context) {
             canvas.height = viewport.height;
             canvas.width = viewport.width;
             await firstPage.render({ canvasContext: context, viewport }).promise;
-            coverImageUrl = canvas.toDataURL('image/jpeg', 0.6);
+            coverImageUrl = canvas.toDataURL('image/jpeg', 0.7);
         }
     } catch (e) {
         console.error("Failed to extract PDF cover", e);

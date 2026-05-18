@@ -103,6 +103,7 @@ const App: FC = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+  const [initialReaderNav, setInitialReaderNav] = useState<{ chapterId: string, searchText?: string } | null>(null);
   const [summaryBook, setSummaryBook] = useState<Book | null>(null);
   const [toast, setToast] = useState<{ message: string; action?: { label: string; onClick: () => void } } | null>(null);
   const [theme, setTheme] = useState<Theme>(ATMOSPHERES.warm);
@@ -152,7 +153,6 @@ const App: FC = () => {
       
       if (currentUser) {
           // Sync with Firestore
-          const usersRef = doc(firestore, 'users', currentUser.uid);
           const booksRef = collection(firestore, 'users', currentUser.uid, 'books');
           const quotesRef = collection(firestore, 'users', currentUser.uid, 'quotes');
           const notesRef = collection(firestore, 'users', currentUser.uid, 'notes');
@@ -167,13 +167,40 @@ const App: FC = () => {
           const cloudQuotes = cloudQuotesSnap.docs.map(doc => doc.data() as Quote);
           const cloudNotes = cloudNotesSnap.docs.map(doc => doc.data() as Note);
 
-          // Merge: if local data exists but not in cloud, we should theoretically upload it.
-          // For now, let's just use cloud as source for this turn.
-          setLibrary(cloudBooks.length > 0 ? cloudBooks : localBooks);
-          setQuotes(cloudQuotes.length > 0 ? cloudQuotes : localQuotes);
-          setNotes(cloudNotes.length > 0 ? cloudNotes : localNotes);
+          // Intelligent merge for books
+          const mergedBooksMap = new Map<string, BookMetadata>();
+          localBooks.forEach(b => mergedBooksMap.set(b.id, b));
+          cloudBooks.forEach(cb => {
+              const existing = mergedBooksMap.get(cb.id);
+              if (!existing || (cb.lastOpened || 0) > (existing.lastOpened || 0)) {
+                  mergedBooksMap.set(cb.id, { ...existing, ...cb });
+                  // If cloud is newer, reflect in local DB (metadata only)
+                  if (!existing || (cb.lastOpened || 0) > (existing.lastOpened || 0)) {
+                      (async () => {
+                          const content = await db.getBookContent(cb.id);
+                          if (content) {
+                              await db.saveBook({ ...cb, ...content });
+                          }
+                      })();
+                  }
+              }
+          });
+          const mergedBooks = Array.from(mergedBooksMap.values());
+
+          // Intelligent merge for quotes/notes
+          const mergedQuotesMap = new Map<string, Quote>();
+          localQuotes.forEach(q => mergedQuotesMap.set(q.id, q));
+          cloudQuotes.forEach(cq => mergedQuotesMap.set(cq.id, cq));
           
-          if (cloudBooks.length > 0 || localBooks.length > 0) {
+          const mergedNotesMap = new Map<string, Note>();
+          localNotes.forEach(n => mergedNotesMap.set(n.id, n));
+          cloudNotes.forEach(cn => mergedNotesMap.set(cn.id, cn));
+
+          setLibrary(mergedBooks);
+          setQuotes(Array.from(mergedQuotesMap.values()));
+          setNotes(Array.from(mergedNotesMap.values()));
+          
+          if (mergedBooks.length > 0) {
               setHasEntered(true);
           } else {
               setHasEntered(false);
@@ -242,8 +269,12 @@ const App: FC = () => {
         let newBook: Book;
         if (file.name.toLowerCase().endsWith('.pdf')) {
             newBook = await parsePdf(file);
+            newBook.type = 'pdf';
+            newBook.isPdf = true;
         } else {
             newBook = await parseEpub(file);
+            newBook.type = 'epub';
+            newBook.isPdf = false;
         }
         newBook.lastOpened = Date.now();
 
@@ -288,12 +319,42 @@ const App: FC = () => {
         return;
     }
     try {
-        const content = await db.getBookContent(bookId);
+        let content = await db.getBookContent(bookId);
+        
+        if (!content && meta.fileUrl) {
+            setToast({ message: "Syncing book content from cloud..." });
+            try {
+                const response = await fetch(meta.fileUrl);
+                const blob = await response.blob();
+                const file = new File([blob], meta.title, { type: meta.type === 'pdf' ? 'application/pdf' : 'application/epub+zip' });
+                
+                let downloadedBook: Book;
+                if (meta.type === 'pdf') {
+                    downloadedBook = await parsePdf(file);
+                } else {
+                    downloadedBook = await parseEpub(file);
+                }
+                
+                // Ensure ID matches the original sync ID
+                downloadedBook.id = meta.id;
+                const { chapters, toc, summaryScript, audioSummaryUrl, audioDuration, pdfData } = downloadedBook;
+                content = { id: meta.id, chapters, toc, summaryScript, audioSummaryUrl, audioDuration, pdfData };
+                
+                // Save locally
+                await db.saveBook({ ...meta, ...content });
+                setToast({ message: "Book downloaded and synced." });
+            } catch (downloadErr) {
+                console.error("Failed to download cloud content", downloadErr);
+                setToast({ message: "Failed to download book content." });
+                return;
+            }
+        }
+
         if (content) {
             setSelectedBook({ ...meta, ...content });
         } else {
             console.error(`Book content missing for ID: ${bookId}`);
-            setToast({ message: "Book content missing." });
+            setToast({ message: "Book content missing locally." });
         }
     } catch (err) {
         console.error(`Error loading book content for ID: ${bookId}:`, err);
@@ -346,6 +407,13 @@ const App: FC = () => {
         // Update library state (metadata only)
         const metaWithFlags = { ...meta, hasSummary: true, hasAudio: true };
         setLibrary(prev => prev.map(b => b.id === bookId ? metaWithFlags : b));
+
+        // Sync flags to Firestore in background
+        if (user) {
+            const bookRef = doc(firestore, 'users', user.uid, 'books', bookId);
+            setDoc(bookRef, { hasSummary: true, hasAudio: true }, { merge: true }).catch(err => console.error("Cloud status sync failed", err));
+        }
+        
         setToast({ message: "Insight generated successfully." });
     } catch (err: any) { 
         console.error("Summary error:", err);
@@ -500,14 +568,20 @@ const App: FC = () => {
                           const meta = library.find(b => b.id === q.bookId);
                           if (meta) {
                               const content = await db.getBookContent(q.bookId);
-                              if (content) setSelectedBook({ ...meta, ...content });
+                              if (content) {
+                                  setInitialReaderNav({ chapterId: q.location, searchText: q.text });
+                                  setSelectedBook({ ...meta, ...content });
+                              }
                           }
                       }} />}
                       {activeTab === 'notes' && <NotesView theme={theme} notes={notes} library={library} onDelete={(id) => { db.deleteNote(id).then(() => setNotes(prev => prev.filter(n => n.id !== id))); }} onGoToNote={async (n) => { 
                           const meta = library.find(b => b.id === n.bookId);
                           if (meta) {
                               const content = await db.getBookContent(n.bookId);
-                              if (content) setSelectedBook({ ...meta, ...content });
+                              if (content) {
+                                  setInitialReaderNav({ chapterId: n.location, searchText: n.text });
+                                  setSelectedBook({ ...meta, ...content });
+                              }
                           }
                       }} />}
                       {activeTab === 'profile' && <ProfileView user={user} streak={streak} library={library} onShowAuth={() => setIsAuthModalOpen(true)} activity={[]} onSignOut={async () => { await firebaseLogout(); setUser(null); }} />}
@@ -569,24 +643,40 @@ const App: FC = () => {
             theme={theme} 
             quotes={quotes.filter(q => q.bookId === selectedBook.id)}
             notes={notes.filter(n => n.bookId === selectedBook.id)}
-            onClose={() => setSelectedBook(null)} 
+            initialChapterId={initialReaderNav?.chapterId}
+            initialSearchText={initialReaderNav?.searchText}
+            onClose={() => { setSelectedBook(null); setInitialReaderNav(null); }} 
             onUpdateProgress={async (bid, ci, st, ts, gp) => { 
               const bidx = library.findIndex(b => b.id === bid); 
               if (bidx === -1) return; 
-              const updatedMeta = { 
-                  ...library[bidx], 
+              
+              const updates: Partial<BookMetadata> = { 
                   progress: gp, 
                   lastScrollTop: st, 
                   readingTime: (library[bidx].readingTime || 0) + ts, 
                   lastOpened: Date.now() 
               }; 
               
-              // We need the full book to save it, but we only have metadata in library
-              // Fetch content first
-              const content = await db.getBookContent(bid);
-              if (content) {
-                  await db.saveBook({ ...updatedMeta, ...content }); 
-                  setLibrary(prev => prev.map(b => b.id === bid ? updatedMeta : b)); 
+              // Local update metadata only
+              await db.updateBookMetadata(bid, updates);
+              setLibrary(prev => prev.map(b => b.id === bid ? { ...b, ...updates } : b)); 
+              
+              // Sync metadata to Firestore in background - Only send changed fields to avoid size limits 
+              // Include id and title to satisfy isValidBook rule in case of a create/upsert
+              if (user) {
+                  const bookRef = doc(firestore, 'users', user.uid, 'books', bid);
+                  setDoc(bookRef, { 
+                      ...updates, 
+                      id: bid, 
+                      title: library[bidx].title,
+                      userId: user.uid 
+                  }, { merge: true }).catch(err => {
+                      try {
+                          handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/books/${bid}`);
+                      } catch (e) {
+                          console.error("Cloud sync failed", e);
+                      }
+                  });
               }
           }} onSaveQuote={async (t, c) => { 
               const nq: Quote = { id: crypto.randomUUID(), text: t, bookTitle: selectedBook.title, author: selectedBook.author, bookId: selectedBook.id, location: c, createdAt: Date.now() }; 
@@ -622,11 +712,11 @@ const App: FC = () => {
 
           {deleteConfirm && (
             <Box className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[3000] flex items-center justify-center p-6">
-                <Box className="bg-white border-4 border-black p-8 shadow-[12px_12px_0_black] max-w-sm w-full">
-                    <h3 className="text-xl font-black uppercase mb-4">Delete Book?</h3>
-                    <Text className="text-sm font-bold mb-8 opacity-70">This will remove the book and all associated highlights from this device.</Text>
+                <Box className="bg-[var(--color-surface)] border-4 border-black p-8 shadow-[12px_12px_0_black] max-w-sm w-full">
+                    <h3 className="text-xl font-black uppercase mb-4 text-[var(--color-primary-text)]">Delete Book?</h3>
+                    <Text className="text-sm font-bold mb-8 opacity-70 text-[var(--color-primary-text)]">This will remove the book and all associated highlights from this device.</Text>
                     <Group grow gap="md">
-                        <Button variant="outline" color="dark" className="rounded-none border-2 border-black font-black uppercase" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
+                        <Button variant="outline" color="dark" className="rounded-none border-2 border-black font-black uppercase text-[var(--color-primary-text)]" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
                         <Button variant="filled" color="red" className="rounded-none border-2 border-black font-black uppercase shadow-[4px_4px_0_black]" onClick={() => handleDeleteBook(deleteConfirm)}>Delete</Button>
                     </Group>
                 </Box>

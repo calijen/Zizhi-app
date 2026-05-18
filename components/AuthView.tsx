@@ -65,12 +65,12 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
                 exit={{ scale: 0.9, y: 20 }}
                 className="w-full max-w-md bg-[var(--color-background)] border-4 border-black shadow-[12px_12px_0px_black] relative flex flex-col items-center p-8 md:p-12"
             >
-                <button onClick={onClose} className="absolute top-4 right-4 p-2 text-black hover:bg-black/5 transition-colors" aria-label="Close auth">
+                <button onClick={onClose} className="absolute top-4 right-4 p-2 text-[var(--color-primary-text)] hover:bg-black/5 transition-colors" aria-label="Close auth">
                     <IconClose className="w-6 h-6" />
                 </button>
                 
                 <header className="text-center mb-8 w-full">
-                    <h2 className="text-3xl font-black mb-2 uppercase tracking-tight text-black">{view === 'login' ? 'Welcome Back' : 'Create Account'}</h2>
+                    <h2 className="text-3xl font-black mb-2 uppercase tracking-tight text-[var(--color-primary-text)]">{view === 'login' ? 'Welcome Back' : 'Create Account'}</h2>
                     <p className="text-[10px] font-black uppercase tracking-widest text-[var(--color-muted-text)]">Sync your library across all devices</p>
                 </header>
 
@@ -110,7 +110,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
                                 placeholder="EMAIL ADDRESS" 
                                 value={email} 
                                 onChange={(e) => setEmail(e.target.value)} 
-                                className="w-full bg-white border-4 border-black p-4 outline-none font-bold text-black placeholder:text-black/30 focus:shadow-[4px_4px_0_black] transition-all text-xs" 
+                                className="w-full bg-[var(--color-surface)] border-4 border-black p-4 outline-none font-bold text-[var(--color-primary-text)] placeholder:text-[var(--color-muted-text)] opacity-80 focus:opacity-100 focus:shadow-[4px_4px_0_black] transition-all text-xs" 
                             />
                         </div>
                         
@@ -122,9 +122,9 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
                                     placeholder="PASSWORD" 
                                     value={password} 
                                     onChange={(e) => setPassword(e.target.value)} 
-                                    className="w-full bg-white border-4 border-black p-4 outline-none font-bold text-black placeholder:text-black/30 pr-12 focus:shadow-[4px_4px_0_black] transition-all text-xs" 
+                                    className="w-full bg-[var(--color-surface)] border-4 border-black p-4 outline-none font-bold text-[var(--color-primary-text)] placeholder:text-[var(--color-muted-text)] opacity-80 pr-12 focus:opacity-100 focus:shadow-[4px_4px_0_black] transition-all text-xs" 
                                 />
-                                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-black/40 hover:text-black">
+                                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-[var(--color-muted-text)] hover:text-[var(--color-primary-text)]">
                                     {showPassword ? <IconEyeOff className="w-5 h-5" /> : <IconEye className="w-5 h-5" />}
                                 </button>
                             </div>
