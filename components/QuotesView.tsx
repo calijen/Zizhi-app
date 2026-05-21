@@ -5,7 +5,6 @@ import { AnimatePresence } from 'framer-motion';
 import type { Quote, Theme, BookMetadata } from '../types';
 import { IconTrash, IconSearch, IconShare, IconSparkles } from './icons';
 import ShareDialog from './ShareDialog';
-import QuoteChat from './QuoteChat';
 
 interface QuotesViewProps {
   quotes: Quote[];
@@ -115,9 +114,6 @@ const QuotesView: FC<QuotesViewProps> = ({ quotes, library = [], theme, onDelete
         {filteredQuotes.length === 0 ? (<div className="col-span-full py-12 flex flex-col items-center justify-center text-center"><EmptyQuotesGraphic /><h2 className="text-2xl font-black mt-4 text-[var(--color-primary-text)] uppercase">No Quotes</h2><p className="text-[12px] font-black text-[var(--color-muted-text)] uppercase">Save text in a book to see it here.</p></div>) : (filteredQuotes.map(quote => <QuoteCard key={quote.id} quote={quote} onDelete={onDelete} onGoToQuote={onGoToQuote} onShare={setActiveShare} />))}
       </div>
        {activeShare && <ShareDialog text={activeShare.text} bookTitle={activeShare.bookTitle} author={activeShare.author} coverImageUrl={activeBookCover} theme={theme} onClose={() => setActiveShare(null)} />}
-       <AnimatePresence>
-         {isChatOpen && <QuoteChat quotes={quotes} onClose={() => setIsChatOpen(false)} />}
-       </AnimatePresence>
     </div>
   );
 };

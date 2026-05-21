@@ -19,6 +19,14 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isHistoryView, setIsHistoryView] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
@@ -99,7 +107,7 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
       ${context}`;
 
       const model = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash",
+        model: "gemini-2.5-flash",
         systemInstruction,
       });
 
@@ -146,15 +154,37 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
     }
   };
 
+  const handleOverlayClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-[2500] pointer-events-none flex items-end justify-end p-4 md:p-6 md:pr-10">
+    <div 
+      className="fixed inset-0 z-[2500] pointer-events-auto md:pointer-events-none bg-black/40 md:bg-transparent flex items-end justify-center md:items-end md:justify-end p-0 md:p-6 md:pr-10 transition-colors duration-300"
+      onClick={handleOverlayClick}
+    >
       <motion.div
-        initial={{ x: '100%', opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        exit={{ x: '100%', opacity: 0 }}
-        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-        className="w-full max-w-[450px] h-[550px] max-h-[90vh] md:h-[650px] md:max-h-[85vh] bg-[var(--color-background)] border-t-8 border-x-4 md:border-4 border-black flex flex-col pointer-events-auto shadow-[0_-15px_50px_rgba(0,0,0,0.3),20px_20px_0_rgba(0,0,0,0.1)] relative overflow-hidden"
+        drag={isMobile ? "y" : false}
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={{ top: 0.1, bottom: 0.8 }}
+        onDragEnd={(event, info) => {
+          if (info.offset.y > 150 || info.velocity.y > 600) {
+            onClose();
+          }
+        }}
+        initial={isMobile ? { y: '100%', x: 0 } : { x: '100%', y: 0, opacity: 0 }}
+        animate={{ x: 0, y: 0, opacity: 1 }}
+        exit={isMobile ? { y: '100%', x: 0 } : { x: '100%', y: 0, opacity: 0 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+        className="w-full md:max-w-[450px] h-[100dvh] md:h-[650px] md:max-h-[85vh] bg-[var(--color-background)] border-t-8 border-x-0 md:border-x-4 md:border-4 border-black flex flex-col pointer-events-auto shadow-[0_-15px_50px_rgba(0,0,0,0.3),20px_20px_0_rgba(0,0,0,0.1)] relative overflow-hidden rounded-t-[24px] md:rounded-t-none"
       >
+        {isMobile && (
+          <div className="flex flex-col items-center justify-center pt-3 pb-1 bg-yellow-300 cursor-grab active:cursor-grabbing shrink-0">
+            <div className="w-16 h-1.5 bg-black/30 rounded-full" />
+          </div>
+        )}
         <Box className="p-4 md:p-5 bg-yellow-300 border-b-4 border-black flex justify-between items-center shrink-0">
           <Group gap="sm" align="center" wrap="nowrap">
             {isHistoryView ? (
@@ -285,7 +315,7 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
     </div>
 
         {!isHistoryView && (
-            <Box className="p-4 md:p-6 border-t-[6px] border-black bg-[var(--color-surface)] shrink-0">
+            <Box className="p-4 pb-8 md:pb-6 md:p-6 border-t-[6px] border-black bg-[var(--color-surface)] shrink-0">
                 <Group gap="md" wrap="nowrap">
                     <div className="flex-1 relative">
                         <input 
