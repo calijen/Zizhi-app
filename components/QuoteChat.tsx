@@ -147,13 +147,13 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[2500] pointer-events-none flex items-end justify-end md:pr-10">
+    <div className="fixed inset-0 z-[2500] pointer-events-none flex items-end justify-end p-4 md:p-6 md:pr-10">
       <motion.div
         initial={{ x: '100%', opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         exit={{ x: '100%', opacity: 0 }}
         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-        className="w-full max-w-[450px] h-[95vh] md:h-auto md:max-h-[min(850px,95dvh)] bg-[var(--color-background)] border-t-8 border-x-4 md:border-4 border-black flex flex-col pointer-events-auto shadow-[0_-15px_50px_rgba(0,0,0,0.3),20px_20px_0_rgba(0,0,0,0.1)] relative overflow-hidden"
+        className="w-full max-w-[450px] h-[550px] max-h-[90vh] md:h-[650px] md:max-h-[85vh] bg-[var(--color-background)] border-t-8 border-x-4 md:border-4 border-black flex flex-col pointer-events-auto shadow-[0_-15px_50px_rgba(0,0,0,0.3),20px_20px_0_rgba(0,0,0,0.1)] relative overflow-hidden"
       >
         <Box className="p-4 md:p-5 bg-yellow-300 border-b-4 border-black flex justify-between items-center shrink-0">
           <Group gap="sm" align="center" wrap="nowrap">
@@ -167,10 +167,10 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
                 </div>
             )}
             <Stack gap={0} className="overflow-hidden">
-              <Text className="font-black uppercase tracking-widest text-[18px] leading-tight truncate">
+              <Text className="font-black uppercase tracking-widest text-[18px] leading-tight truncate text-black">
                 {isHistoryView ? 'History' : 'Zizhi'}
               </Text>
-              <Text className="text-[10px] font-black uppercase tracking-widest opacity-60 leading-none">
+              <Text className="text-[10px] font-black uppercase tracking-widest opacity-60 leading-none text-black">
                 {isHistoryView ? 'Previous Chats' : 'AI Librarian'}
               </Text>
             </Stack>
@@ -200,8 +200,10 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
           </Group>
         </Box>
 
-        <ScrollArea className="flex-1 p-4 md:p-6" viewportRef={scrollRef}>
-          {isHistoryView ? (
+        <div className="flex-1 overflow-hidden relative flex flex-col">
+          <ScrollArea className="h-full" viewportRef={scrollRef}>
+            <div className="p-4 md:p-6">
+              {isHistoryView ? (
             <Stack gap="md" py="md">
               <button 
                 onClick={startNewSession}
@@ -244,17 +246,17 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
           ) : (
             <Stack gap="xl" pb="xl" pt="md">
               {(currentSession?.messages || []).length === 0 && (
-                <Box className="p-8 bg-[var(--color-surface)] border-4 border-black border-dashed text-center mt-10">
+                <Box className="p-8 bg-[var(--color-surface)] border-4 border-black border-dashed text-center mt-4">
                   <div className="w-20 h-20 mx-auto mb-4 border-4 border-black shadow-[4px_4px_0_black] rounded-full bg-yellow-300 overflow-hidden">
                     <img src="/phoebe.png" alt="Zizhi" className="w-full h-full object-contain" onError={(e) => { e.currentTarget.src = 'https://api.dicebear.com/7.x/bottts/svg?seed=phoebe&backgroundColor=FACC15'; }} />
                   </div>
-                  <Text className="text-[16px] font-black uppercase text-black mb-2">Hello! I'm Zizhi.</Text>
-                  <Text className="text-[12px] font-medium leading-relaxed opacity-70 mb-8">
+                  <Text className="text-[16px] font-black uppercase text-[var(--color-primary-text)] mb-2">Hello! I'm Zizhi.</Text>
+                  <Text className="text-[12px] font-medium leading-relaxed opacity-70 mb-8 text-[var(--color-primary-text)]">
                     Query your library of wisdom. I can find patterns, summarize authors, or just talk about the themes you love.
                   </Text>
                   <Stack gap="sm">
-                    <button onClick={() => setInput("Identify the most recurring themes in my quotes.")} className="w-full p-3 text-[11px] uppercase font-black border-2 border-black hover:bg-black hover:text-white transition-colors bg-white"> 🔍 Recurring Themes </button>
-                    <button onClick={() => setInput("Which book has the most impactful quotes according to my highlights?")} className="w-full p-3 text-[11px] uppercase font-black border-2 border-black hover:bg-black hover:text-white transition-colors bg-white"> 📚 Impactful Books </button>
+                    <button onClick={() => setInput("Identify the most recurring themes in my quotes.")} className="w-full p-3 text-[11px] uppercase font-black border-2 border-black hover:bg-black hover:text-white transition-colors bg-white text-black shadow-[2px_2px_0_black]"> 🔍 Recurring Themes </button>
+                    <button onClick={() => setInput("Which book has the most impactful quotes according to my highlights?")} className="w-full p-3 text-[11px] uppercase font-black border-2 border-black hover:bg-black hover:text-white transition-colors bg-white text-black shadow-[2px_2px_0_black]"> 📚 Impactful Books </button>
                   </Stack>
                 </Box>
               )}
@@ -278,7 +280,9 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
               )}
             </Stack>
           )}
-        </ScrollArea>
+        </div>
+      </ScrollArea>
+    </div>
 
         {!isHistoryView && (
             <Box className="p-4 md:p-6 border-t-[6px] border-black bg-[var(--color-surface)] shrink-0">

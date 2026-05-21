@@ -15,6 +15,7 @@ interface ReaderViewProps {
     quotes: Quote[];
     notes: Note[];
     initialChapterId?: string | null;
+    initialSearchText?: string | null;
     onClose: () => void;
     onUpdateProgress: (bookId: string, chapterIndex: number, scrollTop: number, timeSpent: number, granularProgress: number) => void;
     onSaveQuote: (text: string, chapterId: string) => void;
@@ -27,7 +28,7 @@ const ChapterContent = memo(({ html, id, className }: { html: string, id: string
     <div dangerouslySetInnerHTML={{ __html: html }} className={className} />
 ));
 
-const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, onClose, onUpdateProgress, onSaveQuote, onSaveNote, onSearch, onFontSizeChange }) => {
+const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, initialChapterId, initialSearchText, onClose, onUpdateProgress, onSaveQuote, onSaveNote, onSearch, onFontSizeChange }) => {
     const [currentChapterIndex, setCurrentChapterIndex] = useState(0);
     const [showToc, setShowToc] = useState(false);
     const [sidebarTab, setSidebarTab] = useState<'chapters' | 'highlights'>('chapters');
@@ -138,6 +139,114 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, onC
         };
     }, [book.isPdf, theme.fontSize, onFontSizeChange, pdfScale, ephemeralFontSize]);
 
+    const navigateToChapter = (idx: number) => {
+        const chapter = book.chapters[idx];
+        const elementId = book.isPdf ? `pdf-page-${idx + 1}` : `chapter-${chapter.id.replace(/[^a-zA-Z0-9]/g, '-')}`;
+        const element = document.getElementById(elementId);
+        if (element && scrollViewportRef.current) {
+            const viewport = scrollViewportRef.current;
+            const containerRect = viewport.getBoundingClientRect();
+            const targetRect = element.getBoundingClientRect();
+            const scrollOffset = targetRect.top - containerRect.top + viewport.scrollTop;
+            
+            // Set index immediately when navigating
+            setCurrentChapterIndex(idx);
+            viewport.scrollTo({ top: scrollOffset - 20, behavior: 'smooth' });
+            setShowToc(false);
+        }
+    };
+
+    const navigateToHighlight = useCallback((locationId: string, searchText?: string) => {
+        const chapterId = book.isPdf ? `pdf-page-${parseInt(locationId.split('-').pop() || '1')}` : `chapter-${locationId.replace(/[^a-zA-Z0-9]/g, '-')}`;
+        let chapterElement = document.getElementById(chapterId);
+        
+        if (scrollViewportRef.current) {
+            let targetElement: HTMLElement | null = chapterElement;
+            let foundInTarget = false;
+            
+            if (!book.isPdf && searchText) {
+                // Try to find in target chapter first if it exists
+                if (chapterElement) {
+                    const elements = chapterElement.querySelectorAll('p, div, span, h1, h2, h3, h4, h5, h6');
+                    for (const el of Array.from(elements)) {
+                        if (el.textContent?.toLowerCase().includes(searchText.toLowerCase())) {
+                            targetElement = el as HTMLElement;
+                            foundInTarget = true;
+                            break;
+                        }
+                    }
+                }
+
+                // Global fallback search if not found in target chapter (handles legacy bugs)
+                if (!foundInTarget) {
+                    const allSections = scrollViewportRef.current.querySelectorAll('section[data-index]');
+                    for (const section of Array.from(allSections)) {
+                        const els = section.querySelectorAll('p, div, span, h1, h2, h3, h4, h5, h6');
+                        for (const el of Array.from(els)) {
+                            if (el.textContent?.toLowerCase().includes(searchText.toLowerCase())) {
+                                targetElement = el as HTMLElement;
+                                const indexAttr = section.getAttribute('data-index');
+                                if (indexAttr) setCurrentChapterIndex(parseInt(indexAttr));
+                                foundInTarget = true;
+                                break;
+                            }
+                        }
+                        if (foundInTarget) break;
+                    }
+                }
+            }
+            
+            if (targetElement) {
+                const viewport = scrollViewportRef.current;
+                const containerRect = viewport.getBoundingClientRect();
+                const targetRect = targetElement.getBoundingClientRect();
+                const scrollOffset = targetRect.top - containerRect.top + viewport.scrollTop;
+                
+                // Set index immediately when navigating
+                const idx = book.chapters.findIndex(c => c.id === locationId);
+                // Only set if not already set by global search
+                if (!foundInTarget && idx !== -1) setCurrentChapterIndex(idx);
+
+                viewport.scrollTo({ top: scrollOffset - 20, behavior: 'smooth' });
+                setShowToc(false);
+            }
+        }
+    }, [book.chapters, book.isPdf, scrollViewportRef]);
+
+    // Track active chapter during scroll
+    useEffect(() => {
+        if (!isInitialScrollDone || !scrollViewportRef.current) return;
+
+        const observerOptions = {
+            root: scrollViewportRef.current,
+            threshold: [0, 0.1, 0.5, 0.9, 1.0],
+            rootMargin: '-10% 0px -70% 0px' // Focus on the top part of the viewport
+        };
+
+        const callback: IntersectionObserverCallback = (entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting && entry.intersectionRatio > 0.1) {
+                    const indexAttr = entry.target.getAttribute('data-index');
+                    if (indexAttr !== null) {
+                        const index = parseInt(indexAttr);
+                        // We check against ref or state, but here we just update state
+                        // to avoid dependency loops we check if it's different
+                        setCurrentChapterIndex(prev => {
+                            if (prev !== index) return index;
+                            return prev;
+                        });
+                    }
+                }
+            });
+        };
+
+        const observer = new IntersectionObserver(callback, observerOptions);
+        const sections = scrollViewportRef.current.querySelectorAll('section[data-index]');
+        sections.forEach(s => observer.observe(s));
+
+        return () => observer.disconnect();
+    }, [isInitialScrollDone, book.chapters.length, book.isPdf]);
+
     useEffect(() => {
         const handleResize = () => {
             if (window.innerWidth > 1400) setIsDesktopTocPersistent(true);
@@ -148,18 +257,26 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, onC
     }, []);
 
     useEffect(() => {
-        if (!isInitialScrollDone && scrollViewportRef.current && book.lastScrollTop > 0) {
-            const scrollTimer = setTimeout(() => {
-                if (scrollViewportRef.current) {
-                    scrollViewportRef.current.scrollTo({ top: book.lastScrollTop, behavior: 'auto' });
+        if (!isInitialScrollDone && scrollViewportRef.current) {
+            if (initialChapterId) {
+                const timer = setTimeout(() => {
+                    navigateToHighlight(initialChapterId, initialSearchText || undefined);
                     setIsInitialScrollDone(true);
-                }
-            }, 400);
-            return () => clearTimeout(scrollTimer);
-        } else if (!isInitialScrollDone) {
-            setIsInitialScrollDone(true);
+                }, 800);
+                return () => clearTimeout(timer);
+            } else if (book.lastScrollTop > 0) {
+                const scrollTimer = setTimeout(() => {
+                    if (scrollViewportRef.current) {
+                        scrollViewportRef.current.scrollTo({ top: book.lastScrollTop, behavior: 'auto' });
+                        setIsInitialScrollDone(true);
+                    }
+                }, 400);
+                return () => clearTimeout(scrollTimer);
+            } else {
+                setIsInitialScrollDone(true);
+            }
         }
-    }, [isInitialScrollDone, book.lastScrollTop]);
+    }, [isInitialScrollDone, initialChapterId, initialSearchText, book.lastScrollTop, navigateToHighlight]);
 
     useEffect(() => {
         const handleSelection = () => {
@@ -186,29 +303,6 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, onC
             const timeSpent = Math.floor((now - lastUpdateRef.current) / 1000);
             onUpdateProgress(book.id, currentChapterIndex, position.y, timeSpent, progress);
             lastUpdateRef.current = now;
-        }
-    };
-
-    const navigateToChapter = (idx: number) => {
-        const chapter = book.chapters[idx];
-        const elementId = book.isPdf ? `pdf-page-${idx + 1}` : `chapter-${chapter.id.replace(/[^a-zA-Z0-9]/g, '-')}`;
-        const element = document.getElementById(elementId);
-        if (element && scrollViewportRef.current) {
-            scrollViewportRef.current.scrollTo({ top: element.offsetTop - 20, behavior: 'smooth' });
-            setCurrentChapterIndex(idx);
-            setShowToc(false);
-        }
-    };
-
-    const navigateToHighlight = (locationId: string) => {
-        const elementId = book.isPdf ? `pdf-page-${parseInt(locationId.split('-').pop() || '1')}` : `chapter-${locationId.replace(/[^a-zA-Z0-9]/g, '-')}`;
-        const element = document.getElementById(elementId);
-        if (element && scrollViewportRef.current) {
-            scrollViewportRef.current.scrollTo({ top: element.offsetTop - 20, behavior: 'smooth' });
-            // Approximate the chapter index
-            const idx = book.chapters.findIndex(c => c.id === locationId);
-            if (idx !== -1) setCurrentChapterIndex(idx);
-            setShowToc(false);
         }
     };
 
@@ -239,13 +333,13 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, onC
                                 className={`flex-1 p-5 cursor-pointer border-r-4 border-black text-center transition-all ${sidebarTab === 'chapters' ? 'bg-cyan-400' : 'bg-transparent'}`}
                                 onClick={() => setSidebarTab('chapters')}
                             >
-                                <Text className="text-[11px] font-black uppercase tracking-widest text-black">Chapters</Text>
+                                <Text className={`text-[11px] font-black uppercase tracking-widest ${sidebarTab === 'chapters' ? 'text-black' : 'text-[var(--text-color)]'}`}>Chapters</Text>
                             </Box>
                             <Box 
                                 className={`flex-1 p-5 cursor-pointer text-center transition-all ${sidebarTab === 'highlights' ? 'bg-yellow-300' : 'bg-transparent'}`}
                                 onClick={() => setSidebarTab('highlights')}
                             >
-                                <Text className="text-[11px] font-black uppercase tracking-widest text-black">Highlights</Text>
+                                <Text className={`text-[11px] font-black uppercase tracking-widest ${sidebarTab === 'highlights' ? 'text-black' : 'text-[var(--text-color)]'}`}>Highlights</Text>
                             </Box>
                         </div>
                         <ScrollArea className="flex-1 p-6">
@@ -273,11 +367,11 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, onC
                                                 <Box 
                                                     key={note.id} 
                                                     className="border-l-4 border-yellow-300 pl-4 py-1 cursor-pointer hover:bg-black/5 transition-colors"
-                                                    onClick={() => note.location && navigateToHighlight(note.location)}
+                                                    onClick={() => note.location && navigateToHighlight(note.location, note.text)}
                                                 >
                                                     <Text className="text-[11px] font-serif italic mb-2 line-clamp-3 opacity-80">"{note.text}"</Text>
                                                     <Box className="bg-black/5 p-3 border-l-2 border-black">
-                                                        <Text className="text-[10px] font-black">{note.note}</Text>
+                                                        <Text className="text-[10px] font-black text-[var(--text-color)]">{note.note}</Text>
                                                     </Box>
                                                 </Box>
                                             ))}
@@ -285,7 +379,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, onC
                                                 <Box 
                                                     key={quote.id} 
                                                     className="border-l-4 border-cyan-400 pl-4 py-1 cursor-pointer hover:bg-black/5 transition-colors"
-                                                    onClick={() => quote.location && navigateToHighlight(quote.location)}
+                                                    onClick={() => quote.location && navigateToHighlight(quote.location, quote.text)}
                                                 >
                                                     <Text className="text-[11px] font-serif italic mb-2 line-clamp-4">"{quote.text}"</Text>
                                                 </Box>
@@ -349,13 +443,13 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, onC
                             </Center>
                         ) : book.isPdf && pdfDocument ? (
                             book.chapters.map((chapter, idx) => (
-                                <section key={chapter.id} id={`pdf-page-${idx + 1}`} className="mb-8 last:mb-0">
+                                <section key={chapter.id} id={`pdf-page-${idx + 1}`} data-index={idx} className="mb-8 last:mb-0">
                                     <PdfPage pdfDocument={pdfDocument} pageNumber={idx + 1} scale={pdfScale} />
                                 </section>
                             ))
                         ) : (
-                            book.chapters.map((chapter) => (
-                                <section key={chapter.id} id={`chapter-${chapter.id.replace(/[^a-zA-Z0-9]/g, '-')}`} className="mb-24 last:mb-0">
+                            book.chapters.map((chapter, idx) => (
+                                <section key={chapter.id} id={`chapter-${chapter.id.replace(/[^a-zA-Z0-9]/g, '-')}`} data-index={idx} className="mb-24 last:mb-0">
                                     <ChapterContent html={chapter.html} id={chapter.id} className={`epub-content`} />
                                 </section>
                             ))
@@ -484,7 +578,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, onC
                                                     <Box 
                                                         key={note.id} 
                                                         className="border-l-4 border-yellow-300 pl-4 py-1 cursor-pointer hover:bg-black/5 transition-colors"
-                                                        onClick={() => note.location && navigateToHighlight(note.location)}
+                                                        onClick={() => note.location && navigateToHighlight(note.location, note.text)}
                                                     >
                                                         <Text className="text-[11px] font-serif italic mb-2 line-clamp-3 opacity-80">"{note.text}"</Text>
                                                         <Box className="bg-black/5 p-3 border-l-2 border-black">
@@ -496,7 +590,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, onC
                                                     <Box 
                                                         key={quote.id} 
                                                         className="border-l-4 border-cyan-400 pl-4 py-1 cursor-pointer hover:bg-black/5 transition-colors"
-                                                        onClick={() => quote.location && navigateToHighlight(quote.location)}
+                                                        onClick={() => quote.location && navigateToHighlight(quote.location, quote.text)}
                                                     >
                                                         <Text className="text-[11px] font-serif italic mb-2 line-clamp-4">"{quote.text}"</Text>
                                                     </Box>

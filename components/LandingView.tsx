@@ -72,12 +72,12 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter, onLogin }) => {
            transition={{ duration: 0.8, ease: "easeOut" }}
            className="relative z-10 flex flex-col items-center gap-8 md:gap-[64px] w-full max-w-[1000px]"
         >
-          <div className="flex flex-col items-center w-full">
+          <div className="flex flex-col items-center w-full text-[var(--color-primary-text)]">
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[72px] leading-tight md:leading-[88px] font-display tracking-[-0.08em] text-center mb-0 md:whitespace-nowrap">
               Turn <span className="text-[var(--color-primary)] drop-shadow-[4px_4px_0_black]">Books</span> Into <span className="text-[var(--color-primary)] drop-shadow-[4px_4px_0_black]">Ideas!</span>
             </h1>
             
-            <p className="text-lg md:text-2xl font-serif leading-relaxed md:leading-[34px] text-center text-[var(--color-primary-text)] mt-4 md:mt-0 max-w-2xl">
+            <p className="text-lg md:text-2xl font-serif leading-relaxed md:leading-[34px] text-center mt-4 md:mt-0 max-w-2xl">
               Zizhi helps you make sense of what you read and remember the core concepts long after you’ve turned the last page.
             </p>
           </div>
@@ -91,7 +91,7 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter, onLogin }) => {
               Start Reading
             </button>
             <button 
-              className="w-full md:w-[295px] h-[73.01px] text-black px-[10px] py-[24px] font-serif font-bold text-base flex items-center justify-center gap-2 group border-2 border-black shadow-[4px_4px_0px_black] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none bg-transparent"
+              className="w-full md:w-[295px] h-[73.01px] text-[var(--color-primary-text)] px-[10px] py-[24px] font-serif font-bold text-base flex items-center justify-center gap-2 group border-2 border-black shadow-[4px_4px_0px_black] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none bg-transparent"
             >
               See how it works <ArrowRight className="w-6 h-6 transition-transform group-hover:translate-x-1" />
             </button>

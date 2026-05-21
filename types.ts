@@ -73,6 +73,8 @@ export interface BookMetadata {
     hasSummary?: boolean;
     hasAudio?: boolean;
     isPdf?: boolean;
+    fileUrl?: string;
+    type?: 'pdf' | 'epub';
 }
 
 export interface BookContent {

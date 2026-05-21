@@ -179,7 +179,31 @@ export const parseEpub = async (file: File): Promise<Book> => {
         const coverFile = zip.file(coverManifestItem.href);
         if (coverFile) {
             const coverData = await coverFile.async('blob');
-            coverImageUrl = await blobToBase64(coverData);
+            // Resize cover if it's likely high-res to avoid Firestore/IDB limits
+            const dataUrl = await blobToBase64(coverData);
+            try {
+                coverImageUrl = await new Promise<string>((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const maxDim = 600;
+                        if (img.width > maxDim || img.height > maxDim) {
+                            const canvas = document.createElement('canvas');
+                            const scale = Math.min(maxDim / img.width, maxDim / img.height);
+                            canvas.width = img.width * scale;
+                            canvas.height = img.height * scale;
+                            const ctx = canvas.getContext('2d');
+                            ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+                            resolve(canvas.toDataURL('image/jpeg', 0.7));
+                        } else {
+                            resolve(dataUrl);
+                        }
+                    };
+                    img.onerror = () => resolve(dataUrl);
+                    img.src = dataUrl;
+                });
+            } catch (e) {
+                coverImageUrl = dataUrl;
+            }
         }
     }
 
