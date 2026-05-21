@@ -11,6 +11,7 @@ import ReaderView from './components/ReaderView';
 import SummaryView from './components/TrailerView';
 import ProfileView from './components/ProfileView';
 import LandingView from './components/LandingView';
+import QuoteChat from './components/QuoteChat';
 import Toast from './components/Toast';
 import ReloadPrompt from './components/ReloadPrompt';
 import { Logo, LogoIcon, IconSettings, IconUser, IconLibrary, IconQuote, IconUpload, IconLayoutGrid, IconLayoutList, IconSpinner, IconMenu, IconNote } from './components/icons';
@@ -624,20 +625,22 @@ const App: FC = () => {
                   </AnimatePresence>
               )}
           </Box>
-          <nav className="fixed bottom-0 left-0 right-0 bg-[var(--color-surface)] h-20 flex items-center justify-around z-[200] border-t-4 border-black md:hidden">
-              <NavItem tab="library" activeTab={activeTab} onSelect={setActiveTab} icon={IconLibrary} label="Library" />
-              <NavItem tab="quotes" activeTab={activeTab} onSelect={setActiveTab} icon={IconQuote} label="Quotes" />
-                  <Box className="relative -top-6">
-                      <>
-                        <input type="file" ref={fileInputRef} onChange={handleUpload} accept=".epub,.pdf" className="hidden" />
-                        <ActionIcon size={72} className="bg-yellow-400 border-4 border-black shadow-[6px_6px_0_black] rounded-none" onClick={() => fileInputRef.current?.click()}>
-                            {isUploading ? <IconSpinner className="w-8 h-8 text-black" /> : <IconUpload className="w-10 h-10 text-black" />}
-                        </ActionIcon>
-                      </>
-                  </Box>
-              <NavItem tab="notes" activeTab={activeTab} onSelect={setActiveTab} icon={IconNote} label="Notes" />
-              <NavItem tab="profile" activeTab={activeTab} onSelect={setActiveTab} icon={IconUser} label="Profile" />
-          </nav>
+          {!isChatOpen && (
+            <nav className="fixed bottom-0 left-0 right-0 bg-[var(--color-surface)] h-20 flex items-center justify-around z-[200] border-t-4 border-black md:hidden">
+                <NavItem tab="library" activeTab={activeTab} onSelect={setActiveTab} icon={IconLibrary} label="Library" />
+                <NavItem tab="quotes" activeTab={activeTab} onSelect={setActiveTab} icon={IconQuote} label="Quotes" />
+                    <Box className="relative -top-6">
+                        <>
+                          <input type="file" ref={fileInputRef} onChange={handleUpload} accept=".epub,.pdf" className="hidden" />
+                          <ActionIcon size={72} className="bg-yellow-400 border-4 border-black shadow-[6px_6px_0_black] rounded-none" onClick={() => fileInputRef.current?.click()}>
+                              {isUploading ? <IconSpinner className="w-8 h-8 text-black" /> : <IconUpload className="w-10 h-10 text-black" />}
+                          </ActionIcon>
+                        </>
+                    </Box>
+                <NavItem tab="notes" activeTab={activeTab} onSelect={setActiveTab} icon={IconNote} label="Notes" />
+                <NavItem tab="profile" activeTab={activeTab} onSelect={setActiveTab} icon={IconUser} label="Profile" />
+            </nav>
+          )}
           {selectedBook && <ReaderView 
             book={selectedBook} 
             theme={theme} 
@@ -707,6 +710,12 @@ const App: FC = () => {
           <AnimatePresence>
             {isAuthModalOpen && (
               <AuthView onClose={() => setIsAuthModalOpen(false)} onLogin={(u) => { setUser(u as User); setIsAuthModalOpen(false); if (!hasEntered) setHasEntered(true); }} />
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {isChatOpen && (
+              <QuoteChat quotes={quotes} onClose={() => setIsChatOpen(false)} />
             )}
           </AnimatePresence>
 
