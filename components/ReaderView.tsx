@@ -32,7 +32,8 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
     const [currentChapterIndex, setCurrentChapterIndex] = useState(0);
     const [showToc, setShowToc] = useState(false);
     const [sidebarTab, setSidebarTab] = useState<'chapters' | 'highlights'>('chapters');
-    const [isDesktopTocPersistent, setIsDesktopTocPersistent] = useState(window.innerWidth > 1400);
+    const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1280);
+    const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(window.innerWidth >= 1280);
     const [selection, setSelection] = useState<{ text: string, rect: DOMRect } | null>(null);
     const [noteInput, setNoteInput] = useState<{ text: string } | null>(null);
     const [noteValue, setNoteValue] = useState('');
@@ -249,8 +250,8 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
 
     useEffect(() => {
         const handleResize = () => {
-            if (window.innerWidth > 1400) setIsDesktopTocPersistent(true);
-            else setIsDesktopTocPersistent(false);
+            const desk = window.innerWidth >= 1280;
+            setIsDesktop(desk);
         };
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
@@ -325,21 +326,28 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
     return (
         <Box className={`fixed inset-0 z-[1000] flex flex-col md:flex-row overflow-hidden animate-fade-in reader-atmosphere-${theme.id}`} style={{ ...styleVariables, backgroundColor: 'var(--bg-color)' }}>
             
-            <Transition mounted={isDesktopTocPersistent} transition="slide-right" duration={300}>
+            <Transition mounted={isDesktop && isDesktopSidebarOpen} transition="slide-right" duration={300}>
                 {(styles) => (
                     <Box style={styles} className="hidden xl:flex w-80 bg-[var(--bg-color)] border-r-4 border-black flex-col h-full z-[1100]">
-                        <div className="border-b-4 border-black flex">
+                        <div className="h-16 md:h-20 border-b-4 border-black flex shrink-0 items-stretch">
                             <Box 
-                                className={`flex-1 p-5 cursor-pointer border-r-4 border-black text-center transition-all ${sidebarTab === 'chapters' ? 'bg-cyan-400' : 'bg-transparent'}`}
+                                className={`flex-1 flex items-center justify-center cursor-pointer border-r-4 border-black text-center transition-all ${sidebarTab === 'chapters' ? 'bg-cyan-400' : 'bg-transparent'}`}
                                 onClick={() => setSidebarTab('chapters')}
                             >
                                 <Text className={`text-[11px] font-black uppercase tracking-widest ${sidebarTab === 'chapters' ? 'text-black' : 'text-[var(--text-color)]'}`}>Chapters</Text>
                             </Box>
                             <Box 
-                                className={`flex-1 p-5 cursor-pointer text-center transition-all ${sidebarTab === 'highlights' ? 'bg-yellow-300' : 'bg-transparent'}`}
+                                className={`flex-1 flex items-center justify-center cursor-pointer text-center transition-all ${sidebarTab === 'highlights' ? 'bg-yellow-300' : 'bg-transparent'}`}
                                 onClick={() => setSidebarTab('highlights')}
                             >
                                 <Text className={`text-[11px] font-black uppercase tracking-widest ${sidebarTab === 'highlights' ? 'text-black' : 'text-[var(--text-color)]'}`}>Highlights</Text>
+                            </Box>
+                            <Box 
+                                className="w-14 flex items-center justify-center cursor-pointer border-l-4 border-black text-center hover:bg-red-400 active:translate-y-[1px] transition-all bg-[var(--bg-color)] shrink-0"
+                                onClick={() => setIsDesktopSidebarOpen(false)}
+                                title="Close Sidebar"
+                            >
+                                <IconClose className="text-[var(--text-color)] w-5 h-5 font-black" />
                             </Box>
                         </div>
                         <ScrollArea className="flex-1 p-6">
@@ -428,10 +436,26 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
                         </Group>
                     )}
 
-                    {!isDesktopTocPersistent && (
-                        <ActionIcon variant="filled" color="yellow" size="lg" onClick={() => setShowToc(true)} className="border-2 border-black rounded-none shadow-[3px_3px_0_black] bg-[var(--bg-color)]"><IconMenu className="text-[var(--text-color)] w-5 h-5" /></ActionIcon>
+                    {(!isDesktop || !isDesktopSidebarOpen) ? (
+                        <ActionIcon 
+                            variant="filled" 
+                            color="yellow" 
+                            size="lg" 
+                            onClick={() => {
+                                if (isDesktop) {
+                                    setIsDesktopSidebarOpen(true);
+                                } else {
+                                    setShowToc(true);
+                                }
+                            }} 
+                            className="border-2 border-black rounded-none shadow-[3px_3px_0_black] bg-[var(--bg-color)]"
+                            title="Open Sidebar"
+                        >
+                            <IconMenu className="text-[var(--text-color)] w-5 h-5" />
+                        </ActionIcon>
+                    ) : (
+                        <div className="w-10"></div>
                     )}
-                    {isDesktopTocPersistent && <div className="w-10"></div>}
                 </header>
 
                 <ScrollArea className={`flex-1 ${theme.texture === 'paper' ? 'printed-texture' : ''}`} viewportRef={scrollViewportRef} onScrollPositionChange={handleScroll}>
@@ -531,7 +555,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
                 </Box>
             )}
 
-            <Transition mounted={showToc && !isDesktopTocPersistent} transition="slide-right" duration={300}>
+            <Transition mounted={showToc && !isDesktop} transition="slide-right" duration={300}>
                 {(styles) => (
                     <Box style={styles} className="fixed inset-0 z-[1500] flex">
                         <Box className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowToc(false)} />

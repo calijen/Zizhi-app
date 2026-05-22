@@ -159,7 +159,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShow
             
             try {
                 const genAI = new GoogleGenerativeAI(process.env.API_KEY || "");
-                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
                 
                 // We limit the number of titles to avoid context bloat
                 const titles = library.slice(0, 5).map(b => b.title).join(', ');
