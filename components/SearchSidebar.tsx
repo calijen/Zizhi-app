@@ -1,183 +1,155 @@
-
-import React, { useState, useEffect } from 'react';
-import { IconClose, IconSpinner } from './icons';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
+import { IconClose, IconSpinner, IconSearch, IconGoogle } from './icons';
+import type { Theme } from '../types';
 
 interface SearchSidebarProps {
   query: string;
+  theme?: Theme;
   onClose: () => void;
 }
 
-// Add google to window type for TypeScript
-declare global {
-    interface Window {
-        google?: any;
-        __gcse?: any;
+const SearchSidebar: React.FC<SearchSidebarProps> = ({ query, theme, onClose }) => {
+  const [inputValue, setInputValue] = useState(query);
+  const [searchTerm, setSearchTerm] = useState(query);
+  const [isIframeLoading, setIsIframeLoading] = useState(true);
+
+  const styleVariables = theme ? {
+    '--bg-color': theme.colors['background'],
+    '--text-color': theme.colors['primary-text'],
+    '--sec-text': theme.colors['secondary-text'],
+    '--surface': theme.colors['surface'],
+    '--border': theme.colors['border-color'],
+  } as React.CSSProperties : {} as React.CSSProperties;
+
+  useEffect(() => {
+    setInputValue(query);
+    setSearchTerm(query);
+    setIsIframeLoading(true);
+  }, [query]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (inputValue.trim()) {
+      setIsIframeLoading(true);
+      setSearchTerm(inputValue.trim());
     }
-}
+  };
 
-const SearchSidebar: React.FC<SearchSidebarProps> = ({ query, onClose }) => {
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+  const handleExternalSearch = () => {
+    window.open(`https://www.google.com/search?q=${encodeURIComponent(searchTerm)}`, '_blank', 'noopener,noreferrer');
+  };
 
-    useEffect(() => {
-        // Check for environment variable in both standard process.env and Vite's import.meta.env using safe access
-        const searchEngineId = (import.meta as any).env?.VITE_GOOGLE_CSE_ID || (typeof process !== 'undefined' ? process.env?.GOOGLE_CSE_ID : undefined);
+  const googleIframeUrl = `https://www.google.com/search?igu=1&q=${encodeURIComponent(searchTerm)}`;
 
-        if (!searchEngineId) {
-            setError("Search is not configured. Missing Search Engine ID. Please set GOOGLE_CSE_ID (or VITE_GOOGLE_CSE_ID) in your environment variables.");
-            setIsLoading(false);
-            return;
-        }
-
-        // Define callbacks for the CSE script to hook into.
-        const handleSearchComplete = () => {
-            setIsLoading(false);
-        };
-        
-        window.__gcse = {
-            searchCallbacks: {
-                web: {
-                    ready: handleSearchComplete,
-                    error: () => {
-                        handleSearchComplete();
-                        setError("An error occurred with Google Search.");
-                    }
-                },
-            },
-        };
-        
-        // Inject the Google CSE script into the page.
-        const scriptId = 'gcse-script';
-        if (!document.getElementById(scriptId)) {
-            const script = document.createElement('script');
-            script.src = `https://cse.google.com/cse.js?cx=${searchEngineId}`;
-            script.async = true;
-            script.id = scriptId;
-            document.head.appendChild(script);
-        }
-
-        return () => {
-            // Cleanup on component unmount
-            const existingScript = document.getElementById(scriptId);
-            if (existingScript) {
-                existingScript.remove();
-            }
-            // Remove the callback object to avoid memory leaks
-            delete window.__gcse;
-        };
-    }, []); // Runs only once when the sidebar is first opened
-
-    useEffect(() => {
-        // This effect executes the search when the query changes or after the script loads.
-        if (!query) return;
-        if (error) return; // Don't try to search if setup failed
-
-        const executeSearch = () => {
-            if (window.google?.search?.cse?.element) {
-                setIsLoading(true);
-                // Programmatically execute a search for the given query
-                window.google.search.cse.element.getElement('zizhi-search-results').execute(query);
-            } else {
-                // If script isn't loaded yet, poll for it.
-                setTimeout(executeSearch, 100);
-            }
-        };
-        
-        executeSearch();
-
-    }, [query, error]);
-
-    // Google CSE injects its own styles. These overrides help integrate it into the app's theme.
-    const customStyles = `
-        .gsc-control-cse {
-            background-color: transparent !important;
-            border: none !important;
-            padding: 1rem !important;
-            font-family: var(--font-sans), sans-serif !important;
-        }
-        .gsc-webResult.gsc-result {
-            border-color: var(--color-border-color) !important;
-            background-color: transparent !important;
-            padding: 0 0 1rem 0 !important;
-            margin-bottom: 1rem !important;
-        }
-        .gsc-result-info, .gsc-orderby {
-            display: none !important;
-        }
-        .gs-webResult.gs-result a.gs-title:link,
-        .gs-webResult.gs-result a.gs-title:visited {
-            color: var(--color-primary) !important;
-            text-decoration: none !important;
-            font-size: 1rem !important;
-            font-family: var(--font-sans), sans-serif !important;
-        }
-        .gs-webResult.gs-result a.gs-title:hover {
-            text-decoration: underline !important;
-        }
-        .gsc-url-top,
-        .gs-webResult .gs-snippet {
-            color: var(--color-primary-text) !important;
-            font-size: 0.875rem !important;
-        }
-        .gsc-cursor-box {
-            border: none !important;
-            margin-top: 1rem;
-        }
-        .gsc-cursor-page {
-            color: var(--color-secondary-text) !important;
-            background: transparent !important;
-            border-color: var(--color-border-color) !important;
-            margin: 0 0.25rem !important;
-        }
-        .gsc-cursor-current-page {
-            color: var(--color-primary) !important;
-            background-color: rgba(var(--color-primary-rgb), 0.1) !important;
-            border-color: var(--color-primary) !important;
-        }
-        .gsc-adBlock {
-            display: none !important; /* Hide ads */
-        }
-        .gs-image-box, .gs-promotion-image-box {
-            float: left;
-            margin-right: 0.75rem;
-        }
-        .gsc-results .gsc-cursor-box .gsc-cursor-current-page {
-             font-weight: bold;
-        }
-    `;
-
-    return (
-        <div className="fixed inset-0 z-40 flex items-end md:items-stretch md:justify-end" aria-modal="true" role="dialog">
-            <style>{customStyles}</style>
-            <div className="fixed inset-0 bg-black/50" onClick={onClose}></div>
-            <div className="relative z-10 w-full h-4/5 md:h-full md:w-2/5 lg:w-1/3 bg-[var(--color-background)] text-[var(--color-primary-text)] shadow-2xl flex flex-col animate-search-panel-in">
-                <header className="flex items-center justify-between p-4 border-b border-[var(--color-border-color)] flex-shrink-0">
-                    <h3 className="font-bold truncate">Search Results for "{query}"</h3>
-                    <button onClick={onClose} className="p-1 rounded-full hover:bg-[rgba(var(--color-border-color-rgb),0.2)]" aria-label="Close search">
-                        <IconClose className="w-5 h-5"/>
-                    </button>
-                </header>
-                <div className="flex-1 overflow-y-auto relative">
-                    {isLoading && !error && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-[var(--color-background)] z-10">
-                            <div className="flex items-center space-x-2">
-                                <IconSpinner className="w-6 h-6 text-[var(--color-primary)]" />
-                                <span>Searching...</span>
-                            </div>
-                        </div>
-                    )}
-                    {error && (
-                        <div className="p-4 text-red-700 bg-red-50 m-4 rounded-md text-center">
-                            <p className="font-semibold mb-1">Search Unavailable</p>
-                            <p className="text-sm">{error}</p>
-                        </div>
-                    )}
-                    {/* This div will be populated by the Google CSE script */}
-                    <div className="gcse-searchresults-only" id="zizhi-search-results"></div>
-                </div>
+  return (
+    <div 
+      className="fixed inset-0 z-[2200] flex items-stretch justify-end pointer-events-auto" 
+      style={styleVariables}
+      aria-modal="true" 
+      role="dialog"
+    >
+      <div 
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300" 
+        onClick={onClose}
+      />
+      
+      <motion.div 
+        initial={{ x: '100%' }}
+        animate={{ x: 0 }}
+        exit={{ x: '100%' }}
+        transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+        className="relative z-10 w-full md:max-w-2xl bg-[var(--bg-color)] border-l-4 border-black flex flex-col h-full shadow-[0_30px_70px_rgba(0,0,0,0.5)] pt-safe"
+      >
+        {/* Header Block */}
+        <header className="p-4 bg-[var(--surface)] border-b-4 border-black flex flex-col gap-3 shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="h-6 w-6 bg-black flex items-center justify-center rounded-none shadow-[1px_1px_0_black]">
+                <IconGoogle className="text-white w-4 h-4 p-0.5" />
+              </div>
+              <h3 className="font-display uppercase tracking-wider text-xs font-black text-[var(--text-color)]">
+                Zizhi Google Search
+              </h3>
             </div>
+            
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={handleExternalSearch}
+                className="px-3 py-1 bg-yellow-300 border-2 border-black font-black text-[10px] uppercase tracking-wider text-black shadow-[2px_2px_0_black] active:translate-y-0.5 active:shadow-none hover:bg-yellow-400 transition-all flex items-center gap-1"
+                title="Open directly in Google.com"
+              >
+                Open Google.com ↗
+              </button>
+              <button 
+                onClick={onClose} 
+                className="p-1 border-2 border-black bg-[var(--bg-color)] shadow-[2px_2px_0_black] active:translate-y-0.5 active:shadow-none transition-all hover:bg-red-400"
+                aria-label="Close"
+              >
+                <IconClose className="w-4 h-4 text-black" />
+              </button>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="relative">
+            <input
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              className="w-full pl-10 pr-20 py-3 bg-[var(--bg-color)] border-2 border-black font-bold text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 rounded-none shadow-[2px_2px_0_black] text-[var(--text-color)]"
+              placeholder="Search Google..."
+            />
+            <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black/60 pointer-events-none">
+              <IconSearch className="w-4 h-4" />
+            </div>
+            {inputValue && (
+              <button
+                type="button"
+                onClick={() => setInputValue('')}
+                className="absolute right-16 top-1/2 -translate-y-1/2 font-black text-[9px] uppercase tracking-wider text-black/50 hover:text-black hover:underline"
+              >
+                Clear
+              </button>
+            )}
+            <button
+              type="submit"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-cyan-400 border border-black font-black uppercase text-[9px] tracking-wider text-black shadow-[1px_1px_0_black] hover:bg-cyan-500 active:translate-y-0.5 active:shadow-none"
+            >
+              Search
+            </button>
+          </form>
+        </header>
+
+        {/* Search Viewport Frame Container */}
+        <div className="flex-1 overflow-hidden relative bg-[var(--bg-color)] flex flex-col">
+          {isIframeLoading && (
+            <div className="absolute inset-0 bg-[var(--bg-color)]/95 backdrop-blur-xs flex flex-col gap-4 items-center justify-center z-20">
+              <motion.div 
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+                className="p-3 bg-yellow-300 border-4 border-black shadow-[4px_4px_0_black]"
+              >
+                <IconSpinner className="w-8 h-8 text-black" />
+              </motion.div>
+              <span className="text-xs font-black uppercase tracking-widest text-[var(--text-color)]">
+                Loading Google Search results...
+              </span>
+            </div>
+          )}
+
+          <iframe
+            key={searchTerm}
+            src={googleIframeUrl}
+            title={`Google Search for ${searchTerm}`}
+            className="w-full h-full border-none flex-1"
+            referrerPolicy="no-referrer"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+            onLoad={() => setIsIframeLoading(false)}
+          />
         </div>
-    );
+      </motion.div>
+    </div>
+  );
 };
 
 export default SearchSidebar;

@@ -1,6 +1,5 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
-import { Box, Group, Stack, Text, SimpleGrid } from '@mantine/core';
+import { Box, Stack, Text } from '@mantine/core';
 import type { BookMetadata, ReadingActivity } from '../types';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { IconSpinner } from './icons';
@@ -17,43 +16,156 @@ interface ProfileViewProps {
 interface Recommendation {
     title: string;
     author: string;
-    coverUrl: string | null;
+    reason: string;
+    genre: string;
+}
+
+interface ProfileAIData {
+    genres: string[];
+    archetypeTitle: string;
+    archetypeDesc: string;
+    recommendations: Recommendation[];
 }
 
 /**
  * Utility to safely extract and parse JSON from an AI response string.
  * Handles cases where the AI wraps JSON in markdown blocks.
  */
-const safeJsonParse = (text: string) => {
+const safeJsonParse = (text: string): ProfileAIData | null => {
     try {
         // Attempt 1: Direct parse
-        return JSON.parse(text);
+        return JSON.parse(text.trim());
     } catch (e) {
         // Attempt 2: Extract content between ```json and ```
         const match = text.match(/```json\s*([\s\S]*?)\s*```/);
         if (match && match[1]) {
             try {
-                return JSON.parse(match[1]);
+                return JSON.parse(match[1].trim());
             } catch (e2) {
                 console.error("Failed to parse extracted JSON block", e2);
             }
         }
-        // Attempt 3: Try to find any array/object looking structure
-        const firstBracket = text.indexOf('[');
-        const lastBracket = text.lastIndexOf(']');
-        if (firstBracket !== -1 && lastBracket !== -1) {
+        // Attempt 3: Try to find any curly brace structure
+        const firstBrace = text.indexOf('{');
+        const lastBrace = text.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1) {
             try {
-                return JSON.parse(text.substring(firstBracket, lastBracket + 1));
+                return JSON.parse(text.substring(firstBrace, lastBrace + 1));
             } catch (e3) {
                 console.error("Failed to parse bracketed content", e3);
             }
         }
-        throw new Error("Could not parse AI response as JSON");
+        return null;
     }
 };
 
+/**
+ * Open Library Client-side Search to retrieve real book covers.
+ */
+const fetchOpenLibraryCover = async (title: string, author: string): Promise<string | null> => {
+    try {
+        // Core cleaning for robust searches
+        const cleanTitle = title.replace(/\(.*?\)/g, "").trim();
+        const cleanAuthor = author.replace(/by /i, "").replace(/\(.*?\)/g, "").trim();
+        
+        const res = await fetch(
+            `https://openlibrary.org/search.json?title=${encodeURIComponent(cleanTitle)}&author=${encodeURIComponent(cleanAuthor)}&limit=1`
+        );
+        if (!res.ok) return null;
+        
+        const data = await res.json();
+        if (data.docs && data.docs.length > 0) {
+            const firstDoc = data.docs[0];
+            if (firstDoc.cover_i) {
+                return `https://covers.openlibrary.org/b/id/${firstDoc.cover_i}-M.jpg`;
+            }
+        }
+        return null;
+    } catch (err) {
+        console.error("Open Library cover look up failed:", err);
+        return null;
+    }
+};
+
+/**
+ * Premium custom cover display component.
+ * Performs async cover retrieval and serves balanced CSS color cards on failure.
+ */
+const BookCover: React.FC<{ title: string; author: string }> = ({ title, author }) => {
+    const [coverUrl, setCoverUrl] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    const fallbackIndex = useMemo(() => {
+        let sum = 0;
+        for (let i = 0; i < title.length; i++) {
+            sum += title.charCodeAt(i);
+        }
+        return sum % 5;
+    }, [title]);
+
+    const fallbackColors = [
+        { bg: 'bg-cyan-500', text: 'text-black' },
+        { bg: 'bg-yellow-400', text: 'text-black' },
+        { bg: 'bg-pink-500', text: 'text-white' },
+        { bg: 'bg-emerald-500', text: 'text-white' },
+        { bg: 'bg-orange-500', text: 'text-white' }
+    ];
+
+    const currentColors = fallbackColors[fallbackIndex];
+
+    useEffect(() => {
+        let active = true;
+        setLoading(true);
+        fetchOpenLibraryCover(title, author).then(url => {
+            if (active) {
+                setCoverUrl(url);
+                setLoading(false);
+            }
+        });
+        return () => {
+            active = false;
+        };
+    }, [title, author]);
+
+    if (loading) {
+        return (
+            <div className="w-28 h-40 bg-slate-100 border-4 border-black flex items-center justify-center animate-pulse shrink-0">
+                <IconSpinner className="w-6 h-6 text-pink-500" />
+            </div>
+        );
+    }
+
+    if (coverUrl) {
+        return (
+            <div className="w-28 h-40 border-4 border-black shadow-[4px_4px_0_black] shrink-0 overflow-hidden bg-white select-none">
+                <img 
+                    src={coverUrl} 
+                    alt={title} 
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover transition-transform hover:scale-105 duration-300"
+                />
+            </div>
+        );
+    }
+
+    return (
+        <div id="book-cover-fallback" className={`w-28 h-40 border-4 border-black shadow-[4px_4px_0_black] p-3 flex flex-col justify-between shrink-0 select-none ${currentColors.bg} ${currentColors.text} relative overflow-hidden`}>
+            {/* Elegant spine indicator */}
+            <div className="absolute top-0 left-0 w-2 h-full bg-black/10 border-r border-black/15" />
+            <div className="pl-2 flex-1 flex flex-col justify-between h-full">
+                <div className="font-serif italic font-black text-[11px] leading-tight line-clamp-3 uppercase mt-1">
+                    {title}
+                </div>
+                <div className="font-sans font-black tracking-widest text-[8px] truncate opacity-80 uppercase leading-none mb-1">
+                    {author}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const StreakRobot = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="200" height="200" className="mx-auto">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="200" height="200" className="mx-auto select-none">
       <defs>
         <linearGradient id="bodyGradientStreak" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#4FACFE" stopOpacity={1} />
@@ -90,7 +202,7 @@ const StreakRobot = () => (
 );
 
 const TimeRobot = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="200" height="200" className="mx-auto">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="200" height="200" className="mx-auto select-none">
       <defs>
         <linearGradient id="bodyGradientTime" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#4facfe" stopOpacity={1} />
@@ -125,58 +237,161 @@ const TimeRobot = () => (
 );
 
 const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShowAuth, activity, onSignOut }) => {
-    const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+    // Unique cache key based on the specific books in the library
+    const cacheKey = useMemo(() => {
+        if (library.length === 0) return '';
+        const ids = library.map(b => b.id || b.title).sort().join(',');
+        return `zizhi-profile-analysis-${ids}`;
+    }, [library]);
+
+    // Fast synchronous cache retrieval for initial state loading (prevents flicker and unneeded API reloading)
+    const getCachedData = (key: string): ProfileAIData | null => {
+        if (!key) return null;
+        try {
+            const cached = localStorage.getItem(key);
+            return cached ? JSON.parse(cached) : null;
+        } catch {
+            return null;
+        }
+    };
+
+    const [aiData, setAiData] = useState<ProfileAIData | null>(() => getCachedData(cacheKey));
+    const [recommendations, setRecommendations] = useState<Recommendation[]>(() => {
+        const cached = getCachedData(cacheKey);
+        return cached?.recommendations || [];
+    });
     const [isLoadingRecs, setIsLoadingRecs] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Synchronize state instantly if the cacheKey changes (e.g. from [] -> loaded books, or when a new book is uploaded)
+    useEffect(() => {
+        if (!cacheKey) {
+            setAiData(null);
+            setRecommendations([]);
+            return;
+        }
+        const cached = getCachedData(cacheKey);
+        if (cached) {
+            setAiData(cached);
+            setRecommendations(cached.recommendations || []);
+        } else {
+            setAiData(null);
+            setRecommendations([]);
+        }
+    }, [cacheKey]);
     
     const totalReadingTimeHours = useMemo(() => {
         const seconds = library.reduce((acc, book) => acc + (book.readingTime || 0), 0);
         return (seconds / 3600).toFixed(1);
     }, [library]);
 
-    const topGenres = useMemo(() => {
+    // Robust Local Top Genres extraction to handle offline fallback or latency safely.
+    const topGenresOffline = useMemo(() => {
         const counts: Record<string, number> = {};
         library.forEach(b => {
             if (b.genre) {
                 b.genre.split(',').forEach(g => {
-                    const clean = g.trim().toLowerCase();
-                    if (clean) counts[clean] = (counts[clean] || 0) + 1;
+                    const clean = g.trim().replace(/^pdf document$/i, '').trim();
+                    if (clean && clean.toLowerCase() !== "unknown" && clean.toLowerCase() !== "epub" && clean.toLowerCase() !== "pdf") {
+                        const capitalized = clean.charAt(0).toUpperCase() + clean.slice(1);
+                        counts[capitalized] = (counts[capitalized] || 0) + 1;
+                    }
                 });
             }
         });
         return Object.entries(counts)
             .sort((a, b) => b[1] - a[1])
-            .slice(0, 3)
+            .slice(0, 4)
             .map(([name]) => name);
     }, [library]);
 
+    const displayedGenres = useMemo(() => {
+        if (aiData?.genres && aiData.genres.length > 0) {
+            return aiData.genres;
+        }
+        return topGenresOffline;
+    }, [aiData, topGenresOffline]);
+
     useEffect(() => {
-        const getRecs = async () => {
-            if (library.length === 0 || recommendations.length > 0) return;
+        const getProfileAnalysis = async () => {
+            if (library.length === 0 || !cacheKey) return;
+            
+            // Check cache first to optimize key usage & prevent loading flicker / Gemini API calls
+            const cached = getCachedData(cacheKey);
+            if (cached) {
+                // Content is already synchronized correctly. Just exit!
+                return;
+            }
             
             setIsLoadingRecs(true);
             setError(null);
             
             try {
+                // Ensure proper instantiating format
                 const genAI = new GoogleGenerativeAI(process.env.API_KEY || "");
                 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
                 
-                // We limit the number of titles to avoid context bloat
-                const titles = library.slice(0, 5).map(b => b.title).join(', ');
-                const result = await model.generateContent(`User library contains: ${titles}. Based on these books, recommend 3 similar must-read titles. Return valid JSON only.`);
+                // Represent library items to Gemini clearly
+                const bookBriefs = library
+                    .slice(0, 10)
+                    .map(b => `"${b.title}" by ${b.author} (original category: ${b.genre || 'None'})`)
+                    .join('\n');
+                
+                const prompt = `
+You are a highly perceptive literary archivist and librarian for the Zizhi Scholar’s Academy.
+Analyze the user's current reading library.
+The library contains the following books:
+${bookBriefs}
+
+Based on these books, determine their true academic study interests to expand their horizons.
+
+Task 1: Determine the user's top 3-4 literary or scientific study domains/genres (e.g. "Philosophy", "Political Science", "Classic Fiction", "Post-Modernism", "Existentialism", "Theoretical Physics", "History", etc.). Avoid generic tags like "PDF Document", "Epub", "Textbook".
+Task 2: Evaluate their overall reading mix and profile them with a witty, profound personal "Scholarly Archetype" (e.g., "The Existential Explorer", "The Scientific Realist", "The Classical Humanist", "The Speculative Thinker") with a 1-sentence description that celebrates their intellectual journey.
+Task 3: Curate exactly 6 recommended readings. For each, give its title, author, its primary genre, and a profound 1-sentence explanation of why it will expand their specific horizon based on what they are already reading.
+
+You must return a valid JSON object ONLY. Do not output any thinking block, comments, or surrounding markdown blocks (such as \`\`\`json). The JSON must conform strictly to this structure:
+{
+  "genres": ["Philosophy", "Existentialism", "Classic Fiction"], 
+  "archetypeTitle": "The Existential Explorer",
+  "archetypeDesc": "You seek fundamental truths of humans, traversing paths of ontological enquiry and classical human ethics.",
+  "recommendations": [
+    {
+      "title": "Thus Spoke Zarathustra",
+      "author": "Friedrich Nietzsche",
+      "reason": "Expands on existential and philosophical questions raised in your reading of classics.",
+      "genre": "Philosophy"
+    }
+  ]
+}
+`;
+                const result = await model.generateContent(prompt);
                 const text = result.response.text();
                 
-                const recs = safeJsonParse(text);
-                setRecommendations(recs);
+                const aiResult = safeJsonParse(text);
+                if (aiResult) {
+                    setAiData(aiResult);
+                    setRecommendations(aiResult.recommendations || []);
+                    if (cacheKey) {
+                        localStorage.setItem(cacheKey, JSON.stringify(aiResult));
+                    }
+                } else {
+                    throw new Error("Invalid json format returned from AI model");
+                }
             } catch (e: any) {
-                console.error("Recs failed", e);
-                setError("Personalization engine currently unavailable. Please verify your connection.");
+                console.error("Profile optimization failed", e);
+                setError("The personalization engine is off duty. Relying on local archives.");
+                // Setup reasonable placeholder recommendations on failure so screen remains gorgeous
+                setRecommendations([
+                    { title: "Beyond Good and Evil", author: "Friedrich Nietzsche", reason: "Unpacks moral values and perspectives crucial to analytical thinking.", genre: "Philosophy" },
+                    { title: "Sapiens", author: "Yuval Noah Harari", reason: "An expansive look at humanity’s path matching your scientific journey.", genre: "Anthropology" },
+                    { title: "Moby Dick", author: "Herman Melville", reason: "A spectacular epic that tests the limits of systemic query and nature.", genre: "Classic Fiction" }
+                ]);
             } finally {
                 setIsLoadingRecs(false);
             }
         };
-        getRecs();
-    }, [library]);
+        getProfileAnalysis();
+    }, [library, cacheKey]);
 
     if (!user) {
         return (
@@ -200,6 +415,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShow
                 <button onClick={onSignOut} className="mt-8 md:mt-0 bg-[var(--color-surface)] border-4 border-[var(--color-border-color)] px-8 py-4 text-[11px] font-black uppercase tracking-[0.3em] shadow-[6px_6px_0_var(--color-border-color)] hover:translate-y-[-2px] transition-all text-[var(--color-primary-text)] rounded-none">Sign Out</button>
             </header>
 
+            {/* Chapter I */}
             <section className="flex flex-col md:flex-row items-center gap-12 bg-[var(--color-surface)] border-8 border-[var(--color-border-color)] p-8 md:p-16 shadow-[20px_20px_0_var(--color-border-color)] relative overflow-hidden">
                 <div className="absolute top-4 left-4 text-[8px] font-black uppercase opacity-20 text-[var(--color-primary-text)]">Chapter I: The Chronometer</div>
                 <div className="flex-1 space-y-6">
@@ -218,6 +434,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShow
                 </div>
             </section>
 
+            {/* Chapter II */}
             <section className="flex flex-col md:flex-row-reverse items-center gap-12 bg-yellow-400 border-8 border-black p-8 md:p-16 shadow-[20px_20px_0_black] relative overflow-hidden">
                 <div className="absolute top-4 right-4 text-[8px] font-black uppercase opacity-20 text-black">Chapter II: The Flame</div>
                 <div className="flex-1 space-y-6">
@@ -236,55 +453,97 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShow
                 </div>
             </section>
 
-            <section className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                <Box className="p-10 bg-[var(--color-surface)] border-8 border-[var(--color-border-color)] shadow-[16px_16px_0_var(--color-border-color)] relative overflow-hidden">
-                    <div className="absolute top-4 left-4 text-[8px] font-black uppercase opacity-20 text-[var(--color-primary-text)]">Chapter III: The Map</div>
-                    <h3 className="text-3xl font-black uppercase tracking-tighter mb-8 italic text-[var(--color-primary-text)]">The Path Traveled</h3>
-                    <Text className="text-base font-serif italic mb-6 leading-relaxed text-[var(--color-secondary-text)]">Your curiosity often leads you through these realms:</Text>
-                    <div className="flex flex-wrap gap-3">
-                        {topGenres.map(genre => (
-                            <Box key={genre} className="bg-pink-500 text-white px-4 py-2 border-4 border-black font-black uppercase text-[12px] shadow-[4px_4px_0_black]">
-                                {genre}
-                            </Box>
-                        ))}
-                        {topGenres.length === 0 && <Text className="opacity-40 italic text-[var(--color-primary-text)]">Exploring new territories...</Text>}
+            {/* Chapter III */}
+            <section className="bg-[var(--color-surface)] border-8 border-[var(--color-border-color)] p-8 md:p-16 shadow-[20px_20px_0_var(--color-border-color)] relative overflow-hidden">
+                <div className="absolute top-4 left-4 text-[8px] font-black uppercase opacity-20 text-[var(--color-primary-text)]">Chapter III: The Map</div>
+                <div className="space-y-8">
+                    <div className="space-y-3">
+                        <h3 className="text-[28px] md:text-3xl font-black uppercase tracking-tighter italic text-[var(--color-primary-text)]">The Path Traveled</h3>
+                        <p className="text-sm font-serif italic text-[var(--color-secondary-text)] leading-relaxed">
+                            Your scholarly inquiry maps onto these specific study domains.
+                        </p>
                     </div>
-                </Box>
 
-                <Box className="p-10 bg-[var(--color-primary-text)] border-8 border-black shadow-[16px_16px_0_pink] text-[var(--color-background)] relative overflow-hidden">
-                    <div className="absolute top-4 right-4 text-[8px] font-black uppercase opacity-20">Chapter IV: The Horizon</div>
-                    <h3 className="text-3xl font-black uppercase tracking-tighter mb-4 italic">Next Horizons</h3>
-                    <Text className="text-[11px] font-black uppercase mb-8 tracking-[0.4em] opacity-60">The future of your journey</Text>
-                    
-                    {isLoadingRecs ? (
-                        <div className="flex flex-col items-center justify-center py-10 gap-4">
-                            <IconSpinner className="w-10 h-10 text-pink-500" />
-                            <Text className="text-[10px] font-black uppercase">Scanning the stars...</Text>
-                        </div>
-                    ) : error ? (
-                        <Box className="p-6 border-4 border-dashed border-white/20 text-center">
-                            <Text className="text-[11px] font-black uppercase text-pink-400 mb-3">Service Notice</Text>
-                            <Text className="text-[10px] opacity-70 leading-relaxed uppercase tracking-wider">{error}</Text>
-                        </Box>
-                    ) : (
-                        <div className="space-y-4">
-                            {recommendations.map((rec, i) => (
-                                <Box key={i} className="bg-white border-4 border-black p-4 flex gap-4 items-center">
-                                    <div className="w-10 h-14 bg-cyan-400 border-2 border-black flex items-center justify-center text-black font-black shrink-0">
-                                        {rec.title.charAt(0)}
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <Text className="text-[13px] font-black text-black uppercase truncate italic">{rec.title}</Text>
-                                        <Text className="text-[10px] font-black text-pink-500 uppercase mt-1 truncate">{rec.author}</Text>
-                                    </div>
-                                </Box>
-                            ))}
-                            {recommendations.length === 0 && !isLoadingRecs && (
-                                <Text className="text-center opacity-40 italic py-10 uppercase text-[9px] tracking-widest">Add more books to unlock insights</Text>
-                            )}
+                    {/* Scholarly Archetype Display (Premium addition) */}
+                    {aiData?.archetypeTitle && (
+                        <div className="p-6 bg-pink-100/80 border-4 border-black shadow-[4px_4px_0_black] text-black space-y-2">
+                            <span className="text-[8px] font-black uppercase tracking-[0.3em] text-pink-600 block">Scholarly Archetype</span>
+                            <h4 className="text-xl font-black uppercase tracking-tight italic">{aiData.archetypeTitle}</h4>
+                            <p className="font-serif italic text-xs text-black/80 leading-relaxed">{aiData.archetypeDesc}</p>
                         </div>
                     )}
-                </Box>
+
+                    <div className="space-y-3">
+                         <span className="text-[10px] font-black uppercase tracking-widest text-[var(--color-muted-text)] block">Primary study topics:</span>
+                         <div className="flex flex-wrap gap-3">
+                             {displayedGenres.map(genre => (
+                                 <Box key={genre} className="bg-pink-500 text-white px-4 py-2 border-4 border-black font-black uppercase text-[11px] shadow-[3px_3px_0_black]">
+                                     {genre}
+                                 </Box>
+                             ))}
+                             {displayedGenres.length === 0 && (
+                                 <Text className="opacity-40 italic text-[var(--color-primary-text)]">Exploring initial pathways...</Text>
+                             )}
+                         </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* Chapter IV: Next Horizons — Full-Width Shelf display to accumulate a larger number of books */}
+            <section className="bg-[var(--color-primary-text)] border-8 border-black p-8 md:p-16 shadow-[20px_20px_0_pink] text-[var(--color-background)] relative overflow-hidden">
+                <div className="absolute top-4 left-4 text-[8px] font-black uppercase opacity-20">Chapter IV: The Horizon</div>
+                
+                <div className="space-y-4 mb-12">
+                    <h3 className="text-3xl md:text-4xl font-black uppercase tracking-tighter italic">Next Horizons</h3>
+                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-pink-400">Curated recommendations supporting your intellectual compass</p>
+                </div>
+
+                {isLoadingRecs ? (
+                    <div className="flex flex-col items-center justify-center py-20 gap-4">
+                        <IconSpinner className="w-12 h-12 text-pink-500 animate-spin" />
+                        <Text className="text-[11px] font-black uppercase tracking-widest">Studying book charts...</Text>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-8">
+                        {recommendations.map((rec, i) => (
+                            <div 
+                                key={i} 
+                                className="bg-white border-4 border-black p-5 flex gap-4 text-black shadow-[6px_6px_0_pink] hover:translate-y-[-2px] hover:shadow-[8px_8px_0_pink] transition-all duration-300"
+                            >
+                                <BookCover title={rec.title} author={rec.author} />
+                                <div className="flex-1 flex flex-col justify-between min-w-0 py-1">
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-start gap-1">
+                                            <span className="text-[8px] font-black uppercase tracking-widest bg-cyan-100 text-cyan-800 px-2.5 py-1 border border-cyan-300 truncate">
+                                                {rec.genre || "Essential study"}
+                                            </span>
+                                        </div>
+                                        <h4 className="text-[14px] font-black uppercase italic leading-tight line-clamp-2">
+                                            {rec.title}
+                                        </h4>
+                                        <p className="text-[10px] font-black text-pink-600 uppercase tracking-wide">
+                                            by {rec.author}
+                                        </p>
+                                    </div>
+                                    <p className="font-serif italic text-xs text-black/75 leading-relaxed line-clamp-3 mt-3 border-t border-black/10 pt-2">
+                                        {rec.reason || `Essential expansion for your library.`}
+                                    </p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+                
+                {recommendations.length === 0 && !isLoadingRecs && (
+                    <div className="py-16 text-center max-w-md mx-auto space-y-4">
+                        <p className="text-sm font-serif italic opacity-60">
+                            "The library is a sphere whose exact center is any one of its hexagons and whose circumference is inaccessible."
+                        </p>
+                        <Text className="text-[11px] font-black uppercase tracking-[0.3em] text-pink-400">
+                            Populate your library to activate the oracle
+                        </Text>
+                    </div>
+                )}
             </section>
         </div>
     );
