@@ -1,4 +1,3 @@
-
 import { FC, useMemo, useState, useRef, useEffect } from 'react';
 import { IconClose, IconDownload, IconShare, IconCopy } from './icons';
 import type { Theme } from '../types';
@@ -13,12 +12,66 @@ interface ShareDialogProps {
 }
 
 const PRESETS = [
-    { name: 'Brutal Cyan', bg: '#22d3ee', text: '#000000', accent: '#000000' },
-    { name: 'Brutal Yellow', bg: '#facc15', text: '#000000', accent: '#000000' },
-    { name: 'Brutal Pink', bg: '#ec4899', text: '#000000', accent: '#000000' },
-    { name: 'Midnight', bg: '#0b162a', text: '#ffffff', accent: '#22d3ee' },
-    { name: 'Ink', bg: '#1a1a1a', text: '#ffffff', accent: '#facc15' },
-    { name: 'Cloud', bg: '#ffffff', text: '#000000', accent: '#000000' },
+    { 
+        id: 'ruled-college', 
+        name: 'College Ruled', 
+        bg: '#fcfbf9', 
+        text: '#22252a', 
+        accent: '#e11d48', // Red margins
+        lineColor: '#cbdcf7', // Notebook blue
+        font: "'JetBrains Mono', 'Courier New', Courier, monospace",
+        fontStyle: 'normal',
+        pattern: 'ruled',
+        authorFont: "'Lora', Georgia, serif"
+    },
+    { 
+        id: 'ruled-vintage', 
+        name: 'Classic Journal', 
+        bg: '#faf4e8', 
+        text: '#201a15', 
+        accent: '#c2410c', // Elegant orange-red
+        lineColor: '#e4d5be', 
+        font: "'EB Garamond', 'Lora', Georgia, serif", 
+        fontStyle: 'italic',
+        pattern: 'ruled',
+        authorFont: "'Inter', sans-serif"
+    },
+    { 
+        id: 'journal-grid', 
+        name: 'Sakura Grid', 
+        bg: '#fff5f7', 
+        text: '#4a1525', 
+        accent: '#f472b6', 
+        lineColor: '#fbcfe8', 
+        font: "'Lora', Georgia, serif", 
+        fontStyle: 'normal',
+        pattern: 'grid',
+        authorFont: "'JetBrains Mono', monospace"
+    },
+    { 
+        id: 'midnight-terminal', 
+        name: 'Midnight Draft', 
+        bg: '#0a0d16', 
+        text: '#38bdf8', // Neon blue text
+        accent: '#f43f5e', 
+        lineColor: '#1e293b', 
+        font: "'JetBrains Mono', monospace", 
+        fontStyle: 'normal',
+        pattern: 'ruled',
+        authorFont: "'Inter', sans-serif"
+    },
+    { 
+        id: 'minimal-noir', 
+        name: 'Cream Card', 
+        bg: '#fbfbfa', 
+        text: '#000000', 
+        accent: '#000000', 
+        lineColor: '#e5e5e5', 
+        font: "'EB Garamond', 'Lora', Georgia, serif", 
+        fontStyle: 'normal',
+        pattern: 'none',
+        authorFont: "'JetBrains Mono', monospace"
+    }
 ];
 
 const MAX_IMAGE_CHARS = 450;
@@ -41,115 +94,9 @@ const SocialIcon = ({ type }: { type: string }) => {
 const ShareDialog: FC<ShareDialogProps> = ({ text, bookTitle, author, coverImageUrl, theme, onClose }) => {
     const [step, setStep] = useState<'choice' | 'image' | 'social'>('choice');
     const [selectedPreset, setSelectedPreset] = useState(PRESETS[0]);
-    const [layout, setLayout] = useState<'pretty' | 'classic'>('pretty');
     const [widthMode, setWidthMode] = useState<'wide' | 'square'>('wide');
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
-
-    const generatePreview = () => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        const scale = 2; 
-        const w = widthMode === 'wide' ? 800 : 600;
-        const h = layout === 'pretty' ? 450 : 600;
-        
-        canvas.width = w * scale;
-        canvas.height = h * scale;
-        ctx.scale(scale, scale);
-
-        ctx.fillStyle = selectedPreset.bg;
-        ctx.fillRect(0, 0, w, h);
-
-        // Brutalist Border
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 12;
-        ctx.strokeRect(6, 6, w - 12, h - 12);
-
-        const padding = 60;
-        const contentW = w - padding * 2;
-        
-        const truncate = (str: string, maxW: number, font: string) => {
-            ctx.font = font;
-            if (ctx.measureText(str).width <= maxW) return str;
-            let current = str;
-            while (ctx.measureText(current + '...').width > maxW && current.length > 0) {
-                current = current.slice(0, -1);
-            }
-            return current + '...';
-        };
-
-        if (layout === 'pretty') {
-            const coverW = 160;
-            const coverH = 240;
-            const textW = contentW - coverW - 40;
-
-            if (coverImageUrl) {
-                const img = new Image();
-                img.crossOrigin = "anonymous";
-                img.onload = () => {
-                    ctx.save();
-                    // Brutalist Shadow for cover
-                    ctx.fillStyle = '#000000';
-                    ctx.fillRect(w - padding - coverW + 8, (h - coverH) / 2 + 8, coverW, coverH);
-                    
-                    ctx.strokeStyle = '#000000';
-                    ctx.lineWidth = 4;
-                    ctx.drawImage(img, w - padding - coverW, (h - coverH) / 2, coverW, coverH);
-                    ctx.strokeRect(w - padding - coverW, (h - coverH) / 2, coverW, coverH);
-                    ctx.restore();
-                    setPreviewUrl(canvas.toDataURL());
-                };
-                img.src = coverImageUrl;
-            } else {
-                ctx.fillStyle = 'rgba(0,0,0,0.1)';
-                ctx.fillRect(w - padding - coverW, (h - coverH) / 2, coverW, coverH);
-                ctx.strokeStyle = '#000000';
-                ctx.lineWidth = 4;
-                ctx.strokeRect(w - padding - coverW, (h - coverH) / 2, coverW, coverH);
-            }
-
-            ctx.fillStyle = selectedPreset.text;
-            ctx.font = `italic 900 24px 'Inter', sans-serif`;
-            const lines = wrapText(ctx, `“${text}”`, textW);
-            lines.slice(0, 10).forEach((line, i) => {
-                ctx.fillText(line, padding, padding + 40 + (i * 34));
-            });
-
-            const footerY = h - padding;
-            ctx.font = `900 14px 'Inter', sans-serif`;
-            const displayTitle = truncate(bookTitle.toUpperCase(), textW, ctx.font);
-            ctx.fillText(displayTitle, padding, footerY - 20);
-            
-            ctx.font = `700 11px 'Inter', sans-serif`;
-            ctx.globalAlpha = 0.7;
-            const displayAuthor = truncate(author.toUpperCase(), textW, ctx.font);
-            ctx.fillText(displayAuthor, padding, footerY);
-            ctx.globalAlpha = 1;
-
-            // Accent line
-            ctx.fillStyle = selectedPreset.accent || '#000000';
-            ctx.fillRect(padding - 15, padding + 15, 6, 120);
-        } else {
-            ctx.textAlign = 'center';
-            ctx.fillStyle = selectedPreset.text;
-            ctx.font = `italic 900 28px 'Inter', sans-serif`;
-            const lines = wrapText(ctx, `“${text}”`, contentW);
-            const startY = (h / 2) - (lines.length * 40 / 2);
-            lines.forEach((line, i) => {
-                ctx.fillText(line, w / 2, startY + (i * 42));
-            });
-            
-            ctx.font = `900 14px 'Inter', sans-serif`;
-            const footerText = `— ${author}, ${bookTitle} —`.toUpperCase();
-            const displayFooter = truncate(footerText, contentW, ctx.font);
-            ctx.fillText(displayFooter, w / 2, h - padding);
-        }
-
-        setPreviewUrl(canvas.toDataURL());
-    };
 
     const wrapText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number) => {
         const words = text.split(' ');
@@ -169,9 +116,168 @@ const ShareDialog: FC<ShareDialogProps> = ({ text, bookTitle, author, coverImage
         return lines;
     };
 
+    const generatePreview = () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Base width
+        const w = widthMode === 'wide' ? 800 : 640;
+        
+        // Define sizes depending on mode
+        const quoteFontSize = widthMode === 'wide' ? 26 : 22;
+        const authorFontSize = widthMode === 'wide' ? 15 : 13;
+        
+        ctx.font = `${selectedPreset.fontStyle} ${quoteFontSize}px ${selectedPreset.font}`;
+        
+        // Notebook formatting metrics
+        const leftMargin = selectedPreset.pattern === 'ruled' ? 100 : 64;
+        const rightMargin = 64;
+        const contentW = w - leftMargin - rightMargin;
+        
+        // Prepend and append curly quotes as requested
+        const formattedQuoteText = `“${text}”`;
+        const lines = wrapText(ctx, formattedQuoteText, contentW);
+        
+        // Calculate layouts dynamically to ensure 100% safety from overlap
+        const lineSpacing = quoteFontSize + 14; 
+        const textStartY = 110;
+        const quoteHeight = lines.length * lineSpacing;
+        
+        const gapToAttribution = 42;
+        const attributionStartY = textStartY + quoteHeight + gapToAttribution;
+        const paddingBottom = 70;
+        
+        // Total height calculation
+        const h = Math.max(400, attributionStartY + authorFontSize * 2 + 15 + paddingBottom);
+        
+        // Set scale for Retina sharp rendering
+        const scale = 2;
+        canvas.width = w * scale;
+        canvas.height = h * scale;
+        ctx.scale(scale, scale);
+
+        // 1. Background Fill
+        ctx.fillStyle = selectedPreset.bg;
+        ctx.fillRect(0, 0, w, h);
+
+        // 2. Draw ruled notebook lines or grid lines
+        if (selectedPreset.pattern === 'ruled') {
+            ctx.strokeStyle = selectedPreset.lineColor;
+            ctx.lineWidth = 1;
+            
+            // Generate rules all the way down
+            const totalLinesCount = Math.floor(h / lineSpacing) + 2;
+            for (let i = 0; i < totalLinesCount; i++) {
+                const lineY = textStartY + (i * lineSpacing) - 4; 
+                if (lineY > 20 && lineY < h - 45) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, lineY);
+                    ctx.lineTo(w, lineY);
+                    ctx.stroke();
+                }
+            }
+
+            // Draw vertical left notebook red margin line
+            ctx.strokeStyle = selectedPreset.accent;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(leftMargin - 24, 0);
+            ctx.lineTo(leftMargin - 24, h);
+            ctx.stroke();
+        } 
+        else if (selectedPreset.pattern === 'grid') {
+            ctx.strokeStyle = selectedPreset.lineColor;
+            ctx.lineWidth = 0.5;
+            const gridSize = 24;
+            
+            // Vertical
+            for (let x = gridSize; x < w; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, h);
+                ctx.stroke();
+            }
+            // Horizontal
+            for (let y = gridSize; y < h; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(w, y);
+                ctx.stroke();
+            }
+            
+            // Red margin
+            ctx.strokeStyle = selectedPreset.accent;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(leftMargin - 20, 0);
+            ctx.lineTo(leftMargin - 20, h);
+            ctx.stroke();
+        }
+        else {
+            // Minimal frame border box
+            ctx.strokeStyle = selectedPreset.lineColor;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(20, 20, w - 40, h - 40);
+            
+            ctx.fillStyle = selectedPreset.accent;
+            ctx.fillRect(20, 20, 6, 60);
+        }
+
+        // 3. Render Quote Text with exact notebook baseline alignment
+        ctx.fillStyle = selectedPreset.text;
+        ctx.font = `${selectedPreset.fontStyle} ${quoteFontSize}px ${selectedPreset.font}`;
+        ctx.textAlign = 'left';
+
+        if (selectedPreset.pattern === 'ruled') {
+            // Align baseline beautifully directly to notebook lines
+            ctx.textBaseline = 'bottom';
+            lines.forEach((line, i) => {
+                const renderY = textStartY + (i * lineSpacing) - 6;
+                ctx.fillText(line, leftMargin, renderY);
+            });
+        } else {
+            ctx.textBaseline = 'top';
+            lines.forEach((line, i) => {
+                const renderY = textStartY + (i * lineSpacing);
+                ctx.fillText(line, leftMargin, renderY);
+            });
+        }
+
+        // 4. Render minimal source attribution
+        ctx.textBaseline = 'top';
+        const attributionText = `— ${author}`;
+        const sourceText = `from "${bookTitle}"`;
+
+        // Bold pristine Author name
+        ctx.font = `bold ${authorFontSize}px ${selectedPreset.authorFont}`;
+        ctx.fillStyle = selectedPreset.text;
+        ctx.globalAlpha = 0.95;
+        ctx.fillText(attributionText, leftMargin, attributionStartY);
+
+        // Italic subtitle book source
+        ctx.font = `italic ${authorFontSize - 1}px ${selectedPreset.authorFont}`;
+        ctx.globalAlpha = 0.65;
+        ctx.fillText(sourceText, leftMargin + 10, attributionStartY + authorFontSize + 6);
+        ctx.globalAlpha = 1.0;
+
+        // 5. Subtle Branding watermark (Unique to Zizhi)
+        ctx.font = `bold 10px 'JetBrains Mono', monospace`;
+        ctx.fillStyle = selectedPreset.text;
+        ctx.globalAlpha = 0.25;
+        ctx.textAlign = 'right';
+        ctx.fillText('ZIZHI BINDER', w - rightMargin, h - 36);
+        ctx.globalAlpha = 1.0;
+
+        setPreviewUrl(canvas.toDataURL());
+    };
+
     useEffect(() => {
-        if (step === 'image') generatePreview();
-    }, [selectedPreset, layout, widthMode, text, step]);
+        if (step === 'image') {
+            generatePreview();
+        }
+    }, [selectedPreset, widthMode, text, step]);
 
     const handleDownload = () => {
         const link = document.createElement('a');
@@ -203,7 +309,7 @@ const ShareDialog: FC<ShareDialogProps> = ({ text, bookTitle, author, coverImage
         { 
             name: 'Substack', 
             color: '#FF6719',
-            getShareUrl: null // Substack doesn't have a direct share intent for external text
+            getShareUrl: null
         }
     ];
 
@@ -212,155 +318,170 @@ const ShareDialog: FC<ShareDialogProps> = ({ text, bookTitle, author, coverImage
             window.open(platform.getShareUrl(text, author, bookTitle), '_blank');
         } else {
             copyToClipboard();
-            alert(`Link copied! You can now paste this into your ${platform.name} post.`);
         }
     };
 
     return (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-fade-in">
-            <div className="w-full max-w-lg bg-white border-8 border-black shadow-[12px_12px_0_black] flex flex-col relative animate-pop-in">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 md:p-6 bg-black/80 backdrop-blur-md animate-fade-in overflow-y-auto">
+            <div className="w-full max-w-lg bg-white border-8 border-black shadow-[12px_12px_0_black] flex flex-col relative animate-pop-in my-8 max-h-[90vh]">
                 
+                {/* Always-accessible Internal Close Button */}
                 <button 
                     onClick={onClose} 
-                    className="absolute -top-4 -right-4 w-12 h-12 bg-red-500 border-4 border-black text-white flex items-center justify-center shadow-[4px_4px_0_black] hover:translate-y-1 hover:shadow-none transition-all z-50"
+                    className="absolute top-3 right-3 w-10 h-10 bg-red-500 border-4 border-black text-white flex items-center justify-center shadow-[3px_3px_0_black] hover:translate-y-0.5 active:shadow-none transition-all z-50 hover:bg-red-600"
                     aria-label="Close dialog"
                 >
-                    <IconClose className="w-8 h-8" />
+                    <IconClose className="w-5 h-5 font-black" />
                 </button>
 
-                {step === 'choice' && (
-                    <div className="p-10 space-y-10">
-                        <header className="text-center space-y-3">
-                            <h2 className="text-4xl font-black uppercase tracking-tighter italic">Share Insight</h2>
-                            <p className="text-[11px] font-black uppercase text-black/60 tracking-widest">Select your delivery method</p>
-                        </header>
-                        
-                        <div className="grid grid-cols-1 gap-6">
-                            <button 
-                                onClick={() => setStep('image')}
-                                className="group p-8 border-4 border-black bg-cyan-400 shadow-[6px_6px_0_black] hover:translate-y-[-4px] hover:shadow-[10px_10px_0_black] active:translate-y-1 active:shadow-none transition-all flex flex-col items-center gap-4"
-                            >
-                                <IconDownload className="w-10 h-10 text-black" />
-                                <span className="font-black uppercase tracking-widest text-base text-black">Download Visual Frame</span>
-                            </button>
-                            <button 
-                                onClick={() => setStep('social')}
-                                className="group p-8 border-4 border-black bg-white shadow-[6px_6px_0_black] hover:translate-y-[-4px] hover:shadow-[10px_10px_0_black] active:translate-y-1 active:shadow-none transition-all flex flex-col items-center gap-4"
-                            >
-                                <IconShare className="w-10 h-10 text-black" />
-                                <span className="font-black uppercase tracking-widest text-base text-black">Post to Social Hubs</span>
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {step === 'social' && (
-                    <div className="p-8 space-y-8">
-                        <header className="flex items-center justify-between">
-                            <button onClick={() => setStep('choice')} className="text-[12px] font-black uppercase underline hover:text-cyan-600 transition-colors">← Back</button>
-                            <h3 className="text-2xl font-black uppercase italic">Social Hub</h3>
-                            <div className="w-10"></div>
-                        </header>
-                        
-                        <div className="p-6 bg-slate-50 border-4 border-black font-serif italic text-base text-black shadow-inner">
-                            “{text.length > 150 ? text.slice(0, 150) + '...' : text}”
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            {socialPlatforms.map(platform => (
+                <div className="flex-1 overflow-y-auto">
+                    {step === 'choice' && (
+                        <div className="p-6 md:p-10 space-y-8">
+                            <header className="text-center space-y-2 pr-10">
+                                <h2 className="text-3xl font-black uppercase tracking-tighter italic text-left">Share Insight</h2>
+                                <p className="text-[10px] font-black uppercase text-black/60 tracking-widest text-left">Select your sharing medium</p>
+                            </header>
+                            
+                            <div className="grid grid-cols-1 gap-4">
                                 <button 
-                                    key={platform.name}
-                                    onClick={() => handleSocialShare(platform)}
-                                    className="p-5 border-4 border-black font-black uppercase text-[11px] flex items-center justify-between hover:bg-slate-100 active:translate-y-1 transition-all shadow-[2px_2px_0_black]"
-                                    style={{ color: 'black' }}
+                                    onClick={() => setStep('image')}
+                                    className="group p-6 border-4 border-black bg-cyan-400 shadow-[4px_4px_0_black] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_black] active:translate-y-0.5 active:shadow-none transition-all flex flex-col items-center gap-3 text-left"
                                 >
-                                    <span>{platform.name}</span>
-                                    <div className="p-1.5 bg-white border-2 border-black rounded-sm" style={{ color: platform.color }}>
-                                        <SocialIcon type={platform.name} />
-                                    </div>
+                                    <IconDownload className="w-8 h-8 text-black" />
+                                    <span className="font-black uppercase tracking-widest text-sm text-black">Generate Notebook Card</span>
                                 </button>
-                            ))}
+                                <button 
+                                    onClick={() => setStep('social')}
+                                    className="group p-6 border-4 border-black bg-white shadow-[4px_4px_0_black] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_black] active:translate-y-0.5 active:shadow-none transition-all flex flex-col items-center gap-3"
+                                >
+                                    <IconShare className="w-8 h-8 text-black" />
+                                    <span className="font-black uppercase tracking-widest text-sm text-black">Post to Social Hubs</span>
+                                </button>
+                            </div>
                         </div>
+                    )}
 
-                        <button 
-                            onClick={copyToClipboard}
-                            className="w-full py-5 bg-yellow-400 border-4 border-black font-black uppercase tracking-[0.2em] shadow-[6px_6px_0_black] hover:translate-y-[-2px] hover:shadow-[8px_8px_0_black] active:translate-y-1 active:shadow-none transition-all flex items-center justify-center gap-3 text-black text-sm"
-                        >
-                            <IconCopy className="w-5 h-5" /> Copy Insight Text
-                        </button>
-                    </div>
-                )}
+                    {step === 'social' && (
+                        <div className="p-6 md:p-8 space-y-6">
+                            <header className="flex items-center justify-between border-b-2 border-black pb-3 pr-10">
+                                <button onClick={() => setStep('choice')} className="text-[11px] font-black uppercase underline hover:text-cyan-600 transition-colors">← Back</button>
+                                <h3 className="text-lg font-black uppercase italic">Social Hub</h3>
+                                <div className="w-4"></div>
+                            </header>
+                            
+                            <div className="p-5 bg-slate-50 border-4 border-black font-serif italic text-sm text-black shadow-inner max-h-36 overflow-y-auto">
+                                “{text}”
+                            </div>
 
-                {step === 'image' && (
-                    <div className="flex flex-col">
-                        <div className="p-4 border-b-4 border-black flex items-center justify-between bg-white">
-                            <button onClick={() => setStep('choice')} className="text-[12px] font-black uppercase underline hover:text-cyan-600 transition-colors">← Back</button>
-                            <h3 className="text-[12px] font-black uppercase tracking-[0.2em] italic">Visual Customizer</h3>
-                            <div className="w-12"></div>
-                        </div>
-
-                        <div className="p-6 bg-slate-200 border-b-4 border-black flex flex-col items-center justify-center min-h-[300px] relative">
-                            {text.length > MAX_IMAGE_CHARS && (
-                                <div className="absolute inset-0 z-10 bg-red-500/90 flex flex-col items-center justify-center p-8 text-center space-y-4">
-                                    <h4 className="text-2xl font-black uppercase text-white italic tracking-tighter">Text Too Long</h4>
-                                    <p className="text-white font-bold text-sm leading-tight uppercase">
-                                        Visual frames are limited to {MAX_IMAGE_CHARS} characters for optimal impact. 
-                                        Your selection is {text.length} characters.
-                                    </p>
+                            <div className="grid grid-cols-2 gap-3">
+                                {socialPlatforms.map(platform => (
                                     <button 
-                                        onClick={() => setStep('choice')}
-                                        className="px-6 py-3 bg-black text-white border-4 border-black font-black uppercase text-xs shadow-[4px_4px_0_white] hover:translate-y-1 hover:shadow-none transition-all"
+                                        key={platform.name}
+                                        onClick={() => handleSocialShare(platform)}
+                                        className="p-3.5 border-4 border-black font-black uppercase text-[10px] flex items-center justify-between hover:bg-slate-100 active:translate-y-0.5 transition-all shadow-[2px_2px_0_black]"
+                                        style={{ color: 'black' }}
                                     >
-                                        Go Back & Copy Text Instead
+                                        <span>{platform.name}</span>
+                                        <div className="p-1 bg-white border-2 border-black rounded-xs" style={{ color: platform.color }}>
+                                            <SocialIcon type={platform.name} />
+                                        </div>
                                     </button>
-                                </div>
-                            )}
-                            <canvas ref={canvasRef} className="hidden" />
-                            {previewUrl && (
-                                <img src={previewUrl} className="w-full h-auto border-4 border-black shadow-[10px_10px_0_black] bg-white" alt="Preview" />
-                            )}
-                        </div>
-
-                        <div className="p-8 space-y-6 bg-white">
-                            <div className="flex flex-wrap gap-3 justify-center">
-                                {PRESETS.map((p) => (
-                                    <button 
-                                        key={p.name}
-                                        onClick={() => setSelectedPreset(p)}
-                                        className={`w-10 h-10 rounded-none border-4 border-black transition-all ${selectedPreset.name === p.name ? 'scale-110 shadow-[4px_4px_0_black] -translate-y-1' : 'opacity-80 hover:opacity-100 hover:scale-105'}`}
-                                        style={{ backgroundColor: p.bg }}
-                                        title={p.name}
-                                    />
                                 ))}
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <button 
-                                    onClick={() => setLayout(l => l === 'pretty' ? 'classic' : 'pretty')}
-                                    className={`py-4 border-4 border-black font-black uppercase text-[11px] tracking-widest transition-all ${layout === 'pretty' ? 'bg-pink-500 text-white shadow-[4px_4px_0_black] -translate-y-1' : 'bg-white text-black'}`}
-                                    disabled={text.length > MAX_IMAGE_CHARS}
-                                >
-                                    {layout === 'pretty' ? 'Pretty Mode' : 'Classic Mode'}
-                                </button>
-                                <button 
-                                    onClick={() => setWidthMode(w => w === 'wide' ? 'square' : 'wide')}
-                                    className={`py-4 border-4 border-black font-black uppercase text-[11px] tracking-widest transition-all ${widthMode === 'wide' ? 'bg-cyan-400 text-black shadow-[4px_4px_0_black] -translate-y-1' : 'bg-white text-black'}`}
-                                    disabled={text.length > MAX_IMAGE_CHARS}
-                                >
-                                    {widthMode === 'wide' ? 'Wide' : 'Square'}
-                                </button>
-                            </div>
-
                             <button 
-                                onClick={handleDownload}
-                                disabled={text.length > MAX_IMAGE_CHARS}
-                                className={`w-full py-5 font-black uppercase tracking-[0.2em] text-sm border-4 border-black transition-all flex items-center justify-center gap-3 ${text.length > MAX_IMAGE_CHARS ? 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-50' : 'bg-black text-white shadow-[6px_6px_0_cyan] hover:translate-y-[-2px] hover:shadow-[8px_8px_0_cyan] active:translate-y-1 active:shadow-none'}`}
+                                onClick={copyToClipboard}
+                                className="w-full py-4 bg-yellow-400 border-4 border-black font-black uppercase tracking-widest shadow-[4px_4px_0_black] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_black] active:translate-y-0.5 active:shadow-none transition-all flex items-center justify-center gap-2 text-black text-xs"
                             >
-                                <IconDownload className="w-5 h-5" /> Export Final Frame
+                                <IconCopy className="w-4 h-4" /> Copy Quote Text
                             </button>
                         </div>
-                    </div>
-                )}
+                    )}
+
+                    {step === 'image' && (
+                        <div className="flex flex-col">
+                            <div className="p-4 border-b-4 border-black flex items-center justify-between bg-white pr-12 shrink-0">
+                                <button onClick={() => setStep('choice')} className="text-[11px] font-black uppercase underline hover:text-cyan-600 transition-colors">← Back</button>
+                                <h3 className="text-[11px] font-black uppercase tracking-widest italic text-center">Visual Customizer</h3>
+                                <div className="w-4"></div>
+                            </div>
+
+                            {/* Canvas Preview Box */}
+                            <div className="p-4 bg-slate-200 border-b-4 border-black flex flex-col items-center justify-center min-h-[220px] max-h-[300px] overflow-y-auto relative">
+                                {text.length > MAX_IMAGE_CHARS && (
+                                    <div className="absolute inset-0 z-10 bg-red-500/90 flex flex-col items-center justify-center p-6 text-center space-y-3">
+                                        <h4 className="text-xl font-black uppercase text-white italic tracking-tighter">Text Too Long</h4>
+                                        <p className="text-white font-bold text-xs leading-snug uppercase max-w-xs">
+                                            Visual cards are limited to {MAX_IMAGE_CHARS} characters for notebook readability. 
+                                            Yours is {text.length}.
+                                        </p>
+                                        <button 
+                                            onClick={() => setStep('choice')}
+                                            className="px-4 py-2.5 bg-black text-white border-4 border-black font-black uppercase text-[10px] shadow-[3px_3px_0_white] hover:translate-y-0.5 hover:shadow-none transition-all"
+                                        >
+                                            Go Back & Copy Text Instead
+                                        </button>
+                                    </div>
+                                )}
+                                <canvas ref={canvasRef} className="hidden" />
+                                {previewUrl && (
+                                    <img src={previewUrl} className="w-full h-auto border-4 border-black shadow-[6px_6px_0_black] bg-white max-h-[240px] object-contain" alt="Notebook card preview" />
+                                )}
+                            </div>
+
+                            {/* Options controls */}
+                            <div className="p-5 space-y-4 bg-white">
+                                {/* Preset circles/squares */}
+                                <div className="flex flex-col gap-1.5">
+                                    <span className="text-[9px] uppercase tracking-wider font-sans font-black text-black/60 block text-center">
+                                        Paper Type presets
+                                    </span>
+                                    <div className="flex flex-wrap gap-2 justify-center">
+                                        {PRESETS.map((p) => (
+                                            <button 
+                                                key={p.name}
+                                                onClick={() => setSelectedPreset(p)}
+                                                className={`px-2.5 py-1.5 rounded-none border-2 border-black font-black uppercase text-[9px] tracking-wider transition-all ${selectedPreset.id === p.id ? 'bg-yellow-300 shadow-[2px_2px_0_black] -translate-y-0.5' : 'bg-transparent text-black/70 hover:text-black hover:border-black'}`}
+                                                style={{ borderLeftColor: p.accent, borderLeftWidth: '4px' }}
+                                                title={p.name}
+                                            >
+                                                {p.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-2">
+                                    <div className="flex items-center justify-between border-t border-black/10 pt-2.5">
+                                        <span className="text-[9px] uppercase font-black text-black/50">Width Mode:</span>
+                                        <div className="flex gap-1">
+                                            <button 
+                                                onClick={() => setWidthMode('wide')}
+                                                className={`px-3 py-1 border-2 border-black text-[9px] font-black uppercase ${widthMode === 'wide' ? 'bg-black text-white' : 'bg-transparent text-black'}`}
+                                            >
+                                                Wide (800px)
+                                            </button>
+                                            <button 
+                                                onClick={() => setWidthMode('square')}
+                                                className={`px-3 py-1 border-2 border-black text-[9px] font-black uppercase ${widthMode === 'square' ? 'bg-black text-white' : 'bg-transparent text-black'}`}
+                                            >
+                                                Square (640px)
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button 
+                                    onClick={handleDownload}
+                                    disabled={text.length > MAX_IMAGE_CHARS}
+                                    className={`w-full py-3.5 font-black uppercase tracking-widest text-xs border-4 border-black transition-all flex items-center justify-center gap-2 ${text.length > MAX_IMAGE_CHARS ? 'bg-gray-150 text-gray-400 cursor-not-allowed opacity-50' : 'bg-black text-white shadow-[4px_4px_0_cyan] hover:translate-y-[-1px] hover:shadow-[5px_5px_0_cyan] active:translate-y-0.5 active:shadow-none'}`}
+                                >
+                                    <IconDownload className="w-4 h-4" /> Export Notebook Page
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

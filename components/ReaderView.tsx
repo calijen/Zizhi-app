@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { Box, Group, Stack, Text, ActionIcon, ScrollArea, Transition, Loader, Center } from '@mantine/core';
 import type { Book, Chapter, Theme, Quote, Note } from '../types';
-import { IconChevronLeft, IconMenu, IconClose, IconPlus, IconMinus } from './icons';
+import { IconChevronLeft, IconMenu, IconClose, IconPlus, IconMinus, IconSettings } from './icons';
 import TextSelectionPopup from './TextSelectionPopup';
 import PdfPage from './PdfPage';
 import ShareDialog from './ShareDialog';
@@ -22,14 +22,67 @@ interface ReaderViewProps {
     onSaveNote: (text: string, note: string, chapterId: string) => void;
     onSearch: (query: string) => void;
     onFontSizeChange?: (newSize: number) => void;
+    onThemeChange?: (newTheme: Theme) => void;
 }
 
 const ChapterContent = memo(({ html, id, className }: { html: string, id: string, className: string }) => (
     <div dangerouslySetInnerHTML={{ __html: html }} className={className} />
 ));
 
-const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, initialChapterId, initialSearchText, onClose, onUpdateProgress, onSaveQuote, onSaveNote, onSearch, onFontSizeChange }) => {
+const FONTS_INLINE = [
+    { name: 'Print Serif', sans: 'Inter', serif: 'Gentium Book Plus' },
+    { name: 'Modern Serif', sans: 'Inter', serif: 'Gentium Book Plus' },
+    { name: 'Clean Sans', sans: 'Inter', serif: 'Inter' }
+];
+
+const ATMOSPHERES_INLINE = [
+    {
+        id: 'warm', name: 'Warm',
+        colors: { 
+          'primary': '#a0522d', 
+          'secondary': '#5d3d2a', 
+          'background': '#fdf6e3', 
+          'surface': '#f5efdc', 
+          'primary-text': '#1a110a', 
+          'secondary-text': '#3a2a1a', 
+          'muted-text': '#5a4334', 
+          'border-color': '#c1b496' 
+        },
+        font: FONTS_INLINE[0], fontSize: 1.3, lineHeight: 1.6, texture: 'paper', readingMode: 'scroll' as const
+    },
+    {
+        id: 'quiet', name: 'Quiet',
+        colors: { 
+          'primary': '#111111', 
+          'secondary': '#222222', 
+          'background': '#ffffff', 
+          'surface': '#f3f3f3', 
+          'primary-text': '#000000', 
+          'secondary-text': '#333333', 
+          'muted-text': '#666666', 
+          'border-color': '#000000' 
+        },
+        font: FONTS_INLINE[0], fontSize: 1.2, lineHeight: 1.9, texture: 'none', readingMode: 'scroll' as const
+    },
+    {
+        id: 'nocturne', name: 'Night',
+        colors: { 
+          'primary': '#00d1ff', 
+          'secondary': '#ffffff', 
+          'background': '#0a0a0b', 
+          'surface': '#1a1a1c', 
+          'primary-text': '#ffffff', 
+          'secondary-text': '#d1d1d1', 
+          'muted-text': '#999999', 
+          'border-color': '#333333' 
+        },
+        font: FONTS_INLINE[2], fontSize: 1.15, lineHeight: 1.7, texture: 'none', readingMode: 'scroll' as const
+    }
+];
+
+const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, initialChapterId, initialSearchText, onClose, onUpdateProgress, onSaveQuote, onSaveNote, onSearch, onFontSizeChange, onThemeChange }) => {
     const [currentChapterIndex, setCurrentChapterIndex] = useState(0);
+    const [showReaderSettings, setShowReaderSettings] = useState(false);
     const [showToc, setShowToc] = useState(false);
     const [sidebarTab, setSidebarTab] = useState<'chapters' | 'highlights'>('chapters');
     const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1280);
@@ -507,6 +560,20 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
                         </ActionIcon>
                     </Box>
                 )}
+
+                {/* Floating Settings Trigger */}
+                <Box className="fixed bottom-8 left-6 md:bottom-12 md:left-12 z-[1200]">
+                    <ActionIcon 
+                        size={48}
+                        variant="filled" 
+                        color="yellow" 
+                        onClick={() => setShowReaderSettings(prev => !prev)}
+                        className="border-2 border-black rounded-none shadow-[4px_4px_0_black] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none hover:bg-yellow-400 transition-all"
+                        title="Reader Settings"
+                    >
+                        <IconSettings className="w-5 h-5 text-black" />
+                    </ActionIcon>
+                </Box>
             </Box>
 
             {selection && (
@@ -630,6 +697,143 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
             </Transition>
 
             {showShareDialog && <ShareDialog text={showShareDialog} bookTitle={book.title} author={book.author} coverImageUrl={book.coverImageUrl} theme={theme} onClose={() => setShowShareDialog(null)} />}
+
+            {/* Inline Reader Settings Popup */}
+            {showReaderSettings && (
+                <Box className="fixed bottom-20 left-6 md:bottom-28 md:left-12 z-[1400] w-[calc(100%-3rem)] sm:w-80 border-4 border-black p-5 shadow-[8px_8px_0_black] animate-pop-in" style={{ backgroundColor: 'var(--bg-color)' }}>
+                    <div className="flex items-center justify-between pb-2 border-b-2 border-black mb-4">
+                        <span className="font-sans uppercase tracking-wider text-[11px] font-black text-[var(--text-color)]">
+                            Format Settings
+                        </span>
+                        <button 
+                            onClick={() => setShowReaderSettings(false)} 
+                            className="p-1 border border-black bg-[var(--bg-color)] shadow-[1px_1px_0_black] active:translate-y-0.5 active:shadow-none transition-all hover:bg-red-400"
+                        >
+                            <IconClose className="w-3.5 h-3.5 text-[var(--text-color)] font-bold pointer-events-none" />
+                        </button>
+                    </div>
+
+                    {/* Presets */}
+                    <div className="mb-4">
+                        <label className="text-[10px] uppercase tracking-wider font-sans font-black text-[var(--sec-text)] block mb-1.5">
+                            Atmosphere
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {ATMOSPHERES_INLINE.map((atm) => {
+                                const isSelected = theme.id === atm.id;
+                                return (
+                                    <button
+                                        key={atm.id}
+                                        onClick={() => {
+                                            if (onThemeChange) {
+                                                onThemeChange({
+                                                    ...theme,
+                                                    id: atm.id,
+                                                    colors: atm.colors,
+                                                    name: atm.name,
+                                                    texture: atm.texture
+                                                });
+                                            }
+                                        }}
+                                        className={`py-1.5 px-1 border-2 text-center text-[9px] font-black uppercase tracking-wider transition-all ${
+                                            isSelected 
+                                                ? 'bg-yellow-300 border-black shadow-[2px_2px_0_black] text-black' 
+                                                : 'bg-transparent border-black/20 text-[var(--text-color)] hover:border-black'
+                                        }`}
+                                    >
+                                        {atm.name}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Text Size Controls */}
+                    <div className="mb-4">
+                        <div className="flex justify-between items-center mb-1">
+                            <label className="text-[10px] uppercase tracking-wider font-sans font-black text-[var(--sec-text)]">
+                                Text Size
+                            </label>
+                            <span className="text-[9px] font-bold bg-black text-white px-1.5 py-0.5">
+                                {Math.round((theme.fontSize || 1.15) * 100)}%
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => {
+                                    const nextSize = parseFloat(Math.max(0.8, (theme.fontSize || 1.2) - 0.05).toFixed(2));
+                                    if (onThemeChange) {
+                                        onThemeChange({ ...theme, fontSize: nextSize });
+                                    } else if (onFontSizeChange) {
+                                        onFontSizeChange(nextSize);
+                                    }
+                                }}
+                                className="w-8 h-8 flex items-center justify-center border-2 border-black bg-transparent hover:bg-black/5 font-extrabold text-lg text-[var(--text-color)] active:translate-y-0.5"
+                            >
+                                -
+                            </button>
+                            <div className="flex-1 text-center font-bold text-[10px] text-[var(--text-color)] uppercase tracking-tighter leading-tight line-clamp-1">
+                                {theme.font ? theme.font.name : 'Serif'}
+                            </div>
+                            <button
+                                onClick={() => {
+                                    const nextSize = parseFloat(Math.min(2.0, (theme.fontSize || 1.2) + 0.05).toFixed(2));
+                                    if (onThemeChange) {
+                                        onThemeChange({ ...theme, fontSize: nextSize });
+                                    } else if (onFontSizeChange) {
+                                        onFontSizeChange(nextSize);
+                                    }
+                                }}
+                                className="w-8 h-8 flex items-center justify-center border-2 border-black bg-transparent hover:bg-black/5 font-extrabold text-lg text-[var(--text-color)] active:translate-y-0.5"
+                            >
+                                +
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Line height controls */}
+                    <div className="mb-2">
+                        <div className="flex justify-between items-center mb-1">
+                            <label className="text-[10px] uppercase tracking-wider font-sans font-black text-[var(--sec-text)]">
+                                Line Spacing
+                            </label>
+                            <span className="text-[9px] font-bold bg-black text-white px-1.5 py-0.5">
+                                {theme.lineHeight || 1.6}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => {
+                                    const nextHeight = parseFloat(Math.max(1.4, (theme.lineHeight || 1.6) - 0.1).toFixed(1));
+                                    if (onThemeChange) {
+                                        onThemeChange({ ...theme, lineHeight: nextHeight });
+                                    }
+                                }}
+                                className="w-8 h-8 flex items-center justify-center border-2 border-black bg-transparent hover:bg-black/5 font-extrabold text-lg text-[var(--text-color)] active:translate-y-0.5"
+                            >
+                                -
+                            </button>
+                            <div className="flex-1 h-2 bg-black/10 rounded-none overflow-hidden relative">
+                                <div 
+                                    className="h-full bg-cyan-400" 
+                                    style={{ width: `${Math.max(0, Math.min(100, (((theme.lineHeight || 1.6) - 1.4) / (2.8 - 1.4)) * 100))}%` }} 
+                                />
+                            </div>
+                            <button
+                                onClick={() => {
+                                    const nextHeight = parseFloat(Math.min(2.8, (theme.lineHeight || 1.6) + 0.1).toFixed(1));
+                                    if (onThemeChange) {
+                                        onThemeChange({ ...theme, lineHeight: nextHeight });
+                                    }
+                                }}
+                                className="w-8 h-8 flex items-center justify-center border-2 border-black bg-transparent hover:bg-black/5 font-extrabold text-lg text-[var(--text-color)] active:translate-y-0.5"
+                            >
+                                +
+                            </button>
+                        </div>
+                    </div>
+                </Box>
+            )}
 
             <style>{`
                 .epub-content { 

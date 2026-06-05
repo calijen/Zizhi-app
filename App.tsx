@@ -14,6 +14,7 @@ import LandingView from './components/LandingView';
 import QuoteChat from './components/QuoteChat';
 import Toast from './components/Toast';
 import ReloadPrompt from './components/ReloadPrompt';
+import SearchSidebar from './components/SearchSidebar';
 import { Logo, LogoIcon, IconSettings, IconUser, IconLibrary, IconQuote, IconUpload, IconLayoutGrid, IconLayoutList, IconSpinner, IconMenu, IconNote } from './components/icons';
 import * as db from './db';
 import { auth, signInWithGoogle, logout as firebaseLogout, db as firestore, handleFirestoreError, OperationType } from './firebase';
@@ -112,6 +113,7 @@ const App: FC = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [generationStatuses, setGenerationStatuses] = useState<Record<string, GenerationStatus>>({});
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const updateStreak = useCallback(() => {
@@ -514,17 +516,14 @@ const App: FC = () => {
                   <NavItem tab="profile" activeTab={activeTab} onSelect={setActiveTab} icon={IconUser} label="Profile" collapsed={isSidebarCollapsed} />
                   <NavItem tab="settings" activeTab={activeTab} onSelect={setActiveTab} icon={IconSettings} label="Settings" collapsed={isSidebarCollapsed} />
               </nav>
-              <div className={`${isSidebarCollapsed ? 'p-2' : 'p-8'} border-t-2 border-black opacity-30 overflow-hidden whitespace-nowrap`}>
-                <Text className="text-[10px] font-black uppercase text-[var(--color-primary-text)]">{isSidebarCollapsed ? 'v4.2' : 'Zizhi v4.2'}</Text>
-              </div>
+
           </aside>
           <Box className="flex-1 flex flex-col h-full overflow-hidden relative">
               <header className="h-16 md:h-20 bg-[var(--color-surface)] z-[100] px-8 flex items-center justify-between border-b-4 border-black">
                   <div className="flex items-center gap-4">
                     <div className="md:hidden"><Logo /></div>
                     <div className="hidden md:flex items-center gap-10">
-                        <Text className="text-[10px] font-black uppercase tracking-widest text-[var(--color-muted-text)]">Theme: {theme.name} v5.0</Text>
-                        {user && <Box className="bg-cyan-400 px-3 py-1 border-2 border-black shadow-[2px_2px_0_black]"><Text className="text-[9px] font-black uppercase text-black">Cloud Sync Active</Text></Box>}
+                        <Text className="text-[10px] font-black uppercase tracking-widest text-[var(--color-muted-text)]">Theme: {theme.name}</Text>
                     </div>
                   </div>
                   <Group gap="md">
@@ -532,10 +531,10 @@ const App: FC = () => {
                       variant="subtle" 
                       color="gray" 
                       size="lg" 
-                      onClick={() => setActiveTab('settings')} 
+                      onClick={() => setActiveTab('profile')} 
                       className="md:hidden border-2 border-black shadow-[2px_2px_0_black] bg-[var(--color-background)] rounded-none"
                     >
-                        <IconSettings className="w-5 h-5 text-[var(--color-primary-text)]" />
+                        <IconUser className="w-5 h-5 text-[var(--color-primary-text)]" />
                     </ActionIcon>
                     <ActionIcon 
                       variant="subtle" 
@@ -638,7 +637,7 @@ const App: FC = () => {
                         </>
                     </Box>
                 <NavItem tab="notes" activeTab={activeTab} onSelect={setActiveTab} icon={IconNote} label="Notes" />
-                <NavItem tab="profile" activeTab={activeTab} onSelect={setActiveTab} icon={IconUser} label="Profile" />
+                <NavItem tab="settings" activeTab={activeTab} onSelect={setActiveTab} icon={IconSettings} label="Settings" />
             </nav>
           )}
           {selectedBook && <ReaderView 
@@ -699,8 +698,12 @@ const App: FC = () => {
               }
               setNotes(prev => [nn, ...prev]); 
               setToast({ message: "Note saved." }); 
-          }} onSearch={() => {}} onFontSizeChange={(newSize) => setTheme(prev => {
+          }} onSearch={(queryText) => setSearchQuery(queryText)} onFontSizeChange={(newSize) => setTheme(prev => {
               const next = { ...prev, fontSize: newSize };
+              localStorage.setItem('zizhi-theme', JSON.stringify(next));
+              return next;
+          })} onThemeChange={(newTheme) => setTheme(prev => {
+              const next = { ...prev, ...newTheme };
               localStorage.setItem('zizhi-theme', JSON.stringify(next));
               return next;
           })} />}
@@ -716,6 +719,12 @@ const App: FC = () => {
           <AnimatePresence>
             {isChatOpen && (
               <QuoteChat quotes={quotes} onClose={() => setIsChatOpen(false)} />
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {searchQuery && (
+              <SearchSidebar query={searchQuery} theme={theme} onClose={() => setSearchQuery(null)} />
             )}
           </AnimatePresence>
 
