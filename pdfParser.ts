@@ -78,6 +78,19 @@ export const parsePdf = async (file: File): Promise<Book> => {
         console.error("Failed to extract PDF cover", e);
     }
 
+    const guessGenre = (title: string): string => {
+        const t = title.toLowerCase();
+        if (t.includes('philosoph') || t.includes('ethics') || t.includes('metaphysic') || t.includes('plato') || t.includes('aristotle') || t.includes('nietzsch') || t.includes('kant') || t.includes('socrates') || t.includes('stoic') || t.includes('marcus aurelius') || t.includes('epictetus') || t.includes('seneca')) return 'Philosophy';
+        if (t.includes('history') || t.includes('empire') || t.includes('war') || t.includes('ancient') || t.includes('world') || t.includes('roman') || t.includes('gree') || t.includes('dynasty') || t.includes('revolution')) return 'History';
+        if (t.includes('science') || t.includes('physic') || t.includes('cosmology') || t.includes('quantum') || t.includes('biolog') || t.includes('evolut') || t.includes('math') || t.includes('astronomy') || t.includes('chemistry')) return 'Science';
+        if (t.includes('novel') || t.includes('fiction') || t.includes('tale') || t.includes('story') || t.includes('poetry') || t.includes('poem') || t.includes('drama') || t.includes('play')) return 'Literature';
+        if (t.includes('politic') || t.includes('state') || t.includes('republic') || t.includes('democrat') || t.includes('governm') || t.includes('sovereign')) return 'Political Science';
+        if (t.includes('psycholog') || t.includes('mind') || t.includes('brain') || t.includes('cognit') || t.includes('behavior')) return 'Psychology';
+        if (t.includes('sociolog') || t.includes('society') || t.includes('culture') || t.includes('anthropolog')) return 'Sociology';
+        if (t.includes('econom') || t.includes('wealth') || t.includes('market') || t.includes('finance') || t.includes('capital')) return 'Economics';
+        return '';
+    };
+
     return {
         id: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Math.random().toString(36).substring(2),
         title,
@@ -89,7 +102,7 @@ export const parsePdf = async (file: File): Promise<Book> => {
         lastScrollTop: 0,
         readingTime: 0,
         lastOpened: Date.now(),
-        genre: 'PDF Document',
+        genre: guessGenre(title) || 'PDF Document',
         isPdf: true,
         pdfData: pdfData
     };

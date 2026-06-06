@@ -20,7 +20,7 @@ import * as db from './db';
 import { auth, signInWithGoogle, logout as firebaseLogout, db as firestore, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, setDoc, getDoc, collection, getDocs, query, where, writeBatch, deleteDoc } from 'firebase/firestore';
-import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { getStorage, ref, uploadBytesResumable, getDownloadURL, getBlob } from 'firebase/storage';
 import type { Book, BookMetadata, BookContent, Quote, Note, Theme, ThemeFont, GenerationStatus } from './types';
 import { parseEpub } from './epubParser';
 import { parsePdf } from './pdfParser';
@@ -175,20 +175,38 @@ const App: FC = () => {
           localBooks.forEach(b => mergedBooksMap.set(b.id, b));
           cloudBooks.forEach(cb => {
               const existing = mergedBooksMap.get(cb.id);
-              if (!existing || (cb.lastOpened || 0) > (existing.lastOpened || 0)) {
-                  mergedBooksMap.set(cb.id, { ...existing, ...cb });
-                  // If cloud is newer, reflect in local DB (metadata only)
-                  if (!existing || (cb.lastOpened || 0) > (existing.lastOpened || 0)) {
-                      (async () => {
-                          const content = await db.getBookContent(cb.id);
-                          if (content) {
-                              await db.saveBook({ ...cb, ...content });
-                          }
-                      })();
-                  }
+              if (!existing) {
+                  mergedBooksMap.set(cb.id, cb);
+              } else {
+                  // Merge: prioritize newer timestamps, but ALWAYS preserve fileUrl & storagePath if present in cloud
+                  const newer = (cb.lastOpened || 0) > (existing.lastOpened || 0) ? cb : existing;
+                  mergedBooksMap.set(cb.id, {
+                      ...existing,
+                      ...cb,
+                      ...newer,
+                      fileUrl: cb.fileUrl || existing.fileUrl,
+                      storagePath: cb.storagePath || existing.storagePath,
+                      fileName: cb.fileName || existing.fileName,
+                  });
               }
           });
           const mergedBooks = Array.from(mergedBooksMap.values());
+
+          // Asynchronously persist new/merged book metadata, quotes and notes back to IndexedDB so they are available offline!
+          mergedBooks.forEach(async (b) => {
+              const existingLocal = localBooks.find(lb => lb.id === b.id);
+              if (!existingLocal) {
+                  // Save new book metadata to IndexedDB
+                  await db.saveBook({
+                      ...b,
+                      chapters: [],
+                      toc: []
+                  });
+              } else if (JSON.stringify(existingLocal) !== JSON.stringify(b)) {
+                  // Update metadata safely
+                  await db.updateBookMetadata(b.id, b);
+              }
+          });
 
           // Intelligent merge for quotes/notes
           const mergedQuotesMap = new Map<string, Quote>();
@@ -199,9 +217,26 @@ const App: FC = () => {
           localNotes.forEach(n => mergedNotesMap.set(n.id, n));
           cloudNotes.forEach(cn => mergedNotesMap.set(cn.id, cn));
 
+          const mergedQuotes = Array.from(mergedQuotesMap.values());
+          const mergedNotes = Array.from(mergedNotesMap.values());
+
+          mergedQuotes.forEach(async (q) => {
+              const existingLocal = localQuotes.find(lq => lq.id === q.id);
+              if (!existingLocal) {
+                  await db.saveQuote(q);
+              }
+          });
+
+          mergedNotes.forEach(async (n) => {
+              const existingLocal = localNotes.find(ln => ln.id === n.id);
+              if (!existingLocal) {
+                  await db.saveNote(n);
+              }
+          });
+
           setLibrary(mergedBooks);
-          setQuotes(Array.from(mergedQuotesMap.values()));
-          setNotes(Array.from(mergedNotesMap.values()));
+          setQuotes(mergedQuotes);
+          setNotes(mergedNotes);
           
           if (mergedBooks.length > 0) {
               setHasEntered(true);
@@ -279,6 +314,20 @@ const App: FC = () => {
             newBook.type = 'epub';
             newBook.isPdf = false;
         }
+
+        // Check if book already exists in library based on title and author
+        const isDuplicate = library.some(b => 
+            b.title.trim().toLowerCase() === newBook.title.trim().toLowerCase() && 
+            b.author.trim().toLowerCase() === newBook.author.trim().toLowerCase()
+        );
+
+        if (isDuplicate) {
+            setToast({ message: `"${newBook.title}" has already been uploaded.` });
+            setIsUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            return;
+        }
+
         newBook.lastOpened = Date.now();
 
         // Save locally first for instant access
@@ -297,12 +346,24 @@ const App: FC = () => {
         if (user) {
             (async () => {
                 try {
-                    const storageRef = ref(getStorage(), `users/${user.uid}/books/${newBook.id}/${file.name}`);
+                    const storagePath = `users/${user.uid}/books/${newBook.id}/${file.name}`;
+                    const storageRef = ref(getStorage(), storagePath);
                     await uploadBytesResumable(storageRef, file);
                     const fileUrl = await getDownloadURL(storageRef);
                     
                     const bookRef = doc(firestore, 'users', user.uid, 'books', newBook.id);
-                    await setDoc(bookRef, { ...metadata, userId: user.uid, fileUrl, createdAt: Date.now() });
+                    await setDoc(bookRef, { 
+                        ...metadata, 
+                        userId: user.uid, 
+                        fileUrl, 
+                        storagePath,
+                        fileName: file.name,
+                        createdAt: Date.now() 
+                    });
+
+                    // Update local library state and local IndexedDB with cloud-synced fields
+                    setLibrary(prev => prev.map(b => b.id === newBook.id ? { ...b, fileUrl, storagePath, fileName: file.name } : b));
+                    await db.updateBookMetadata(newBook.id, { fileUrl, storagePath, fileName: file.name });
                 } catch (err) {
                     console.error("Background cloud sync failed", err);
                 }
@@ -324,11 +385,32 @@ const App: FC = () => {
     try {
         let content = await db.getBookContent(bookId);
         
-        if (!content && meta.fileUrl) {
+        if (!content && (meta.storagePath || meta.fileUrl)) {
             setToast({ message: "Syncing book content from cloud..." });
             try {
-                const response = await fetch(meta.fileUrl);
-                const blob = await response.blob();
+                let blob: Blob;
+                // Try SDK-based getBlob which handles Firebase auth and CORS policy natively
+                if (user && (meta.storagePath || meta.fileName)) {
+                    try {
+                        const path = meta.storagePath || `users/${user.uid}/books/${meta.id}/${meta.fileName || meta.title}`;
+                        const storageRef = ref(getStorage(), path);
+                        blob = await getBlob(storageRef);
+                    } catch (storageErr) {
+                        console.warn("getBlob failed, falling back to direct fetch", storageErr);
+                        if (meta.fileUrl) {
+                            const response = await fetch(meta.fileUrl);
+                            blob = await response.blob();
+                        } else {
+                            throw storageErr;
+                        }
+                    }
+                } else if (meta.fileUrl) {
+                    const response = await fetch(meta.fileUrl);
+                    blob = await response.blob();
+                } else {
+                    throw new Error("No download path or URL available");
+                }
+
                 const file = new File([blob], meta.title, { type: meta.type === 'pdf' ? 'application/pdf' : 'application/epub+zip' });
                 
                 let downloadedBook: Book;
@@ -571,7 +653,11 @@ const App: FC = () => {
                               if (content) {
                                   setInitialReaderNav({ chapterId: q.location, searchText: q.text });
                                   setSelectedBook({ ...meta, ...content });
+                              } else {
+                                  setToast({ message: "Book content is missing." });
                               }
+                          } else {
+                              setToast({ message: "Preserved quote from a book since deleted from your library." });
                           }
                       }} />}
                       {activeTab === 'notes' && <NotesView theme={theme} notes={notes} library={library} onDelete={(id) => { db.deleteNote(id).then(() => setNotes(prev => prev.filter(n => n.id !== id))); }} onGoToNote={async (n) => { 
@@ -581,7 +667,11 @@ const App: FC = () => {
                               if (content) {
                                   setInitialReaderNav({ chapterId: n.location, searchText: n.text });
                                   setSelectedBook({ ...meta, ...content });
+                              } else {
+                                  setToast({ message: "Book content is missing." });
                               }
+                          } else {
+                              setToast({ message: "Preserved note from a book since deleted from your library." });
                           }
                       }} />}
                       {activeTab === 'profile' && <ProfileView user={user} streak={streak} library={library} onShowAuth={() => setIsAuthModalOpen(true)} activity={[]} onSignOut={async () => { await firebaseLogout(); setUser(null); }} />}
