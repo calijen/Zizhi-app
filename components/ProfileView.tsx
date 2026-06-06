@@ -391,7 +391,7 @@ You must return a valid JSON object ONLY. Do not output any thinking block, comm
             }
         };
         getProfileAnalysis();
-    }, [library, cacheKey]);
+    }, [cacheKey]);
 
     if (!user) {
         return (

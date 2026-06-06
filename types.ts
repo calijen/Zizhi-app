@@ -75,6 +75,8 @@ export interface BookMetadata {
     isPdf?: boolean;
     fileUrl?: string;
     type?: 'pdf' | 'epub';
+    storagePath?: string;
+    fileName?: string;
 }
 
 export interface BookContent {
