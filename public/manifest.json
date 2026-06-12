@@ -1,7 +1,7 @@
 {
-  "name": "Zizhi Premium Reader",
+  "name": "Zizhi Premium Online Reading App",
   "short_name": "Zizhi",
-  "description": "An elegant, focused EPUB reader with a beautiful minimal design and AI-powered synthesis.",
+  "description": "An elegant, responsive online reading app for EPUB and PDF e-books with notes, annotations, and smart card-review.",
   "start_url": "/",
   "id": "com.zizhi.reader.v1",
   "display": "standalone",
