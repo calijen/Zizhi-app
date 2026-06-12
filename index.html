@@ -14,7 +14,53 @@
     <meta name="apple-mobile-web-app-title" content="Zizhi" />
     <link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAMAAABlS4L/AAAAA1BMVEX///+nxBvIAAAALElEQVR4nO3BMQEAAADCoPVPbQwfoAAAAAAAAAAAAAAAAAAAAAAAAAAA4GfNTAABmH53PwAAAABJRU5ErkJggg==" />
     
-    <title>Zizhi — Premium Reader</title>
+    <title>Zizhi — Premium Online Reading App | Free EPUB & PDF Reader</title>
+    <meta name="description" content="Zizhi is an elegant, free online reading app and e-book manager. Read, annotate, and review EPUB & PDF books seamlessly with automatic cloud syncing, customized typography, and smart review tools." />
+    <meta name="keywords" content="online reading app, epub reader online, pdf reader online, read books online, web book reader, epub viewer, digital library, academic annotations, note taking app for books, offline book reader" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://zizhi.vercel.app" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://zizhi.vercel.app" />
+    <meta property="og:title" content="Zizhi — Premium Online Reading App | Free EPUB & PDF Reader" />
+    <meta property="og:description" content="Zizhi is an elegant, free online reading app and e-book manager. Read, annotate, and review EPUB & PDF books seamlessly with automatic cloud syncing, customized typography, and smart review tools." />
+    <meta property="og:image" content="https://zizhi.vercel.app/logo.svg" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://zizhi.vercel.app" />
+    <meta property="twitter:title" content="Zizhi — Premium Online Reading App | Free EPUB & PDF Reader" />
+    <meta property="twitter:description" content="Zizhi is an elegant, free online reading app and e-book manager. Read, annotate, and review EPUB & PDF books seamlessly with automatic cloud syncing, customized typography, and smart review tools." />
+    <meta property="twitter:image" content="https://zizhi.vercel.app/logo.svg" />
+
+    <!-- Schema.org WebApplication structured data for major search engine index crawlers -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Zizhi",
+      "alternateName": "Zizhi E-Book Reader",
+      "url": "https://zizhi.vercel.app",
+      "description": "An elegant, vintage-inspired online reading app. Read, annotate, and study your EPUB and PDF files with features like offline library storage, cloud sync, automated summaries, flashcards, visual themes, and an AI learning companion.",
+      "applicationCategory": "EducationalApplication, ReferenceApplication",
+      "operatingSystem": "All",
+      "browserRequirements": "Requires JavaScript. Requires HTML5.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0.00",
+        "priceCurrency": "USD"
+      },
+      "featureList": [
+        "Interactive EPUB & PDF reader",
+        "Semantic search and passage selection",
+        "Automatic cloud synchronization via persistent storage",
+        "Offline-first reading support using client-side caching",
+        "Beautiful 3D interactive index cards for reviewing highlights",
+        "Stunning paper typography and themes (Medium, Slate, Cyberpunk)"
+      ]
+    }
+    </script>
     
     <script>
       // Forcibly unregister all service workers to prevent stale interception
@@ -77,6 +123,26 @@
     </style>
 </head>
   <body>
+    <noscript>
+      <main style="max-width: 800px; margin: 60px auto; padding: 24px; font-family: 'Inter', system-ui, -apple-system, sans-serif; line-height: 1.7; color: #1e293b; background-color: #fcfbf4; border: 4px solid #000000; box-shadow: 8px 8px 0px #000000;">
+        <h1 style="font-size: 2.25rem; font-weight: 900; letter-spacing: -0.025em; text-transform: uppercase; margin-bottom: 1rem;">Zizhi — Premium Online Reading App</h1>
+        <p style="font-size: 1.125rem; font-weight: 500; color: #334155;">Welcome to Zizhi, the premium digital study desk for readers, educators, and lifetime learners. Zizhi is a responsive full-featured offline e-book reader optimized for both mobile and desktop screens.</p>
+        
+        <h2 style="font-size: 1.5rem; font-weight: 800; text-transform: uppercase; border-bottom: 2px solid #000000; padding-bottom: 0.5rem; margin-top: 2rem;">Features of Zizhi Web Book Reader</h2>
+        <ul style="padding-left: 1.5rem; space-y: 0.5rem;">
+          <li><strong>All-In-One Online Reading App:</strong> View, manage, and read your personal or professional digital library seamlessly.</li>
+          <li><strong>EPUB Reader Online:</strong> Upload and scroll through any EPUB file with automated TOC parsing, styled layout text, and progress tracking.</li>
+          <li><strong>PDF Viewer Online:</strong> Native, crisp rendering for PDF articles, study papers, and reference guides with full support for annotations.</li>
+          <li><strong>Durable Cloud Syncing:</strong> Authenticate securely with Firebase to back up your entire bookshelf metadata and review items, ensuring access across all devices.</li>
+          <li><strong>Focus Mode & Custom Fonts:</strong> Immerse yourself with clean typeface pairings including Merriweather, Garamond, Inter, and JetBrains Mono.</li>
+          <li><strong>3D Review Index Cards:</strong> Convert your saved book quotes and highlight passages into tactile, interactive review modules.</li>
+        </ul>
+        
+        <h2 style="font-size: 1.25rem; font-weight: 800; text-transform: uppercase; margin-top: 2rem;">How to Get Started</h2>
+        <p>This application is built with modern, interactive web technologies. To launch the reader interface, please enable JavaScript in your browser preferences and refresh the page.</p>
+        <p style="font-size: 0.875rem; color: #64748b; margin-top: 3rem;">© 2026 Zizhi Reader. Built for scholar, student, and educator productivity.</p>
+      </main>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
 </body>
