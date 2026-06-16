@@ -17,10 +17,10 @@ import ReloadPrompt from './components/ReloadPrompt';
 import SearchSidebar from './components/SearchSidebar';
 import { Logo, LogoIcon, IconSettings, IconUser, IconLibrary, IconQuote, IconUpload, IconLayoutGrid, IconLayoutList, IconSpinner, IconMenu, IconNote } from './components/icons';
 import * as db from './db';
-import { auth, signInWithGoogle, logout as firebaseLogout, db as firestore, handleFirestoreError, OperationType } from './firebase';
+import { auth, signInWithGoogle, logout as firebaseLogout, db as firestore, storage, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, setDoc, getDoc, collection, getDocs, query, where, writeBatch, deleteDoc } from 'firebase/firestore';
-import { getStorage, ref, uploadBytesResumable, getDownloadURL, getBlob } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL, getBlob } from 'firebase/storage';
 import type { Book, BookMetadata, BookContent, Quote, Note, Theme, ThemeFont, GenerationStatus } from './types';
 import { parseEpub } from './epubParser';
 import { parsePdf } from './pdfParser';
@@ -248,11 +248,25 @@ const App: FC = () => {
           mergedBooks.forEach(async (b) => {
               const existingLocal = localBooks.find(lb => lb.id === b.id);
               if (!existingLocal) {
-                  // Save new book metadata to IndexedDB safely using updateBookMetadata without writing empty chapters
-                  await db.updateBookMetadata(b.id, b);
-              } else if (JSON.stringify(existingLocal) !== JSON.stringify(b)) {
-                  // Update metadata safely
-                  await db.updateBookMetadata(b.id, b);
+                  // Since the book only exists in the cloud, save a skeleton representation in IndexedDB.
+                  // It will be fully populated with actual content (chapters, etc.) when the user opens/reads it.
+                  await db.saveBook({
+                      ...b,
+                      chapters: [],
+                      toc: []
+                  });
+              } else {
+                  // Update metadata safely if there are any changes (like progress or storage paths)
+                  const hasMetaDiff = existingLocal.title !== b.title ||
+                                      existingLocal.author !== b.author ||
+                                      existingLocal.coverImageUrl !== b.coverImageUrl ||
+                                      existingLocal.progress !== b.progress ||
+                                      existingLocal.readingTime !== b.readingTime ||
+                                      existingLocal.fileUrl !== b.fileUrl ||
+                                      existingLocal.storagePath !== b.storagePath;
+                  if (hasMetaDiff) {
+                      await db.updateBookMetadata(b.id, b);
+                  }
               }
           });
 
@@ -437,13 +451,29 @@ const App: FC = () => {
             (async () => {
                 try {
                     const storagePath = `users/${user.uid}/books/${newBook.id}/${file.name}`;
-                    const storageRef = ref(getStorage(), storagePath);
+                    const storageRef = ref(storage, storagePath);
                     await uploadBytesResumable(storageRef, file);
                     const fileUrl = await getDownloadURL(storageRef);
                     
+                    // Sync cover image as a separate file in Firebase Storage if it's a local dataURL (base64)
+                    let syncCoverUrl = metadata.coverImageUrl;
+                    if (syncCoverUrl && syncCoverUrl.startsWith('data:')) {
+                        try {
+                            const res = await fetch(syncCoverUrl);
+                            const coverBlob = await res.blob();
+                            const coverStoragePath = `users/${user.uid}/books/${newBook.id}/cover.jpg`;
+                            const coverStorageRef = ref(storage, coverStoragePath);
+                            await uploadBytesResumable(coverStorageRef, coverBlob);
+                            syncCoverUrl = await getDownloadURL(coverStorageRef);
+                        } catch (coverErr) {
+                            console.error("Failed to upload cover to storage", coverErr);
+                        }
+                    }
+
                     const bookRef = doc(firestore, 'users', user.uid, 'books', newBook.id);
                     await setDoc(bookRef, { 
                         ...metadata, 
+                        coverImageUrl: syncCoverUrl,
                         userId: user.uid, 
                         fileUrl, 
                         storagePath,
@@ -452,8 +482,8 @@ const App: FC = () => {
                     });
 
                     // Update local library state and local IndexedDB with cloud-synced fields
-                    setLibrary(prev => prev.map(b => b.id === newBook.id ? { ...b, fileUrl, storagePath, fileName: file.name } : b));
-                    await db.updateBookMetadata(newBook.id, { fileUrl, storagePath, fileName: file.name });
+                    setLibrary(prev => prev.map(b => b.id === newBook.id ? { ...b, fileUrl, storagePath, fileName: file.name, coverImageUrl: syncCoverUrl } : b));
+                    await db.updateBookMetadata(newBook.id, { fileUrl, storagePath, fileName: file.name, coverImageUrl: syncCoverUrl });
                 } catch (err) {
                     console.error("Background cloud sync failed", err);
                 }
@@ -484,7 +514,7 @@ const App: FC = () => {
                 if (user && (meta.storagePath || meta.fileName)) {
                     try {
                         const path = meta.storagePath || `users/${user.uid}/books/${meta.id}/${meta.fileName || meta.title}`;
-                        const storageRef = ref(getStorage(), path);
+                        const storageRef = ref(storage, path);
                         blob = await getBlob(storageRef);
                     } catch (storageErr) {
                         console.warn("getBlob failed, falling back to direct fetch", storageErr);
@@ -513,11 +543,18 @@ const App: FC = () => {
                 
                 // Ensure ID matches the original sync ID
                 downloadedBook.id = meta.id;
-                const { chapters, toc, summaryScript, audioSummaryUrl, audioDuration, pdfData } = downloadedBook;
+                const { chapters, toc, summaryScript, audioSummaryUrl, audioDuration, pdfData, coverImageUrl } = downloadedBook;
                 content = { id: meta.id, chapters, toc, summaryScript, audioSummaryUrl, audioDuration, pdfData };
                 
+                // Keep the Firestore/Storage cover URL if exists, otherwise extract cover directly from the file!
+                const finalCover = meta.coverImageUrl || coverImageUrl;
+                meta.coverImageUrl = finalCover;
+                
+                // Update local library state so the parsed cover appears instantly in the UI!
+                setLibrary(prev => prev.map(b => b.id === meta.id ? { ...b, coverImageUrl: finalCover } : b));
+                
                 // Save locally
-                await db.saveBook({ ...meta, ...content });
+                await db.saveBook({ ...meta, ...content, coverImageUrl: finalCover });
                 setToast({ message: "Book downloaded and synced." });
             } catch (downloadErr) {
                 console.error("Failed to download cloud content", downloadErr);
@@ -527,7 +564,9 @@ const App: FC = () => {
         }
 
         if (content) {
-            setSelectedBook({ ...meta, ...content });
+            // Retrieve latest book metadata from library state to ensure the cover image updates perfectly
+            const latestMeta = library.find(b => b.id === bookId) || meta;
+            setSelectedBook({ ...latestMeta, ...content });
         } else {
             console.error(`Book content missing for ID: ${bookId}`);
             setToast({ message: "Book content missing locally." });
