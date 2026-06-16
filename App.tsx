@@ -92,6 +92,12 @@ const NavItem = ({ tab, activeTab, icon: Icon, label, onSelect, collapsed }: { t
     );
 };
 
+const getBookUniqueKey = (title: string | undefined, author: string | undefined): string => {
+    const cleanTitle = (title || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    const cleanAuthor = (author || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    return `${cleanTitle}|||${cleanAuthor}`;
+};
+
 const App: FC = () => {
   const { colorScheme, setColorScheme } = useMantineColorScheme();
   const [library, setLibrary] = useState<BookMetadata[]>([]);
@@ -190,18 +196,60 @@ const App: FC = () => {
                   });
               }
           });
-          const mergedBooks = Array.from(mergedBooksMap.values());
+          const mergedBooksRaw = Array.from(mergedBooksMap.values());
+
+          // Deduplicate books with identical title & author (different IDs)
+          const groupedMerged = new Map<string, BookMetadata[]>();
+          mergedBooksRaw.forEach(b => {
+              const key = getBookUniqueKey(b.title, b.author);
+              if (!groupedMerged.has(key)) {
+                  groupedMerged.set(key, []);
+              }
+              groupedMerged.get(key)!.push(b);
+          });
+
+          const mergedBooks: BookMetadata[] = [];
+          const duplicateIdsToDeleteOnline: string[] = [];
+
+          for (const [key, list] of groupedMerged.entries()) {
+              if (list.length === 1) {
+                  mergedBooks.push(list[0]);
+              } else {
+                  // Sort to pick the best representation
+                  list.sort((a, b) => {
+                      const aHasFile = a.fileUrl || a.storagePath ? 1 : 0;
+                      const bHasFile = b.fileUrl || b.storagePath ? 1 : 0;
+                      if (aHasFile !== bHasFile) return bHasFile - aHasFile;
+                      return (b.lastOpened || 0) - (a.lastOpened || 0);
+                  });
+                  const best = list[0];
+                  mergedBooks.push(best);
+                  
+                  // Mark the rest as duplicates to delete
+                  for (let i = 1; i < list.length; i++) {
+                      duplicateIdsToDeleteOnline.push(list[i].id);
+                  }
+              }
+          }
+
+          // Delete extra duplicate entries safely in the background
+          if (duplicateIdsToDeleteOnline.length > 0) {
+              duplicateIdsToDeleteOnline.forEach(async (id) => {
+                  try {
+                      await db.deleteBook(id);
+                      await deleteDoc(doc(firestore, 'users', currentUser.uid, 'books', id));
+                  } catch (err) {
+                      console.error("Error deleting duplicate books in sync", err);
+                  }
+              });
+          }
 
           // Asynchronously persist new/merged book metadata, quotes and notes back to IndexedDB so they are available offline!
           mergedBooks.forEach(async (b) => {
               const existingLocal = localBooks.find(lb => lb.id === b.id);
               if (!existingLocal) {
-                  // Save new book metadata to IndexedDB
-                  await db.saveBook({
-                      ...b,
-                      chapters: [],
-                      toc: []
-                  });
+                  // Save new book metadata to IndexedDB safely using updateBookMetadata without writing empty chapters
+                  await db.updateBookMetadata(b.id, b);
               } else if (JSON.stringify(existingLocal) !== JSON.stringify(b)) {
                   // Update metadata safely
                   await db.updateBookMetadata(b.id, b);
@@ -244,11 +292,53 @@ const App: FC = () => {
               setHasEntered(false);
           }
       } else {
-          setLibrary(localBooks);
+          // Deduplicate books with identical title & author (different IDs) offline too
+          const groupedLocal = new Map<string, Book[]>();
+          localBooks.forEach(b => {
+              const key = getBookUniqueKey(b.title, b.author);
+              if (!groupedLocal.has(key)) {
+                  groupedLocal.set(key, []);
+              }
+              groupedLocal.get(key)!.push(b);
+          });
+
+          const deduplicatedLocalBooks: Book[] = [];
+          const duplicateIdsToDeleteOffline: string[] = [];
+
+          for (const [key, list] of groupedLocal.entries()) {
+              if (list.length === 1) {
+                  deduplicatedLocalBooks.push(list[0]);
+              } else {
+                  list.sort((a, b) => {
+                      const aHasFile = a.fileUrl || a.storagePath ? 1 : 0;
+                      const bHasFile = b.fileUrl || b.storagePath ? 1 : 0;
+                      if (aHasFile !== bHasFile) return bHasFile - aHasFile;
+                      return (b.lastOpened || 0) - (a.lastOpened || 0);
+                  });
+                  const best = list[0];
+                  deduplicatedLocalBooks.push(best);
+                  
+                  for (let i = 1; i < list.length; i++) {
+                      duplicateIdsToDeleteOffline.push(list[i].id);
+                  }
+              }
+          }
+
+          if (duplicateIdsToDeleteOffline.length > 0) {
+              duplicateIdsToDeleteOffline.forEach(async (id) => {
+                  try {
+                      await db.deleteBook(id);
+                  } catch (err) {
+                      console.error("Error deleting duplicate book offline", err);
+                  }
+              });
+          }
+
+          setLibrary(deduplicatedLocalBooks);
           setQuotes(localQuotes);
           setNotes(localNotes);
           
-          if (localBooks.length > 0) {
+          if (deduplicatedLocalBooks.length > 0) {
               setHasEntered(true);
           } else {
               setHasEntered(false);
@@ -316,9 +406,9 @@ const App: FC = () => {
         }
 
         // Check if book already exists in library based on title and author
+        const newBookKey = getBookUniqueKey(newBook.title, newBook.author);
         const isDuplicate = library.some(b => 
-            b.title.trim().toLowerCase() === newBook.title.trim().toLowerCase() && 
-            b.author.trim().toLowerCase() === newBook.author.trim().toLowerCase()
+            getBookUniqueKey(b.title, b.author) === newBookKey
         );
 
         if (isDuplicate) {
@@ -384,8 +474,9 @@ const App: FC = () => {
     }
     try {
         let content = await db.getBookContent(bookId);
+        const hasNoRealContent = !content || !content.chapters || content.chapters.length === 0;
         
-        if (!content && (meta.storagePath || meta.fileUrl)) {
+        if (hasNoRealContent && (meta.storagePath || meta.fileUrl)) {
             setToast({ message: "Syncing book content from cloud..." });
             try {
                 let blob: Blob;
