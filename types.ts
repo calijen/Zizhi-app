@@ -120,3 +120,47 @@ export interface Theme {
   texture: string;
   readingMode: 'scroll' | 'page';
 }
+
+export interface StickyNote {
+  id: string;
+  text: string;
+  color: 'yellow' | 'pink' | 'blue' | 'green';
+  x: number;
+  y: number;
+  rotation: number;
+}
+
+export interface ImageSticker {
+  id: string;
+  url: string;
+  x: number;
+  y: number;
+  width: number;
+  height?: number;
+  align?: 'left' | 'right' | 'center';
+}
+
+export interface DrawingPath {
+  points: { x: number; y: number }[];
+  color: string;
+  width: number;
+  isHighlighter?: boolean;
+}
+
+export interface NotebookPageData {
+  id: string;
+  text: string;
+  drawings: DrawingPath[];
+  stickyNotes: StickyNote[];
+  imageStickers: ImageSticker[];
+}
+
+export interface NotebookData {
+  bookId: string;
+  userId: string;
+  drawings: string;
+  stickyNotes: string;
+  imageStickers?: string;
+  pages?: string; // stringified NotebookPageData[]
+  updatedAt: number;
+}

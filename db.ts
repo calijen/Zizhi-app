@@ -1,13 +1,14 @@
-import type { Book, BookMetadata, BookContent, Quote, Note, ReadingActivity, ChatSession } from './types';
+import type { Book, BookMetadata, BookContent, Quote, Note, ReadingActivity, ChatSession, NotebookData } from './types';
 
 const DB_NAME = 'ZizhiDB';
-const DB_VERSION = 8; 
+const DB_VERSION = 10; 
 const BOOK_STORE = 'books';
 const CONTENT_STORE = 'book_contents';
 const QUOTE_STORE = 'quotes';
 const NOTE_STORE = 'notes';
 const ACTIVITY_STORE = 'reading_activity';
 const CHAT_STORE = 'chat_sessions';
+const NOTEBOOK_STORE = 'notebooks';
 
 let db: IDBDatabase;
 
@@ -39,6 +40,9 @@ export const initDB = (): Promise<IDBDatabase> => {
       }
       if (!dbInstance.objectStoreNames.contains(CHAT_STORE)) {
         dbInstance.createObjectStore(CHAT_STORE, { keyPath: 'id' });
+      }
+      if (!dbInstance.objectStoreNames.contains(NOTEBOOK_STORE)) {
+        dbInstance.createObjectStore(NOTEBOOK_STORE, { keyPath: 'bookId' });
       }
     };
   });
@@ -245,5 +249,25 @@ export const deleteChatSession = async (id: string): Promise<void> => {
         const request = transaction.objectStore(CHAT_STORE).delete(id);
         request.onsuccess = () => resolve();
         request.onerror = () => reject();
+    });
+};
+
+export const saveNotebook = async (notebook: NotebookData): Promise<void> => {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(NOTEBOOK_STORE, 'readwrite');
+        const request = transaction.objectStore(NOTEBOOK_STORE).put(notebook);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject();
+    });
+};
+
+export const getNotebook = async (bookId: string): Promise<NotebookData | null> => {
+    const db = await initDB();
+    return new Promise((resolve) => {
+        const transaction = db.transaction(NOTEBOOK_STORE, 'readonly');
+        const request = transaction.objectStore(NOTEBOOK_STORE).get(bookId);
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => resolve(null);
     });
 };

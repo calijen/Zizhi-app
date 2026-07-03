@@ -69,6 +69,20 @@
             "lastVisit": { "type": "string" }
         },
         "required": ["uid"]
+    },
+    "Notebook": {
+        "title": "Notebook",
+        "description": "Notebook drawings and sticky notes for a specific book",
+        "type": "object",
+        "properties": {
+            "bookId": { "type": "string" },
+            "userId": { "type": "string" },
+            "drawings": { "type": "string" },
+            "stickyNotes": { "type": "string" },
+            "imageStickers": { "type": "string" },
+            "updatedAt": { "type": "number" }
+        },
+        "required": ["bookId", "userId"]
     }
   },
   "firestore": {
@@ -87,6 +101,10 @@
     "/users/{userId}/notes/{noteId}": {
       "schema": "Note",
       "description": "Collection of notes belonging to the user"
+    },
+    "/users/{userId}/notebooks/{bookId}": {
+      "schema": "Notebook",
+      "description": "Collection of notebooks containing doodles, sticky notes, and drawing paths"
     }
   }
 }

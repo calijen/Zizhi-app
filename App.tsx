@@ -4,7 +4,6 @@ import { Box, Stack, Group, Text, ActionIcon, Button, Tabs, Badge, Avatar, Simpl
 import { motion, AnimatePresence } from 'framer-motion';
 import LibraryView from './components/FileUpload';
 import QuotesView from './components/QuotesView';
-import NotesView from './components/NotesView';
 import SettingsView from './components/SettingsView';
 import AuthView from './components/AuthView';
 import ReaderView from './components/ReaderView';
@@ -77,7 +76,7 @@ export const ATMOSPHERES: { [key: string]: Theme } = {
     }
 };
 
-const NavItem = ({ tab, activeTab, icon: Icon, label, onSelect, collapsed }: { tab: 'library' | 'quotes' | 'notes' | 'profile' | 'settings'; activeTab: string; icon: any; label: string; onSelect: (tab: any) => void; collapsed?: boolean }) => {
+const NavItem = ({ tab, activeTab, icon: Icon, label, onSelect, collapsed }: { tab: 'library' | 'quotes' | 'profile' | 'settings'; activeTab: string; icon: any; label: string; onSelect: (tab: any) => void; collapsed?: boolean }) => {
     const isActive = activeTab === tab;
     return (
         <Stack gap={4} align="center" className={`cursor-pointer transition-all duration-200 group ${isActive ? 'text-[var(--color-primary-text)]' : 'text-[var(--color-muted-text)] hover:text-[var(--color-primary-text)]'}`} onClick={() => onSelect(tab)}>
@@ -106,7 +105,7 @@ const App: FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [hasEntered, setHasEntered] = useState<boolean | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'library' | 'quotes' | 'notes' | 'profile' | 'settings'>('library');
+  const [activeTab, setActiveTab] = useState<'library' | 'quotes' | 'profile' | 'settings'>('library');
   const [streak, setStreak] = useState(1);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -724,7 +723,6 @@ const App: FC = () => {
               <nav className={`flex-1 ${isSidebarCollapsed ? 'p-2' : 'p-6'} space-y-4`}>
                   <NavItem tab="library" activeTab={activeTab} onSelect={setActiveTab} icon={IconLibrary} label="Library" collapsed={isSidebarCollapsed} />
                   <NavItem tab="quotes" activeTab={activeTab} onSelect={setActiveTab} icon={IconQuote} label="Quotes" collapsed={isSidebarCollapsed} />
-                  <NavItem tab="notes" activeTab={activeTab} onSelect={setActiveTab} icon={IconNote} label="Notes" collapsed={isSidebarCollapsed} />
                   <NavItem tab="profile" activeTab={activeTab} onSelect={setActiveTab} icon={IconUser} label="Profile" collapsed={isSidebarCollapsed} />
                   <NavItem tab="settings" activeTab={activeTab} onSelect={setActiveTab} icon={IconSettings} label="Settings" collapsed={isSidebarCollapsed} />
               </nav>
@@ -743,17 +741,9 @@ const App: FC = () => {
                       variant="subtle" 
                       color="gray" 
                       size="lg" 
-                      onClick={() => setActiveTab('profile')} 
-                      className="md:hidden border-2 border-black shadow-[2px_2px_0_black] bg-[var(--color-background)] rounded-none"
-                    >
-                        <IconUser className="w-5 h-5 text-[var(--color-primary-text)]" />
-                    </ActionIcon>
-                    <ActionIcon 
-                      variant="subtle" 
-                      color="gray" 
-                      size="lg" 
                       onClick={() => setViewMode(v => v === 'grid' ? 'list' : 'grid')} 
-                      className="hidden md:flex border-2 border-black shadow-[2px_2px_0_black] bg-[var(--color-background)] rounded-none"
+                      className="border-2 border-black shadow-[2px_2px_0_black] bg-[var(--color-background)] rounded-none"
+                      title="Toggle View Mode"
                     >
                         {viewMode === 'grid' ? <IconLayoutList className="w-5 h-5 text-[var(--color-primary-text)]" /> : <IconLayoutGrid className="w-5 h-5 text-[var(--color-primary-text)]" />}
                     </ActionIcon>
@@ -788,20 +778,6 @@ const App: FC = () => {
                               }
                           } else {
                               setToast({ message: "Preserved quote from a book since deleted from your library." });
-                          }
-                      }} />}
-                      {activeTab === 'notes' && <NotesView theme={theme} notes={notes} library={library} onDelete={(id) => { db.deleteNote(id).then(() => setNotes(prev => prev.filter(n => n.id !== id))); }} onGoToNote={async (n) => { 
-                          const meta = library.find(b => b.id === n.bookId);
-                          if (meta) {
-                              const content = await db.getBookContent(n.bookId);
-                              if (content) {
-                                  setInitialReaderNav({ chapterId: n.location, searchText: n.text });
-                                  setSelectedBook({ ...meta, ...content });
-                              } else {
-                                  setToast({ message: "Book content is missing." });
-                              }
-                          } else {
-                              setToast({ message: "Preserved note from a book since deleted from your library." });
                           }
                       }} />}
                       {activeTab === 'profile' && <ProfileView user={user} streak={streak} library={library} onShowAuth={() => setIsAuthModalOpen(true)} activity={[]} onSignOut={async () => { await firebaseLogout(); setUser(null); }} />}
@@ -856,7 +832,7 @@ const App: FC = () => {
                           </ActionIcon>
                         </>
                     </Box>
-                <NavItem tab="notes" activeTab={activeTab} onSelect={setActiveTab} icon={IconNote} label="Notes" />
+                <NavItem tab="profile" activeTab={activeTab} onSelect={setActiveTab} icon={IconUser} label="Profile" />
                 <NavItem tab="settings" activeTab={activeTab} onSelect={setActiveTab} icon={IconSettings} label="Settings" />
             </nav>
           )}
