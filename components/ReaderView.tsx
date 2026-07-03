@@ -1,13 +1,72 @@
 
-import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react';
 import { Box, Group, Stack, Text, ActionIcon, ScrollArea, Transition, Loader, Center } from '@mantine/core';
 import type { Book, Chapter, Theme, Quote, Note } from '../types';
-import { IconChevronLeft, IconMenu, IconClose, IconPlus, IconMinus, IconSettings } from './icons';
+import { IconChevronLeft, IconMenu, IconClose, IconPlus, IconMinus, IconSettings, IconNote } from './icons';
 import TextSelectionPopup from './TextSelectionPopup';
 import PdfPage from './PdfPage';
 import ShareDialog from './ShareDialog';
+import { NotebookSidebar } from './NotebookSidebar';
+import Toast from './Toast';
 
 declare const pdfjsLib: any;
+
+const Icon3DNotebook: React.FC = () => (
+    <div className="relative w-8 h-9 select-none" style={{ perspective: '300px' }}>
+        {/* 3D Notebook block container with subtle tilt */}
+        <div 
+            className="absolute inset-0 transition-transform duration-300 group-hover:scale-110" 
+            style={{ 
+                transform: 'rotateY(-15deg) rotateX(10deg) rotateZ(-4deg)', 
+                transformStyle: 'preserve-3d' 
+            }}
+        >
+            {/* Back Cover shadow layer */}
+            <div 
+                className="absolute inset-y-0 left-0 right-0 bg-amber-950 border-2 border-black rounded-l-[3px] shadow-md" 
+                style={{ transform: 'translateZ(-3px)' }} 
+            />
+
+            {/* Pages Layer (underneath) - offset to show white paper edges */}
+            <div 
+                className="absolute top-[2px] left-[3px] right-[1px] bottom-[2px] bg-yellow-50 border border-stone-400" 
+                style={{ transform: 'translateZ(-1px)' }}
+            >
+                {/* Page line detailing at the bottom and right edges */}
+                <div className="absolute top-0 bottom-0 right-[1px] w-[1px] bg-stone-300" />
+                <div className="absolute top-0 bottom-0 right-[2px] w-[1px] bg-stone-200" />
+                <div className="absolute left-0 right-0 bottom-[1px] h-[1px] bg-stone-300" />
+            </div>
+
+            {/* Front Cover (main color) */}
+            <div 
+                className="absolute inset-y-0 left-0 right-[3px] bg-amber-500 border-2 border-black rounded-l-[3px] flex flex-col justify-between p-1" 
+                style={{ transform: 'translateZ(2px)' }}
+            >
+                {/* Ribbon bookmark / stripe detail */}
+                <div className="absolute top-0 bottom-0 left-[5px] w-[2px] bg-amber-800/40" />
+                
+                {/* Spiral ring bindings on the left edge */}
+                <div className="absolute -left-[5px] top-1.5 bottom-1.5 w-[5px] flex flex-col justify-between">
+                    <div className="w-[7px] h-[2px] bg-stone-300 border border-black rounded-full" style={{ transform: 'translateX(-1px)' }} />
+                    <div className="w-[7px] h-[2px] bg-stone-300 border border-black rounded-full" style={{ transform: 'translateX(-1px)' }} />
+                    <div className="w-[7px] h-[2px] bg-stone-300 border border-black rounded-full" style={{ transform: 'translateX(-1px)' }} />
+                    <div className="w-[7px] h-[2px] bg-stone-300 border border-black rounded-full" style={{ transform: 'translateX(-1px)' }} />
+                    <div className="w-[7px] h-[2px] bg-stone-300 border border-black rounded-full" style={{ transform: 'translateX(-1px)' }} />
+                </div>
+
+                {/* Small sticker or text block on the cover */}
+                <div className="w-4 h-3 bg-white border border-black rounded-xs self-end mt-1.5 flex flex-col gap-[1px] p-[1px] justify-center shadow-xs">
+                    <div className="h-[1px] w-2.5 bg-stone-400" />
+                    <div className="h-[1px] w-1.5 bg-stone-400" />
+                </div>
+
+                {/* Bottom band line */}
+                <div className="h-[1.5px] w-full bg-amber-700/50 rounded-sm mt-auto" />
+            </div>
+        </div>
+    </div>
+);
 
 interface ReaderViewProps {
     book: Book;
@@ -96,6 +155,79 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
     const [pdfDocument, setPdfDocument] = useState<any>(null);
     const [isPdfLoading, setIsPdfLoading] = useState(book.isPdf);
     const [pdfScale, setPdfScale] = useState(window.innerWidth < 768 ? 1.5 : 2.0);
+    const [isNotebookOpen, setIsNotebookOpen] = useState(false);
+    const [clickedImage, setClickedImage] = useState<{ url: string; rect: DOMRect } | null>(null);
+    const [toast, setToast] = useState<{ message: string; action?: { label: string; onClick: () => void } } | null>(null);
+
+    const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'IMG') {
+            e.preventDefault();
+            e.stopPropagation();
+            const img = target as HTMLImageElement;
+            const rect = img.getBoundingClientRect();
+            setClickedImage({
+                url: img.src,
+                rect: rect
+            });
+        }
+    };
+
+    const handleSaveImageToComputer = (imageUrl: string) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                triggerDirectDownload(imageUrl);
+                return;
+            }
+            ctx.drawImage(img, 0, 0);
+            canvas.toBlob((blob) => {
+                if (blob) {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'book-image.png';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    setToast({ message: 'Image downloaded as PNG successfully!' });
+                } else {
+                    triggerDirectDownload(imageUrl);
+                }
+            }, 'image/png');
+        };
+        img.onerror = () => {
+            triggerDirectDownload(imageUrl);
+        };
+        img.src = imageUrl;
+    };
+
+    const triggerDirectDownload = (url: string) => {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'book-image.png';
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setToast({ message: 'Image download initiated.' });
+    };
+
+    const handleAddImageToNotebook = (imageUrl: string) => {
+        window.dispatchEvent(new CustomEvent('add-notebook-sticker', {
+            detail: { url: imageUrl }
+        }));
+        setIsNotebookOpen(true);
+        setToast({
+            message: 'Image successfully added to your notebook!'
+        });
+    };
     
     const [ephemeralFontSize, setEphemeralFontSize] = useState<number | null>(null);
     
@@ -337,7 +469,11 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
             const sel = window.getSelection();
             if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
                 const range = sel.getRangeAt(0);
-                setSelection({ text: sel.toString().trim(), rect: range.getBoundingClientRect() });
+                if (scrollViewportRef.current && scrollViewportRef.current.contains(range.commonAncestorContainer)) {
+                    setSelection({ text: sel.toString().trim(), rect: range.getBoundingClientRect() });
+                } else {
+                    setSelection(null);
+                }
             } else {
                 setSelection(null);
             }
@@ -489,30 +625,30 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
                         </Group>
                     )}
 
-                    {(!isDesktop || !isDesktopSidebarOpen) ? (
-                        <ActionIcon 
-                            variant="filled" 
-                            color="yellow" 
-                            size="lg" 
-                            onClick={() => {
-                                if (isDesktop) {
-                                    setIsDesktopSidebarOpen(true);
-                                } else {
-                                    setShowToc(true);
-                                }
-                            }} 
-                            className="border-2 border-black rounded-none shadow-[3px_3px_0_black] bg-[var(--bg-color)]"
-                            title="Open Sidebar"
-                        >
-                            <IconMenu className="text-[var(--text-color)] w-5 h-5" />
-                        </ActionIcon>
-                    ) : (
-                        <div className="w-10"></div>
-                    )}
+                    <Group gap="xs">
+                        {(!isDesktop || !isDesktopSidebarOpen) ? (
+                            <ActionIcon 
+                                variant="filled" 
+                                color="yellow" 
+                                size="lg" 
+                                onClick={() => {
+                                    if (isDesktop) {
+                                        setIsDesktopSidebarOpen(true);
+                                    } else {
+                                        setShowToc(true);
+                                    }
+                                }} 
+                                className="border-2 border-black rounded-none shadow-[3px_3px_0_black] bg-yellow-300 text-black hover:bg-yellow-200"
+                                title="Open Sidebar"
+                            >
+                                <IconMenu className="w-5 h-5" />
+                            </ActionIcon>
+                        ) : null}
+                    </Group>
                 </header>
 
                 <ScrollArea className={`flex-1 ${theme.texture === 'paper' ? 'printed-texture' : ''}`} viewportRef={scrollViewportRef} onScrollPositionChange={handleScroll}>
-                    <Box className={`relative ${book.isPdf ? 'w-full' : 'max-w-3xl'} mx-auto min-h-screen pt-8 md:pt-16 pb-64 px-4 md:px-8 font-serif text-[var(--text-color)] overflow-x-auto`}>
+                    <Box onClick={handleContainerClick} className={`relative ${book.isPdf ? 'w-full' : 'max-w-3xl'} mx-auto min-h-screen pt-8 md:pt-16 pb-64 px-4 md:px-8 font-serif text-[var(--text-color)] overflow-x-auto`}>
                         {isPdfLoading ? (
                             <Center className="h-64 flex-col gap-4">
                                 <Loader color="cyan" size="xl" />
@@ -574,6 +710,19 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
                         <IconSettings className="w-5 h-5 text-black" />
                     </ActionIcon>
                 </Box>
+
+                {/* Floating 3D Notebook Toggle */}
+                {!isNotebookOpen && (
+                    <Box className={`fixed ${book.isPdf ? 'bottom-36 md:bottom-12' : 'bottom-8 md:bottom-12'} right-6 md:right-12 z-[1200]`}>
+                        <button 
+                            onClick={() => setIsNotebookOpen(true)}
+                            className="w-14 h-14 md:w-16 md:h-16 flex items-center justify-center bg-yellow-300 border-4 border-black shadow-[4px_4px_0_black] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_black] active:translate-y-[2px] active:shadow-none transition-all duration-150 rounded-none group"
+                            title="Open Student Notebook"
+                        >
+                            <Icon3DNotebook />
+                        </button>
+                    </Box>
+                )}
             </Box>
 
             {selection && (
@@ -583,6 +732,24 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
                     onQuote={() => { onSaveQuote(selection.text, book.chapters[currentChapterIndex].id); setSelection(null); }}
                     onSearch={() => { onSearch(selection.text); setSelection(null); }}
                     onShare={() => { setShowShareDialog(selection.text); setSelection(null); }}
+                />
+            )}
+
+            {clickedImage && (
+                <ImageClickPopup
+                    rect={clickedImage.rect}
+                    imageUrl={clickedImage.url}
+                    onAddToNotebook={() => handleAddImageToNotebook(clickedImage.url)}
+                    onSaveToComputer={() => handleSaveImageToComputer(clickedImage.url)}
+                    onClose={() => setClickedImage(null)}
+                />
+            )}
+
+            {toast && (
+                <Toast
+                    message={toast.message}
+                    action={toast.action}
+                    onClose={() => setToast(null)}
                 />
             )}
 
@@ -835,6 +1002,13 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
                 </Box>
             )}
 
+            <NotebookSidebar 
+                bookId={book.id} 
+                bookTitle={book.title}
+                isOpen={isNotebookOpen} 
+                onClose={() => setIsNotebookOpen(false)} 
+            />
+
             <style>{`
                 .epub-content { 
                     word-break: break-word; 
@@ -902,4 +1076,72 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
         </Box>
     );
 };
+
+interface ImageClickPopupProps {
+    rect: DOMRect;
+    imageUrl: string;
+    onAddToNotebook: () => void;
+    onSaveToComputer: () => void;
+    onClose: () => void;
+}
+
+const ImageClickPopup: React.FC<ImageClickPopupProps> = ({ rect, imageUrl, onAddToNotebook, onSaveToComputer, onClose }) => {
+    const positionStyle = useMemo(() => {
+        const barWidth = 240;
+        const barHeight = 110;
+        
+        let top = rect.top + (rect.height / 2) - (barHeight / 2);
+        let left = rect.left + (rect.width / 2) - (barWidth / 2);
+        
+        top = Math.max(80, Math.min(window.innerHeight - barHeight - 20, top));
+        left = Math.max(15, Math.min(window.innerWidth - barWidth - 15, left));
+        
+        return {
+            top: `${top}px`,
+            left: `${left}px`,
+            width: `${barWidth}px`
+        };
+    }, [rect]);
+
+    return (
+        <>
+            <div className="fixed inset-0 z-[1999] bg-black/20" onClick={onClose} />
+            <div 
+                style={positionStyle} 
+                className="fixed z-[2000] flex flex-col bg-stone-900 border-2 border-black text-stone-100 rounded-none shadow-[8px_8px_0_rgba(0,0,0,0.3)] p-2 animate-pop-in"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex items-center justify-between border-b border-stone-800 pb-1 mb-1 px-1">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-stone-400">Save Image</span>
+                    <button onClick={onClose} className="text-stone-400 hover:text-white transition-colors">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <div className="flex flex-col gap-1">
+                    <button 
+                        onClick={() => {
+                            onAddToNotebook();
+                            onClose();
+                        }}
+                        className="w-full text-left px-2 py-1.5 hover:bg-stone-800 text-xs font-bold flex items-center gap-2 rounded-xs transition-colors"
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                        <span>Add to Notebook</span>
+                    </button>
+                    <button 
+                        onClick={() => {
+                            onSaveToComputer();
+                            onClose();
+                        }}
+                        className="w-full text-left px-2 py-1.5 hover:bg-stone-800 text-xs font-bold flex items-center gap-2 rounded-xs transition-colors"
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#eab308" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        <span>Save to Computer</span>
+                    </button>
+                </div>
+            </div>
+        </>
+    );
+};
+
 export default ReaderView;
