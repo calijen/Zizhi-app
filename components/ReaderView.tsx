@@ -5,6 +5,7 @@ import type { Book, Chapter, Theme, Quote, Note } from '../types';
 import { IconChevronLeft, IconMenu, IconClose, IconPlus, IconMinus, IconSettings, IconNote } from './icons';
 import TextSelectionPopup from './TextSelectionPopup';
 import PdfPage from './PdfPage';
+import { PdfThumbnail } from './PdfThumbnail';
 import ShareDialog from './ShareDialog';
 import { NotebookSidebar } from './NotebookSidebar';
 import Toast from './Toast';
@@ -541,17 +542,31 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
                         </div>
                         <ScrollArea className="flex-1 p-6">
                             {sidebarTab === 'chapters' ? (
-                                <Stack gap={4}>
-                                    {book.chapters.map((item, idx) => (
-                                        <Box key={idx} 
-                                            className={`p-5 cursor-pointer border-4 transition-all ${idx === currentChapterIndex ? 'bg-cyan-400 border-black shadow-[4px_4px_0_black] -translate-y-1' : 'bg-transparent border-transparent hover:border-black'}`}
-                                            style={{ borderRadius: '0px' }}
-                                            onClick={() => navigateToChapter(idx)}
-                                        >
-                                            <Text className="text-[11px] font-black leading-relaxed line-clamp-2" style={{ color: 'var(--text-color)' }}>{item.label}</Text>
-                                        </Box>
-                                    ))}
-                                </Stack>
+                                book.isPdf && pdfDocument ? (
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {book.chapters.map((item, idx) => (
+                                            <PdfThumbnail 
+                                                key={idx}
+                                                pdfDocument={pdfDocument}
+                                                pageNumber={idx + 1}
+                                                isActive={idx === currentChapterIndex}
+                                                onClick={() => navigateToChapter(idx)}
+                                            />
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <Stack gap={4}>
+                                        {book.chapters.map((item, idx) => (
+                                            <Box key={idx} 
+                                                className={`p-5 cursor-pointer border-4 transition-all ${idx === currentChapterIndex ? 'bg-cyan-400 border-black shadow-[4px_4px_0_black] -translate-y-1' : 'bg-transparent border-transparent hover:border-black'}`}
+                                                style={{ borderRadius: '0px' }}
+                                                onClick={() => navigateToChapter(idx)}
+                                            >
+                                                <Text className="text-[11px] font-black leading-relaxed line-clamp-2" style={{ color: 'var(--text-color)' }}>{item.label}</Text>
+                                            </Box>
+                                        ))}
+                                    </Stack>
+                                )
                             ) : (
                                 <Stack gap="xl">
                                     {notes.length === 0 && quotes.length === 0 ? (
@@ -814,16 +829,30 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
                             
                             <ScrollArea className="flex-1 p-6">
                                 {sidebarTab === 'chapters' ? (
-                                    <Stack gap={4}>
-                                        {book.chapters.map((item, idx) => (
-                                            <Box key={idx} 
-                                                className={`p-4 cursor-pointer border-2 transition-all ${idx === currentChapterIndex ? 'bg-cyan-400 border-black shadow-[3px_3px_0_black]' : 'border-transparent'}`}
-                                                onClick={() => navigateToChapter(idx)}
-                                            >
-                                                <Text className="text-[11px] font-bold text-[var(--text-color)] line-clamp-2">{item.label}</Text>
-                                            </Box>
-                                        ))}
-                                    </Stack>
+                                    book.isPdf && pdfDocument ? (
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {book.chapters.map((item, idx) => (
+                                                <PdfThumbnail 
+                                                    key={idx}
+                                                    pdfDocument={pdfDocument}
+                                                    pageNumber={idx + 1}
+                                                    isActive={idx === currentChapterIndex}
+                                                    onClick={() => navigateToChapter(idx)}
+                                                />
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <Stack gap={4}>
+                                            {book.chapters.map((item, idx) => (
+                                                <Box key={idx} 
+                                                    className={`p-4 cursor-pointer border-2 transition-all ${idx === currentChapterIndex ? 'bg-cyan-400 border-black shadow-[3px_3px_0_black]' : 'border-transparent'}`}
+                                                    onClick={() => navigateToChapter(idx)}
+                                                >
+                                                    <Text className="text-[11px] font-bold text-[var(--text-color)] line-clamp-2">{item.label}</Text>
+                                                </Box>
+                                            ))}
+                                        </Stack>
+                                    )
                                 ) : (
                                     <Stack gap="xl">
                                         {notes.length === 0 && quotes.length === 0 ? (

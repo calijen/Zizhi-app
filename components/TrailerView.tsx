@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 // Import Box from @mantine/core to fix missing component error
 import { Box } from '@mantine/core';
+import { Volume2, VolumeX } from 'lucide-react';
 import type { Book, GenerationStatus } from '../types';
 import { IconPlay, IconPause, IconClose, IconRewind, IconForward, IconDownload } from './icons';
 
@@ -40,6 +41,50 @@ async function decodeAudioData(
   return buffer;
 }
 
+function generateAmbientPad(ctx: AudioContext, durationSeconds: number, sampleRate: number): AudioBuffer {
+  const frameCount = sampleRate * durationSeconds;
+  const buffer = ctx.createBuffer(1, frameCount, sampleRate);
+  const channelData = buffer.getChannelData(0);
+
+  // Harmonics for a gorgeous major 7th chord (C3, G3, C4, E4, B4)
+  const frequencies = [130.81, 196.00, 261.63, 329.63, 493.88];
+  const numFreqs = frequencies.length;
+
+  for (let i = 0; i < frameCount; i++) {
+    const t = i / sampleRate;
+    let sample = 0;
+
+    for (let f = 0; f < numFreqs; f++) {
+      const freq = frequencies[f];
+      // Slow LFO for each frequency to create movement and depth
+      const lfoSpeed = 0.08 + f * 0.04;
+      const lfoAmp = 0.4 + 0.3 * Math.sin(2 * Math.PI * lfoSpeed * t);
+      
+      // Warm synthesizer: mix of sine and soft triangle wave
+      const sine = Math.sin(2 * Math.PI * freq * t);
+      const tri = Math.asin(Math.sin(2 * Math.PI * freq * t)) / (Math.PI / 2);
+      
+      sample += (sine * 0.7 + tri * 0.3) * lfoAmp * (1 / numFreqs);
+    }
+
+    // Add subtle warm tape hiss
+    const noise = (Math.random() * 2 - 1) * 0.005;
+    
+    // Smooth fade-in at start (first 3s) and fade-out at end (last 4s)
+    let envelope = 1;
+    if (t < 3) {
+      envelope = t / 3;
+    } else if (t > durationSeconds - 4) {
+      envelope = Math.max(0, (durationSeconds - t) / 4);
+    }
+
+    // Scale down to a very soft background volume (approx 5% volume)
+    channelData[i] = (sample * 0.06 + noise * 0.002) * envelope;
+  }
+
+  return buffer;
+}
+
 const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -48,6 +93,9 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isReady, setIsReady] = useState(false);
   const [userInteracted, setUserInteracted] = useState(false);
+  const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoiceName, setSelectedVoiceName] = useState<string>("");
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioBufferRef = useRef<AudioBuffer | null>(null);
@@ -56,6 +104,64 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
   const pauseTimeRef = useRef<number>(0);
   const rafRef = useRef<number>(0);
   const activePhraseRef = useRef<HTMLParagraphElement>(null);
+
+  const synthRef = useRef<SpeechSynthesis | null>(null);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+
+  // Load and configure Web Speech voices, sorting premium/natural ones to the top
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    const synth = window.speechSynthesis;
+
+    const updateVoices = () => {
+      const allVoices = synth.getVoices();
+      // Filter English primarily, but preserve others if not English
+      const englishVoices = allVoices.filter(v => v.lang.startsWith('en'));
+      const listToUse = englishVoices.length > 0 ? englishVoices : allVoices;
+
+      // Sort voices: put "natural", "premium", "neural", "google", "siri" voices first
+      const sortedVoices = [...listToUse].sort((a, b) => {
+        const aLower = a.name.toLowerCase();
+        const bLower = b.name.toLowerCase();
+        
+        const aIsPremium = aLower.includes('natural') || aLower.includes('premium') || aLower.includes('neural') || aLower.includes('google') || aLower.includes('siri');
+        const bIsPremium = bLower.includes('natural') || bLower.includes('premium') || bLower.includes('neural') || bLower.includes('google') || bLower.includes('siri');
+
+        if (aIsPremium && !bIsPremium) return -1;
+        if (!aIsPremium && bIsPremium) return 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      setVoices(sortedVoices);
+
+      const savedVoice = localStorage.getItem('zizhi-preferred-voice');
+      if (savedVoice && sortedVoices.some(v => v.name === savedVoice)) {
+        setSelectedVoiceName(savedVoice);
+      } else {
+        // Default to a premium sounding voice if available
+        const defaultVoice = sortedVoices.find(v => {
+          const nameLower = v.name.toLowerCase();
+          return nameLower.includes('natural') || nameLower.includes('google') || nameLower.includes('premium') || nameLower.includes('neural');
+        }) || sortedVoices[0];
+
+        if (defaultVoice) {
+          setSelectedVoiceName(defaultVoice.name);
+        }
+      }
+    };
+
+    updateVoices();
+    if (synth.onvoiceschanged !== undefined) {
+      synth.onvoiceschanged = updateVoices;
+    }
+  }, []);
+
+  // Calculate high-fidelity duration based on reading speed (approx 135 words per minute)
+  const calculatedDuration = useMemo(() => {
+    if (!book.summaryScript) return 60;
+    const wordCount = book.summaryScript.split(/\s+/).filter(Boolean).length;
+    return Math.max(30, Math.ceil((wordCount / 135) * 60));
+  }, [book.summaryScript]);
 
   const timedLines = useMemo(() => {
     if (!book.summaryScript || !duration) return [];
@@ -94,19 +200,83 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
     setCurrentTime(offset);
   }, [duration, playbackRate]);
 
+  // Init Web Speech synthesis
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      synthRef.current = window.speechSynthesis;
+    }
+    return () => {
+      synthRef.current?.cancel();
+    };
+  }, []);
+
+  // Sync spoken audio with visual active line
+  useEffect(() => {
+    if (!isPlaying || !isVoiceEnabled || activePhraseIndex === -1 || !timedLines[activePhraseIndex] || !synthRef.current) {
+      synthRef.current?.cancel();
+      return;
+    }
+
+    try {
+      synthRef.current.cancel();
+
+      const textToSpeak = timedLines[activePhraseIndex].text;
+      const utterance = new SpeechSynthesisUtterance(textToSpeak);
+      utterance.rate = playbackRate * 1.05;
+      
+      if (selectedVoiceName) {
+        const chosenVoice = synthRef.current.getVoices().find(v => v.name === selectedVoiceName);
+        if (chosenVoice) {
+          utterance.voice = chosenVoice;
+        }
+      }
+
+      utteranceRef.current = utterance;
+
+      synthRef.current.speak(utterance);
+    } catch (e) {
+      console.error("TTS failed to speak:", e);
+    }
+
+    return () => {
+      synthRef.current?.cancel();
+    };
+  }, [activePhraseIndex, isPlaying, isVoiceEnabled, timedLines, playbackRate, selectedVoiceName]);
+
   useEffect(() => {
     const initAudio = async () => {
-      if (!book.audioSummaryUrl) return;
+      if (!book.audioSummaryUrl && !book.summaryScript) return;
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       audioContextRef.current = audioContext;
       try {
-        const rawBytes = decodeBase64(book.audioSummaryUrl);
-        const buffer = await decodeAudioData(rawBytes, audioContext, 24000, 1);
+        let buffer: AudioBuffer;
+        if (book.audioSummaryUrl) {
+          const rawBytes = decodeBase64(book.audioSummaryUrl);
+          buffer = await decodeAudioData(rawBytes, audioContext, 24000, 1);
+          
+          // If decoded buffer is a placeholder (i.e. very short duration), generate beautiful lo-fi background track instead
+          if (buffer.duration < 2.0) {
+            console.log("Generating high-fidelity lo-fi background ambient track of duration:", calculatedDuration);
+            buffer = generateAmbientPad(audioContext, calculatedDuration, 24000);
+          }
+        } else {
+          console.log("No audio URL found but script is present. Generating procedural ambient background pad.");
+          buffer = generateAmbientPad(audioContext, calculatedDuration, 24000);
+        }
+
         audioBufferRef.current = buffer;
         setDuration(buffer.duration);
         setIsReady(true);
       } catch (err) {
-        console.error("Audio error:", err);
+        console.error("Audio decoding error, falling back to procedural generation:", err);
+        try {
+          const buffer = generateAmbientPad(audioContext, calculatedDuration, 24000);
+          audioBufferRef.current = buffer;
+          setDuration(buffer.duration);
+          setIsReady(true);
+        } catch (fallbackErr) {
+          console.error("Procedural generation fallback failed:", fallbackErr);
+        }
       }
     };
     initAudio();
@@ -115,7 +285,7 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
       audioContextRef.current?.close();
       cancelAnimationFrame(rafRef.current);
     };
-  }, [book.audioSummaryUrl]);
+  }, [book.audioSummaryUrl, book.summaryScript, calculatedDuration]);
 
   const updateProgress = useCallback(() => {
     if (!audioContextRef.current || !isPlaying) return;
@@ -422,7 +592,40 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
                                 <button onClick={() => playAt(Math.min(duration, currentTime + 10))} className="bg-[var(--color-background)] border-2 border-black p-2 shadow-[2px_2px_0_#000] text-[var(--color-primary-text)] rounded-none hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all">
                                     <IconForward className="w-5 h-5" />
                                 </button>
+                                <button 
+                                    onClick={() => setIsVoiceEnabled(!isVoiceEnabled)} 
+                                    className={`border-2 border-black p-2 shadow-[2px_2px_0_#000] rounded-none hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all ${isVoiceEnabled ? 'bg-cyan-400 text-black' : 'bg-gray-200 text-gray-500'}`}
+                                    title={isVoiceEnabled ? "Mute voice narration" : "Unmute voice narration"}
+                                >
+                                    {isVoiceEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+                                </button>
                             </div>
+
+                            {/* Voice Selector */}
+                            {voices.length > 0 && (
+                                <div className="w-full space-y-2 mt-4 px-2">
+                                    <label className="text-[10px] font-black tracking-widest uppercase text-[var(--color-primary-text)] block">
+                                        Voice narration:
+                                    </label>
+                                    <select
+                                        value={selectedVoiceName}
+                                        onChange={(e) => {
+                                            setSelectedVoiceName(e.target.value);
+                                            localStorage.setItem("zizhi-preferred-voice", e.target.value);
+                                            if (isPlaying) {
+                                                synthRef.current?.cancel();
+                                            }
+                                        }}
+                                        className="w-full bg-[var(--color-surface)] border-2 border-black p-2 font-mono text-xs rounded-none focus:outline-none shadow-[2px_2px_0_#000] focus:translate-x-[1px] focus:translate-y-[1px] focus:shadow-none transition-all text-[var(--color-primary-text)] cursor-pointer"
+                                    >
+                                        {voices.map(voice => (
+                                            <option key={voice.name} value={voice.name} className="bg-[var(--color-surface)]">
+                                                {voice.name} ({voice.lang}) {voice.name.toLowerCase().includes("natural") || voice.name.toLowerCase().includes("google") || voice.name.toLowerCase().includes("premium") || voice.name.toLowerCase().includes("neural") ? "✨" : ""}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -459,16 +662,48 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
                 </div>
             </div>
             {/* Mobile-only playback controls */}
-            <div className="flex items-center justify-center gap-6 mt-3">
-                <button onClick={() => playAt(Math.max(0, currentTime - 10))} className="bg-[var(--color-background)] border-2 border-black p-2 shadow-[2px_2px_0_#000] text-[var(--color-primary-text)] rounded-none"><IconRewind className="w-5 h-5" /></button>
-                <button 
-                    onClick={handlePlayPause} 
-                    disabled={!isReady}
-                    className="w-14 h-14 bg-pink-500 border-4 border-black shadow-[4px_4px_0_#000] flex flex-col items-center justify-center transition-all disabled:opacity-50 rounded-none"
-                >
-                    {isPlaying ? <IconPause className="w-5 h-5 text-white" /> : <IconPlay className="w-5 h-5 pl-1 text-white" />}
-                </button>
-                <button onClick={() => playAt(Math.min(duration, currentTime + 10))} className="bg-[var(--color-background)] border-2 border-black p-2 shadow-[2px_2px_0_#000] text-[var(--color-primary-text)] rounded-none"><IconForward className="w-5 h-5" /></button>
+            <div className="flex flex-col items-center gap-3 mt-3">
+                <div className="flex items-center justify-center gap-6">
+                    <button onClick={() => playAt(Math.max(0, currentTime - 10))} className="bg-[var(--color-background)] border-2 border-black p-2 shadow-[2px_2px_0_#000] text-[var(--color-primary-text)] rounded-none"><IconRewind className="w-5 h-5" /></button>
+                    <button 
+                        onClick={handlePlayPause} 
+                        disabled={!isReady}
+                        className="w-14 h-14 bg-pink-500 border-4 border-black shadow-[4px_4px_0_#000] flex flex-col items-center justify-center transition-all disabled:opacity-50 rounded-none"
+                    >
+                        {isPlaying ? <IconPause className="w-5 h-5 text-white" /> : <IconPlay className="w-5 h-5 pl-1 text-white" />}
+                    </button>
+                    <button onClick={() => playAt(Math.min(duration, currentTime + 10))} className="bg-[var(--color-background)] border-2 border-black p-2 shadow-[2px_2px_0_#000] text-[var(--color-primary-text)] rounded-none"><IconForward className="w-5 h-5" /></button>
+                    <button 
+                        onClick={() => setIsVoiceEnabled(!isVoiceEnabled)} 
+                        className={`border-2 border-black p-2 shadow-[2px_2px_0_#000] rounded-none ${isVoiceEnabled ? 'bg-cyan-400 text-black' : 'bg-gray-200 text-gray-500'}`}
+                    >
+                        {isVoiceEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+                    </button>
+                </div>
+
+                {/* Mobile voice selector */}
+                {voices.length > 0 && (
+                    <div className="w-full flex items-center justify-between gap-2 px-2">
+                        <span className="text-[9px] font-black tracking-widest uppercase text-[var(--color-primary-text)] whitespace-nowrap">Voice:</span>
+                        <select
+                          value={selectedVoiceName}
+                          onChange={(e) => {
+                            setSelectedVoiceName(e.target.value);
+                            localStorage.setItem("zizhi-preferred-voice", e.target.value);
+                            if (isPlaying) {
+                              synthRef.current?.cancel();
+                            }
+                          }}
+                          className="flex-1 max-w-[200px] bg-[var(--color-background)] border-2 border-black py-1 px-2 font-mono text-[10px] rounded-none focus:outline-none text-[var(--color-primary-text)] cursor-pointer"
+                        >
+                          {voices.map(voice => (
+                            <option key={voice.name} value={voice.name}>
+                              {voice.name.replace("Microsoft", "MS").replace("Google", "G")}
+                            </option>
+                          ))}
+                        </select>
+                    </div>
+                )}
             </div>
         </footer>
     </div>

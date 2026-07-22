@@ -161,7 +161,7 @@ const QuotesView: FC<QuotesViewProps> = ({ quotes, library = [], theme, onDelete
       if (!apiKey) return null;
 
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
       
       const payload = quotes.map(q => ({
         id: q.id,
