@@ -329,7 +329,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShow
             try {
                 // Ensure proper instantiating format
                 const genAI = new GoogleGenerativeAI(process.env.API_KEY || "");
-                const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+                const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
                 
                 // Represent library items to Gemini clearly
                 const bookBriefs = library

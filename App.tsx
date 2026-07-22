@@ -596,7 +596,7 @@ const App: FC = () => {
     
     try {
         const genAI = new GoogleGenerativeAI(process.env.API_KEY || "");
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
         
         setGenerationStatuses(prev => ({ ...prev, [bookId]: { stage: 'Thinking', progress: 0.2, currentAction: 'Distilling content...' } }));
 
