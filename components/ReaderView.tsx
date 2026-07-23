@@ -240,18 +240,29 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
     useEffect(() => {
         if (book.isPdf && book.pdfData && typeof pdfjsLib !== 'undefined') {
             setIsPdfLoading(true);
-            const loadingTask = pdfjsLib.getDocument({ 
-                data: book.pdfData,
-                disableAutoFetch: true,
-                disableStream: true
-            });
-            loadingTask.promise.then((pdf: any) => {
-                setPdfDocument(pdf);
+            try {
+                const rawData = book.pdfData instanceof Uint8Array 
+                    ? book.pdfData 
+                    : new Uint8Array(book.pdfData);
+                
+                // Always pass a sliced copy so pdf.js worker transfer does not detach the original buffer
+                const dataCopy = rawData.slice(0);
+                const loadingTask = pdfjsLib.getDocument({ 
+                    data: dataCopy,
+                    disableAutoFetch: true,
+                    disableStream: true
+                });
+                loadingTask.promise.then((pdf: any) => {
+                    setPdfDocument(pdf);
+                    setIsPdfLoading(false);
+                }).catch((err: any) => {
+                    console.error("Error loading PDF document:", err);
+                    setIsPdfLoading(false);
+                });
+            } catch (err) {
+                console.error("Failed to prepare PDF data:", err);
                 setIsPdfLoading(false);
-            }).catch((err: any) => {
-                console.error("Error loading PDF document:", err);
-                setIsPdfLoading(false);
-            });
+            }
         }
     }, [book.isPdf, book.pdfData]);
 
@@ -344,7 +355,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
     };
 
     const navigateToHighlight = useCallback((locationId: string, searchText?: string) => {
-        const chapterId = book.isPdf ? `pdf-page-${parseInt(locationId.split('-').pop() || '1')}` : `chapter-${locationId.replace(/[^a-zA-Z0-9]/g, '-')}`;
+        const chapterId = book.isPdf ? `pdf-page-${parseInt((locationId || '').split('-').pop() || '1')}` : `chapter-${(locationId || '').replace(/[^a-zA-Z0-9]/g, '-')}`;
         let chapterElement = document.getElementById(chapterId);
         
         if (scrollViewportRef.current) {
@@ -434,6 +445,41 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
         return () => observer.disconnect();
     }, [isInitialScrollDone, book.chapters.length, book.isPdf]);
 
+    const handleCloseReader = () => {
+        if (scrollViewportRef.current) {
+            const viewport = scrollViewportRef.current;
+            const { scrollHeight, clientHeight, scrollTop } = viewport;
+            const progress = scrollHeight > clientHeight ? scrollTop / (scrollHeight - clientHeight) : 0;
+            const timeSpent = Math.max(0, Math.floor((Date.now() - lastUpdateRef.current) / 1000));
+            onUpdateProgress(book.id, currentChapterIndex, scrollTop, timeSpent, progress);
+        }
+        onClose();
+    };
+
+    useEffect(() => {
+        return () => {
+            if (scrollViewportRef.current) {
+                const viewport = scrollViewportRef.current;
+                const { scrollHeight, clientHeight, scrollTop } = viewport;
+                const progress = scrollHeight > clientHeight ? scrollTop / (scrollHeight - clientHeight) : 0;
+                const timeSpent = Math.max(0, Math.floor((Date.now() - lastUpdateRef.current) / 1000));
+                onUpdateProgress(book.id, currentChapterIndex, scrollTop, timeSpent, progress);
+            }
+        };
+    }, [book.id, currentChapterIndex, onUpdateProgress]);
+
+    useEffect(() => {
+        if (sidebarTab === 'chapters' && (isDesktopSidebarOpen || showToc)) {
+            const timer = setTimeout(() => {
+                const activeEl = document.querySelector('[data-active="true"]');
+                if (activeEl) {
+                    activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                }
+            }, 150);
+            return () => clearTimeout(timer);
+        }
+    }, [currentChapterIndex, sidebarTab, isDesktopSidebarOpen, showToc]);
+
     useEffect(() => {
         const handleResize = () => {
             const desk = window.innerWidth >= 1280;
@@ -444,26 +490,55 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
     }, []);
 
     useEffect(() => {
-        if (!isInitialScrollDone && scrollViewportRef.current) {
+        if (isInitialScrollDone) return;
+        if (!scrollViewportRef.current) return;
+
+        // For PDF, wait until pdfDocument is initialized
+        if (book.isPdf && (isPdfLoading || !pdfDocument)) return;
+
+        const performInitialScroll = () => {
+            const viewport = scrollViewportRef.current;
+            if (!viewport) return;
+
             if (initialChapterId) {
-                const timer = setTimeout(() => {
-                    navigateToHighlight(initialChapterId, initialSearchText || undefined);
-                    setIsInitialScrollDone(true);
-                }, 800);
-                return () => clearTimeout(timer);
-            } else if (book.lastScrollTop > 0) {
-                const scrollTimer = setTimeout(() => {
-                    if (scrollViewportRef.current) {
-                        scrollViewportRef.current.scrollTo({ top: book.lastScrollTop, behavior: 'auto' });
-                        setIsInitialScrollDone(true);
-                    }
-                }, 400);
-                return () => clearTimeout(scrollTimer);
-            } else {
+                navigateToHighlight(initialChapterId, initialSearchText || undefined);
                 setIsInitialScrollDone(true);
+                return;
             }
-        }
-    }, [isInitialScrollDone, initialChapterId, initialSearchText, book.lastScrollTop, navigateToHighlight]);
+
+            const savedIndex = typeof book.lastChapterIndex === 'number' && book.lastChapterIndex >= 0
+                ? book.lastChapterIndex
+                : (book.progress && book.progress > 0 ? Math.min(book.chapters.length - 1, Math.floor(book.progress * book.chapters.length)) : 0);
+
+            if (savedIndex > 0 || (book.lastScrollTop && book.lastScrollTop > 0)) {
+                setCurrentChapterIndex(savedIndex);
+
+                const elementId = book.isPdf 
+                    ? `pdf-page-${savedIndex + 1}` 
+                    : `chapter-${book.chapters[savedIndex]?.id?.replace(/[^a-zA-Z0-9]/g, '-') || savedIndex}`;
+                
+                const targetElement = document.getElementById(elementId);
+
+                if (targetElement) {
+                    const containerRect = viewport.getBoundingClientRect();
+                    const targetRect = targetElement.getBoundingClientRect();
+                    const scrollOffset = targetRect.top - containerRect.top + viewport.scrollTop;
+                    
+                    const targetScrollTop = (book.lastScrollTop && book.lastScrollTop > 0)
+                        ? book.lastScrollTop
+                        : scrollOffset;
+
+                    viewport.scrollTo({ top: targetScrollTop, behavior: 'auto' });
+                } else if (book.lastScrollTop && book.lastScrollTop > 0) {
+                    viewport.scrollTo({ top: book.lastScrollTop, behavior: 'auto' });
+                }
+            }
+            setIsInitialScrollDone(true);
+        };
+
+        const timer = setTimeout(performInitialScroll, book.isPdf ? 300 : 100);
+        return () => clearTimeout(timer);
+    }, [isInitialScrollDone, isPdfLoading, pdfDocument, initialChapterId, initialSearchText, book, navigateToHighlight]);
 
     useEffect(() => {
         const handleSelection = () => {
@@ -489,8 +564,35 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
         const progress = scrollHeight > clientHeight ? position.y / (scrollHeight - clientHeight) : 0;
         setScrollProgress(progress);
 
+        if (isInitialScrollDone) {
+            const viewport = scrollViewportRef.current;
+            const containerRect = viewport.getBoundingClientRect();
+            const sections = viewport.querySelectorAll('section[data-index]');
+            
+            let closestIndex = -1;
+            let minDistance = Infinity;
+
+            sections.forEach((section) => {
+                const rect = section.getBoundingClientRect();
+                if (rect.bottom > containerRect.top + 30 && rect.top < containerRect.bottom - 30) {
+                    const dist = Math.abs(rect.top - containerRect.top);
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        const idxAttr = section.getAttribute('data-index');
+                        if (idxAttr !== null) {
+                            closestIndex = parseInt(idxAttr, 10);
+                        }
+                    }
+                }
+            });
+
+            if (closestIndex !== -1) {
+                setCurrentChapterIndex(prev => prev !== closestIndex ? closestIndex : prev);
+            }
+        }
+
         const now = Date.now();
-        if (now - lastUpdateRef.current > 3000) {
+        if (now - lastUpdateRef.current > 2000) {
             const timeSpent = Math.floor((now - lastUpdateRef.current) / 1000);
             onUpdateProgress(book.id, currentChapterIndex, position.y, timeSpent, progress);
             lastUpdateRef.current = now;
@@ -542,31 +644,78 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
                         </div>
                         <ScrollArea className="flex-1 p-6">
                             {sidebarTab === 'chapters' ? (
-                                book.isPdf && pdfDocument ? (
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {book.chapters.map((item, idx) => (
-                                            <PdfThumbnail 
-                                                key={idx}
-                                                pdfDocument={pdfDocument}
-                                                pageNumber={idx + 1}
-                                                isActive={idx === currentChapterIndex}
-                                                onClick={() => navigateToChapter(idx)}
-                                            />
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <Stack gap={4}>
-                                        {book.chapters.map((item, idx) => (
-                                            <Box key={idx} 
-                                                className={`p-5 cursor-pointer border-4 transition-all ${idx === currentChapterIndex ? 'bg-cyan-400 border-black shadow-[4px_4px_0_black] -translate-y-1' : 'bg-transparent border-transparent hover:border-black'}`}
-                                                style={{ borderRadius: '0px' }}
-                                                onClick={() => navigateToChapter(idx)}
-                                            >
-                                                <Text className="text-[11px] font-black leading-relaxed line-clamp-2" style={{ color: 'var(--text-color)' }}>{item.label}</Text>
-                                            </Box>
-                                        ))}
-                                    </Stack>
-                                )
+                                <Stack gap="md">
+                                    <Box className="p-3 bg-cyan-400/20 border-2 border-black shadow-[2px_2px_0_black]">
+                                        <div className="flex items-center justify-between mb-1">
+                                            <Text className="text-[10px] font-black uppercase tracking-wider text-[var(--text-color)]">
+                                                Reading Progress
+                                            </Text>
+                                            <Text className="text-[10px] font-black uppercase tracking-wider text-[var(--text-color)]">
+                                                {Math.round(scrollProgress * 100)}%
+                                            </Text>
+                                        </div>
+                                        <div className="w-full h-2 bg-white/50 border border-black overflow-hidden relative">
+                                            <div className="h-full bg-cyan-400 transition-all duration-300" style={{ width: `${scrollProgress * 100}%` }} />
+                                        </div>
+                                        <Text className="text-[9px] font-bold uppercase tracking-tight text-[var(--sec-text)] opacity-80 mt-1.5">
+                                            {book.isPdf ? `Page ${currentChapterIndex + 1} of ${book.chapters.length}` : `Chapter ${currentChapterIndex + 1} of ${book.chapters.length}`}
+                                        </Text>
+                                    </Box>
+
+                                    {book.isPdf && pdfDocument ? (
+                                        <div className="grid grid-cols-2 gap-3 w-full">
+                                            {book.chapters.map((item, idx) => (
+                                                <PdfThumbnail 
+                                                    key={idx}
+                                                    pdfDocument={pdfDocument}
+                                                    pageNumber={idx + 1}
+                                                    isActive={idx === currentChapterIndex}
+                                                    onClick={() => navigateToChapter(idx)}
+                                                />
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <Stack gap="xs">
+                                            {book.chapters.map((item, idx) => {
+                                                const isActive = idx === currentChapterIndex;
+                                                const isRead = idx < currentChapterIndex;
+                                                return (
+                                                    <Box 
+                                                        key={idx} 
+                                                        data-active={isActive ? 'true' : undefined}
+                                                        className={`p-4 cursor-pointer border-2 transition-all flex flex-col gap-1 ${
+                                                            isActive 
+                                                                ? 'bg-cyan-400 border-black shadow-[4px_4px_0_black] -translate-y-0.5' 
+                                                                : isRead
+                                                                ? 'bg-black/5 border-black/20 hover:border-black'
+                                                                : 'bg-transparent border-black/10 hover:border-black'
+                                                        }`}
+                                                        onClick={() => navigateToChapter(idx)}
+                                                    >
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <Text className="text-[10px] font-black uppercase tracking-widest text-[var(--sec-text)]">
+                                                                Chapter {idx + 1}
+                                                            </Text>
+                                                            {isActive && (
+                                                                <span className="bg-black text-white px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider">
+                                                                    Current
+                                                                </span>
+                                                            )}
+                                                            {!isActive && isRead && (
+                                                                <span className="text-emerald-800 font-bold text-[9px]">
+                                                                    ✓ Read
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <Text className={`text-[12px] font-black leading-snug line-clamp-2 ${isActive ? 'text-black' : 'text-[var(--text-color)]'}`}>
+                                                            {item.label}
+                                                        </Text>
+                                                    </Box>
+                                                );
+                                            })}
+                                        </Stack>
+                                    )}
+                                </Stack>
                             ) : (
                                 <Stack gap="xl">
                                     {notes.length === 0 && quotes.length === 0 ? (
@@ -593,6 +742,11 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
                                                     className="border-l-4 border-cyan-400 pl-4 py-1 cursor-pointer hover:bg-black/5 transition-colors"
                                                     onClick={() => quote.location && navigateToHighlight(quote.location, quote.text)}
                                                 >
+                                                    {quote.bookTitle && (
+                                                        <Text className="text-[9px] font-black uppercase tracking-wider text-cyan-600 mb-0.5">
+                                                            {quote.bookTitle} {quote.author ? `— ${quote.author}` : ''}
+                                                        </Text>
+                                                    )}
                                                     <Text className="text-[11px] font-serif italic mb-2 line-clamp-4">"{quote.text}"</Text>
                                                 </Box>
                                             ))}
@@ -605,9 +759,9 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
                 )}
             </Transition>
 
-            <Box className="flex-1 flex flex-col h-full relative">
+            <Box className="flex-1 min-w-0 flex flex-col h-full relative overflow-hidden">
                 <header className="h-16 md:h-20 bg-[var(--bg-color)] border-b-4 border-black flex items-center justify-between px-6 md:px-8 z-[1200] shadow-[0_4px_0_rgba(0,0,0,0.05)]">
-                    <ActionIcon variant="filled" color="cyan" size="lg" onClick={onClose} className="border-2 border-black rounded-none shadow-[3px_3px_0_black] bg-[var(--bg-color)]"><IconChevronLeft className="text-[var(--text-color)] w-5 h-5" /></ActionIcon>
+                    <ActionIcon variant="filled" color="cyan" size="lg" onClick={handleCloseReader} className="border-2 border-black rounded-none shadow-[3px_3px_0_black] bg-[var(--bg-color)]"><IconChevronLeft className="text-[var(--text-color)] w-5 h-5" /></ActionIcon>
                     
                     <Group gap="xs" className="flex items-center">
                         <Text className="text-[11px] md:text-[13px] font-black uppercase tracking-widest text-[var(--text-color)]">
@@ -829,30 +983,78 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
                             
                             <ScrollArea className="flex-1 p-6">
                                 {sidebarTab === 'chapters' ? (
-                                    book.isPdf && pdfDocument ? (
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {book.chapters.map((item, idx) => (
-                                                <PdfThumbnail 
-                                                    key={idx}
-                                                    pdfDocument={pdfDocument}
-                                                    pageNumber={idx + 1}
-                                                    isActive={idx === currentChapterIndex}
-                                                    onClick={() => navigateToChapter(idx)}
-                                                />
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <Stack gap={4}>
-                                            {book.chapters.map((item, idx) => (
-                                                <Box key={idx} 
-                                                    className={`p-4 cursor-pointer border-2 transition-all ${idx === currentChapterIndex ? 'bg-cyan-400 border-black shadow-[3px_3px_0_black]' : 'border-transparent'}`}
-                                                    onClick={() => navigateToChapter(idx)}
-                                                >
-                                                    <Text className="text-[11px] font-bold text-[var(--text-color)] line-clamp-2">{item.label}</Text>
-                                                </Box>
-                                            ))}
-                                        </Stack>
-                                    )
+                                    <Stack gap="md">
+                                        <Box className="p-3 bg-cyan-400/20 border-2 border-black shadow-[2px_2px_0_black]">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <Text className="text-[10px] font-black uppercase tracking-wider text-[var(--text-color)]">
+                                                    Reading Progress
+                                                </Text>
+                                                <Text className="text-[10px] font-black uppercase tracking-wider text-[var(--text-color)]">
+                                                    {Math.round(scrollProgress * 100)}%
+                                                </Text>
+                                            </div>
+                                            <div className="w-full h-2 bg-white/50 border border-black overflow-hidden relative">
+                                                <div className="h-full bg-cyan-400 transition-all duration-300" style={{ width: `${scrollProgress * 100}%` }} />
+                                            </div>
+                                            <Text className="text-[9px] font-bold uppercase tracking-tight text-[var(--sec-text)] opacity-80 mt-1.5">
+                                                {book.isPdf ? `Page ${currentChapterIndex + 1} of ${book.chapters.length}` : `Chapter ${currentChapterIndex + 1} of ${book.chapters.length}`}
+                                            </Text>
+                                        </Box>
+
+                                        {book.isPdf && pdfDocument ? (
+                                            <div className="grid grid-cols-2 gap-3 w-full">
+                                                {book.chapters.map((item, idx) => (
+                                                    <PdfThumbnail 
+                                                        key={idx}
+                                                        pdfDocument={pdfDocument}
+                                                        pageNumber={idx + 1}
+                                                        isActive={idx === currentChapterIndex}
+                                                        onClick={() => navigateToChapter(idx)}
+                                                    />
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <Stack gap="xs">
+                                                {book.chapters.map((item, idx) => {
+                                                    const isActive = idx === currentChapterIndex;
+                                                    const isRead = idx < currentChapterIndex;
+                                                    return (
+                                                        <Box 
+                                                            key={idx} 
+                                                            data-active={isActive ? 'true' : undefined}
+                                                            className={`p-4 cursor-pointer border-2 transition-all flex flex-col gap-1 ${
+                                                                isActive 
+                                                                    ? 'bg-cyan-400 border-black shadow-[3px_3px_0_black] -translate-y-0.5' 
+                                                                    : isRead
+                                                                    ? 'bg-black/5 border-black/20 hover:border-black'
+                                                                    : 'bg-transparent border-black/10 hover:border-black'
+                                                            }`}
+                                                            onClick={() => navigateToChapter(idx)}
+                                                        >
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <Text className="text-[10px] font-black uppercase tracking-widest text-[var(--sec-text)]">
+                                                                    Chapter {idx + 1}
+                                                                </Text>
+                                                                {isActive && (
+                                                                    <span className="bg-black text-white px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider">
+                                                                        Current
+                                                                    </span>
+                                                                )}
+                                                                {!isActive && isRead && (
+                                                                    <span className="text-emerald-800 font-bold text-[9px]">
+                                                                        ✓ Read
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <Text className={`text-[12px] font-black leading-snug line-clamp-2 ${isActive ? 'text-black' : 'text-[var(--text-color)]'}`}>
+                                                                {item.label}
+                                                            </Text>
+                                                        </Box>
+                                                    );
+                                                })}
+                                            </Stack>
+                                        )}
+                                    </Stack>
                                 ) : (
                                     <Stack gap="xl">
                                         {notes.length === 0 && quotes.length === 0 ? (
@@ -879,6 +1081,11 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
                                                         className="border-l-4 border-cyan-400 pl-4 py-1 cursor-pointer hover:bg-black/5 transition-colors"
                                                         onClick={() => quote.location && navigateToHighlight(quote.location, quote.text)}
                                                     >
+                                                        {quote.bookTitle && (
+                                                            <Text className="text-[9px] font-black uppercase tracking-wider text-cyan-600 mb-0.5">
+                                                                {quote.bookTitle} {quote.author ? `— ${quote.author}` : ''}
+                                                            </Text>
+                                                        )}
                                                         <Text className="text-[11px] font-serif italic mb-2 line-clamp-4">"{quote.text}"</Text>
                                                     </Box>
                                                 ))}

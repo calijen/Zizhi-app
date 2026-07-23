@@ -13,7 +13,9 @@ interface SummaryViewProps {
 }
 
 function decodeBase64(base64: string) {
-  const binaryString = atob(base64.split(',')[1] || base64);
+  if (!base64) return new Uint8Array(0);
+  const parts = base64.split(',');
+  const binaryString = atob(parts[1] || base64);
   const len = binaryString.length;
   const bytes = new Uint8Array(len);
   for (let i = 0; i < len; i++) {
@@ -158,14 +160,14 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
 
   // Calculate high-fidelity duration based on reading speed (approx 135 words per minute)
   const calculatedDuration = useMemo(() => {
-    if (!book.summaryScript) return 60;
-    const wordCount = book.summaryScript.split(/\s+/).filter(Boolean).length;
+    if (!book?.summaryScript) return 60;
+    const wordCount = (book.summaryScript || '').split(/\s+/).filter(Boolean).length;
     return Math.max(30, Math.ceil((wordCount / 135) * 60));
-  }, [book.summaryScript]);
+  }, [book?.summaryScript]);
 
   const timedLines = useMemo(() => {
-    if (!book.summaryScript || !duration) return [];
-    const processedLines = book.summaryScript.split(/\n\n+/).flatMap(p => p.match(/[^.!?]+[.!?]+/g) || [p]).map(line => line.trim()).filter(l => l.length > 5);
+    if (!book?.summaryScript || !duration) return [];
+    const processedLines = (book.summaryScript || '').split(/\n\n+/).flatMap(p => p.match(/[^.!?]+[.!?]+/g) || [p]).map(line => line.trim()).filter(l => l.length > 5);
     const totalChars = processedLines.reduce((acc, l) => acc + l.length, 0);
     let accumulatedTime = 0;
     return processedLines.map((text) => {
@@ -388,7 +390,7 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `${book.title.replace(/\s+/g, '_')}_Insight.${mimeType.split('/')[1]}`;
+        link.download = `${(book?.title || 'Book').replace(/\s+/g, '_')}_Insight.${(mimeType || '').split('/')[1] || 'mp4'}`;
         link.click();
         setIsExporting(false);
     };
@@ -452,7 +454,7 @@ const SummaryView: React.FC<SummaryViewProps> = ({ book, onClose }) => {
             ctx.textBaseline = 'top';
             
             // Draw highlight box
-            const words = activeLine.text.toUpperCase().split(' ');
+            const words = (activeLine?.text || '').toUpperCase().split(' ');
             let line = '';
             let lines = [];
             for (let n = 0; n < words.length; n++) {

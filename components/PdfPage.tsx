@@ -87,10 +87,15 @@ const PdfPage: React.FC<PdfPageProps> = ({ pdfDocument, pageNumber, scale = 1.5 
         renderTaskRef.current = page.render(renderContext);
         await renderTaskRef.current.promise;
 
+        if (containerRef.current) {
+          containerRef.current.style.setProperty('--scale-factor', `${viewport.scale}`);
+        }
+
         if (textLayerRef.current) {
           textLayerRef.current.innerHTML = '';
           textLayerRef.current.style.width = `${viewport.width}px`;
           textLayerRef.current.style.height = `${viewport.height}px`;
+          textLayerRef.current.style.setProperty('--scale-factor', `${viewport.scale}`);
           
           try {
             const textContent = await page.getTextContent({

@@ -159,117 +159,69 @@ const App: FC = () => {
         db.getNotes().catch(() => [])
       ]);
       
+      // Deduplicate local books by title & author (keeping the most recently opened)
+      const groupedLocal = new Map<string, BookMetadata[]>();
+      localBooks.forEach(b => {
+          const key = getBookUniqueKey(b.title, b.author);
+          if (!groupedLocal.has(key)) {
+              groupedLocal.set(key, []);
+          }
+          groupedLocal.get(key)!.push(b);
+      });
+
+      const deduplicatedLocalBooks: BookMetadata[] = [];
+      const duplicateIdsToDeleteOffline: string[] = [];
+
+      for (const list of groupedLocal.values()) {
+          if (list.length === 1) {
+              deduplicatedLocalBooks.push(list[0]);
+          } else {
+              list.sort((a, b) => (b.lastOpened || 0) - (a.lastOpened || 0));
+              deduplicatedLocalBooks.push(list[0]);
+              for (let i = 1; i < list.length; i++) {
+                  duplicateIdsToDeleteOffline.push(list[i].id);
+              }
+          }
+      }
+
+      if (duplicateIdsToDeleteOffline.length > 0) {
+          duplicateIdsToDeleteOffline.forEach(id => db.deleteBook(id).catch(() => {}));
+      }
+
       if (currentUser) {
-          // Sync with Firestore
+          // Sync books, quotes, and notes with Firestore
           const booksRef = collection(firestore, 'users', currentUser.uid, 'books');
           const quotesRef = collection(firestore, 'users', currentUser.uid, 'quotes');
           const notesRef = collection(firestore, 'users', currentUser.uid, 'notes');
 
           const [cloudBooksSnap, cloudQuotesSnap, cloudNotesSnap] = await Promise.all([
-              getDocs(booksRef),
-              getDocs(quotesRef),
-              getDocs(notesRef)
+              getDocs(booksRef).catch(() => null),
+              getDocs(quotesRef).catch(() => null),
+              getDocs(notesRef).catch(() => null)
           ]);
 
-          const cloudBooks = cloudBooksSnap.docs.map(doc => doc.data() as BookMetadata);
-          const cloudQuotes = cloudQuotesSnap.docs.map(doc => doc.data() as Quote);
-          const cloudNotes = cloudNotesSnap.docs.map(doc => doc.data() as Note);
+          const cloudBooks = cloudBooksSnap ? cloudBooksSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as BookMetadata) })) : [];
+          const cloudQuotes = cloudQuotesSnap ? cloudQuotesSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as Quote) })) : [];
+          const cloudNotes = cloudNotesSnap ? cloudNotesSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as Note) })) : [];
 
           // Intelligent merge for books
           const mergedBooksMap = new Map<string, BookMetadata>();
-          localBooks.forEach(b => mergedBooksMap.set(b.id, b));
+          deduplicatedLocalBooks.forEach(b => mergedBooksMap.set(b.id, b));
           cloudBooks.forEach(cb => {
-              const existing = mergedBooksMap.get(cb.id);
-              if (!existing) {
+              if (!mergedBooksMap.has(cb.id)) {
                   mergedBooksMap.set(cb.id, cb);
               } else {
-                  // Merge: prioritize newer timestamps, but ALWAYS preserve fileUrl & storagePath if present in cloud
-                  const newer = (cb.lastOpened || 0) > (existing.lastOpened || 0) ? cb : existing;
+                  const local = mergedBooksMap.get(cb.id)!;
                   mergedBooksMap.set(cb.id, {
-                      ...existing,
                       ...cb,
-                      ...newer,
-                      fileUrl: cb.fileUrl || existing.fileUrl,
-                      storagePath: cb.storagePath || existing.storagePath,
-                      fileName: cb.fileName || existing.fileName,
+                      ...local,
+                      progress: Math.max(local.progress || 0, cb.progress || 0),
+                      lastOpened: Math.max(local.lastOpened || 0, cb.lastOpened || 0)
                   });
               }
           });
-          const mergedBooksRaw = Array.from(mergedBooksMap.values());
 
-          // Deduplicate books with identical title & author (different IDs)
-          const groupedMerged = new Map<string, BookMetadata[]>();
-          mergedBooksRaw.forEach(b => {
-              const key = getBookUniqueKey(b.title, b.author);
-              if (!groupedMerged.has(key)) {
-                  groupedMerged.set(key, []);
-              }
-              groupedMerged.get(key)!.push(b);
-          });
-
-          const mergedBooks: BookMetadata[] = [];
-          const duplicateIdsToDeleteOnline: string[] = [];
-
-          for (const [key, list] of groupedMerged.entries()) {
-              if (list.length === 1) {
-                  mergedBooks.push(list[0]);
-              } else {
-                  // Sort to pick the best representation
-                  list.sort((a, b) => {
-                      const aHasFile = a.fileUrl || a.storagePath ? 1 : 0;
-                      const bHasFile = b.fileUrl || b.storagePath ? 1 : 0;
-                      if (aHasFile !== bHasFile) return bHasFile - aHasFile;
-                      return (b.lastOpened || 0) - (a.lastOpened || 0);
-                  });
-                  const best = list[0];
-                  mergedBooks.push(best);
-                  
-                  // Mark the rest as duplicates to delete
-                  for (let i = 1; i < list.length; i++) {
-                      duplicateIdsToDeleteOnline.push(list[i].id);
-                  }
-              }
-          }
-
-          // Delete extra duplicate entries safely in the background
-          if (duplicateIdsToDeleteOnline.length > 0) {
-              duplicateIdsToDeleteOnline.forEach(async (id) => {
-                  try {
-                      await db.deleteBook(id);
-                      await deleteDoc(doc(firestore, 'users', currentUser.uid, 'books', id));
-                  } catch (err) {
-                      console.error("Error deleting duplicate books in sync", err);
-                  }
-              });
-          }
-
-          // Asynchronously persist new/merged book metadata, quotes and notes back to IndexedDB so they are available offline!
-          mergedBooks.forEach(async (b) => {
-              const existingLocal = localBooks.find(lb => lb.id === b.id);
-              if (!existingLocal) {
-                  // Since the book only exists in the cloud, save a skeleton representation in IndexedDB.
-                  // It will be fully populated with actual content (chapters, etc.) when the user opens/reads it.
-                  await db.saveBook({
-                      ...b,
-                      chapters: [],
-                      toc: []
-                  });
-              } else {
-                  // Update metadata safely if there are any changes (like progress or storage paths)
-                  const hasMetaDiff = existingLocal.title !== b.title ||
-                                      existingLocal.author !== b.author ||
-                                      existingLocal.coverImageUrl !== b.coverImageUrl ||
-                                      existingLocal.progress !== b.progress ||
-                                      existingLocal.readingTime !== b.readingTime ||
-                                      existingLocal.fileUrl !== b.fileUrl ||
-                                      existingLocal.storagePath !== b.storagePath;
-                  if (hasMetaDiff) {
-                      await db.updateBookMetadata(b.id, b);
-                  }
-              }
-          });
-
-          // Intelligent merge for quotes/notes
+          // Intelligent merge for quotes and notes
           const mergedQuotesMap = new Map<string, Quote>();
           localQuotes.forEach(q => mergedQuotesMap.set(q.id, q));
           cloudQuotes.forEach(cq => mergedQuotesMap.set(cq.id, cq));
@@ -278,9 +230,34 @@ const App: FC = () => {
           localNotes.forEach(n => mergedNotesMap.set(n.id, n));
           cloudNotes.forEach(cn => mergedNotesMap.set(cn.id, cn));
 
+          const mergedBooks = Array.from(mergedBooksMap.values());
           const mergedQuotes = Array.from(mergedQuotesMap.values());
           const mergedNotes = Array.from(mergedNotesMap.values());
 
+          // Asynchronously upload local items to cloud if missing in Cloud
+          localQuotes.forEach(async (q) => {
+              const inCloud = cloudQuotes.some(cq => cq.id === q.id);
+              if (!inCloud) {
+                  const quoteRef = doc(firestore, 'users', currentUser.uid, 'quotes', q.id);
+                  setDoc(quoteRef, { ...q, userId: currentUser.uid }, { merge: true }).catch(() => {});
+              }
+          });
+          localNotes.forEach(async (n) => {
+              const inCloud = cloudNotes.some(cn => cn.id === n.id);
+              if (!inCloud) {
+                  const noteRef = doc(firestore, 'users', currentUser.uid, 'notes', n.id);
+                  setDoc(noteRef, { ...n, userId: currentUser.uid }, { merge: true }).catch(() => {});
+              }
+          });
+          deduplicatedLocalBooks.forEach(async (b) => {
+              const inCloud = cloudBooks.some(cb => cb.id === b.id);
+              if (!inCloud) {
+                  const bookRef = doc(firestore, 'users', currentUser.uid, 'books', b.id);
+                  setDoc(bookRef, { ...b, userId: currentUser.uid }, { merge: true }).catch(() => {});
+              }
+          });
+
+          // Asynchronously persist missing cloud quotes & notes to IndexedDB for offline access
           mergedQuotes.forEach(async (q) => {
               const existingLocal = localQuotes.find(lq => lq.id === q.id);
               if (!existingLocal) {
@@ -298,68 +275,20 @@ const App: FC = () => {
           setLibrary(mergedBooks);
           setQuotes(mergedQuotes);
           setNotes(mergedNotes);
-          
-          if (mergedBooks.length > 0) {
-              setHasEntered(true);
-          } else {
-              setHasEntered(false);
-          }
+
+          const storedEntered = localStorage.getItem('zizhi-entered') === 'true';
+          setHasEntered(storedEntered || mergedBooks.length > 0 || mergedQuotes.length > 0 || true);
       } else {
-          // Deduplicate books with identical title & author (different IDs) offline too
-          const groupedLocal = new Map<string, Book[]>();
-          localBooks.forEach(b => {
-              const key = getBookUniqueKey(b.title, b.author);
-              if (!groupedLocal.has(key)) {
-                  groupedLocal.set(key, []);
-              }
-              groupedLocal.get(key)!.push(b);
-          });
-
-          const deduplicatedLocalBooks: Book[] = [];
-          const duplicateIdsToDeleteOffline: string[] = [];
-
-          for (const [key, list] of groupedLocal.entries()) {
-              if (list.length === 1) {
-                  deduplicatedLocalBooks.push(list[0]);
-              } else {
-                  list.sort((a, b) => {
-                      const aHasFile = a.fileUrl || a.storagePath ? 1 : 0;
-                      const bHasFile = b.fileUrl || b.storagePath ? 1 : 0;
-                      if (aHasFile !== bHasFile) return bHasFile - aHasFile;
-                      return (b.lastOpened || 0) - (a.lastOpened || 0);
-                  });
-                  const best = list[0];
-                  deduplicatedLocalBooks.push(best);
-                  
-                  for (let i = 1; i < list.length; i++) {
-                      duplicateIdsToDeleteOffline.push(list[i].id);
-                  }
-              }
-          }
-
-          if (duplicateIdsToDeleteOffline.length > 0) {
-              duplicateIdsToDeleteOffline.forEach(async (id) => {
-                  try {
-                      await db.deleteBook(id);
-                  } catch (err) {
-                      console.error("Error deleting duplicate book offline", err);
-                  }
-              });
-          }
-
           setLibrary(deduplicatedLocalBooks);
           setQuotes(localQuotes);
           setNotes(localNotes);
-          
-          if (deduplicatedLocalBooks.length > 0) {
-              setHasEntered(true);
-          } else {
-              setHasEntered(false);
-          }
+          const storedEntered = localStorage.getItem('zizhi-entered') === 'true';
+          setHasEntered(storedEntered || deduplicatedLocalBooks.length > 0);
       }
     } catch (e) { 
         console.error("Load failed", e); 
-        setHasEntered(false); 
+        const storedEntered = localStorage.getItem('zizhi-entered') === 'true';
+        setHasEntered(storedEntered); 
     }
   }, [updateStreak]);
 
@@ -440,54 +369,40 @@ const App: FC = () => {
         const { chapters, toc, summaryScript, audioSummaryUrl, audioDuration, pdfData, ...metadata } = newBook;
         const metaWithFlags = { ...metadata, hasSummary: !!summaryScript, hasAudio: !!audioSummaryUrl };
         setLibrary(prev => [metaWithFlags, ...prev]);
+
+        // Sync metadata to Firestore for authenticated users
+        if (user) {
+            const bookRef = doc(firestore, 'users', user.uid, 'books', newBook.id);
+            setDoc(bookRef, { ...metaWithFlags, userId: user.uid }, { merge: true }).catch(err => console.error("Cloud book sync failed", err));
+        }
         
         // Release the UI lock
         setIsUploading(false);
         setToast({ message: `${file.name.toLowerCase().endsWith('.pdf') ? 'PDF' : 'EPUB'} added to library.` });
 
-        // Handle cloud sync in background
-        if (user) {
-            (async () => {
-                try {
-                    const storagePath = `users/${user.uid}/books/${newBook.id}/${file.name}`;
-                    const storageRef = ref(storage, storagePath);
-                    await uploadBytesResumable(storageRef, file);
-                    const fileUrl = await getDownloadURL(storageRef);
-                    
-                    // Sync cover image as a separate file in Firebase Storage if it's a local dataURL (base64)
-                    let syncCoverUrl = metadata.coverImageUrl;
-                    if (syncCoverUrl && syncCoverUrl.startsWith('data:')) {
-                        try {
-                            const res = await fetch(syncCoverUrl);
-                            const coverBlob = await res.blob();
-                            const coverStoragePath = `users/${user.uid}/books/${newBook.id}/cover.jpg`;
-                            const coverStorageRef = ref(storage, coverStoragePath);
-                            await uploadBytesResumable(coverStorageRef, coverBlob);
-                            syncCoverUrl = await getDownloadURL(coverStorageRef);
-                        } catch (coverErr) {
-                            console.error("Failed to upload cover to storage", coverErr);
-                        }
-                    }
-
-                    const bookRef = doc(firestore, 'users', user.uid, 'books', newBook.id);
-                    await setDoc(bookRef, { 
-                        ...metadata, 
-                        coverImageUrl: syncCoverUrl,
-                        userId: user.uid, 
-                        fileUrl, 
-                        storagePath,
-                        fileName: file.name,
-                        createdAt: Date.now() 
-                    });
-
-                    // Update local library state and local IndexedDB with cloud-synced fields
-                    setLibrary(prev => prev.map(b => b.id === newBook.id ? { ...b, fileUrl, storagePath, fileName: file.name, coverImageUrl: syncCoverUrl } : b));
-                    await db.updateBookMetadata(newBook.id, { fileUrl, storagePath, fileName: file.name, coverImageUrl: syncCoverUrl });
-                } catch (err) {
-                    console.error("Background cloud sync failed", err);
+        // Re-associate existing quotes and notes for this book if re-uploaded
+        setQuotes(prev => prev.map(q => {
+            if (q.bookTitle && getBookUniqueKey(q.bookTitle, q.author) === newBookKey && q.bookId !== newBook.id) {
+                const updated = { ...q, bookId: newBook.id };
+                db.saveQuote(updated);
+                if (user) {
+                    setDoc(doc(firestore, 'users', user.uid, 'quotes', q.id), { ...updated, userId: user.uid }, { merge: true }).catch(() => {});
                 }
-            })();
-        }
+                return updated;
+            }
+            return q;
+        }));
+        setNotes(prev => prev.map(n => {
+            if (n.bookTitle && getBookUniqueKey(n.bookTitle, n.author) === newBookKey && n.bookId !== newBook.id) {
+                const updated = { ...n, bookId: newBook.id };
+                db.saveNote(updated);
+                if (user) {
+                    setDoc(doc(firestore, 'users', user.uid, 'notes', n.id), { ...updated, userId: user.uid }, { merge: true }).catch(() => {});
+                }
+                return updated;
+            }
+            return n;
+        }));
     } catch (err) { 
         console.error(err);
         setToast({ message: "File parsing failed." }); 
@@ -502,73 +417,13 @@ const App: FC = () => {
         return;
     }
     try {
-        let content = await db.getBookContent(bookId);
-        const hasNoRealContent = !content || !content.chapters || content.chapters.length === 0;
-        
-        if (hasNoRealContent && (meta.storagePath || meta.fileUrl)) {
-            setToast({ message: "Syncing book content from cloud..." });
-            try {
-                let blob: Blob;
-                // Try SDK-based getBlob which handles Firebase auth and CORS policy natively
-                if (user && (meta.storagePath || meta.fileName)) {
-                    try {
-                        const path = meta.storagePath || `users/${user.uid}/books/${meta.id}/${meta.fileName || meta.title}`;
-                        const storageRef = ref(storage, path);
-                        blob = await getBlob(storageRef);
-                    } catch (storageErr) {
-                        console.warn("getBlob failed, falling back to direct fetch", storageErr);
-                        if (meta.fileUrl) {
-                            const response = await fetch(meta.fileUrl);
-                            blob = await response.blob();
-                        } else {
-                            throw storageErr;
-                        }
-                    }
-                } else if (meta.fileUrl) {
-                    const response = await fetch(meta.fileUrl);
-                    blob = await response.blob();
-                } else {
-                    throw new Error("No download path or URL available");
-                }
-
-                const file = new File([blob], meta.title, { type: meta.type === 'pdf' ? 'application/pdf' : 'application/epub+zip' });
-                
-                let downloadedBook: Book;
-                if (meta.type === 'pdf') {
-                    downloadedBook = await parsePdf(file);
-                } else {
-                    downloadedBook = await parseEpub(file);
-                }
-                
-                // Ensure ID matches the original sync ID
-                downloadedBook.id = meta.id;
-                const { chapters, toc, summaryScript, audioSummaryUrl, audioDuration, pdfData, coverImageUrl } = downloadedBook;
-                content = { id: meta.id, chapters, toc, summaryScript, audioSummaryUrl, audioDuration, pdfData };
-                
-                // Keep the Firestore/Storage cover URL if exists, otherwise extract cover directly from the file!
-                const finalCover = meta.coverImageUrl || coverImageUrl;
-                meta.coverImageUrl = finalCover;
-                
-                // Update local library state so the parsed cover appears instantly in the UI!
-                setLibrary(prev => prev.map(b => b.id === meta.id ? { ...b, coverImageUrl: finalCover } : b));
-                
-                // Save locally
-                await db.saveBook({ ...meta, ...content, coverImageUrl: finalCover });
-                setToast({ message: "Book downloaded and synced." });
-            } catch (downloadErr) {
-                console.error("Failed to download cloud content", downloadErr);
-                setToast({ message: "Failed to download book content." });
-                return;
-            }
-        }
-
-        if (content) {
-            // Retrieve latest book metadata from library state to ensure the cover image updates perfectly
+        const content = await db.getBookContent(bookId);
+        if (content && content.chapters && content.chapters.length > 0) {
             const latestMeta = library.find(b => b.id === bookId) || meta;
             setSelectedBook({ ...latestMeta, ...content });
         } else {
             console.error(`Book content missing for ID: ${bookId}`);
-            setToast({ message: "Book content missing locally." });
+            setToast({ message: "Book content missing locally. Please re-upload this book." });
         }
     } catch (err) {
         console.error(`Error loading book content for ID: ${bookId}:`, err);
@@ -640,15 +495,10 @@ const App: FC = () => {
   const handleDeleteBook = async (id: string) => {
     try {
         await db.deleteBook(id);
-        if (user) {
-            // Delete from Firestore
-            const bookRef = doc(firestore, 'users', user.uid, 'books', id);
-            await deleteDoc(bookRef).catch(e => console.error("Firestore delete failed", e));
-            
-            // Note: Storage deletion would require the filename/path which we should store in metadata
-            // For now, we prioritize cleaning firestore.
-        }
         setLibrary(prev => prev.filter(b => b.id !== id));
+        if (user) {
+            deleteDoc(doc(firestore, 'users', user.uid, 'books', id)).catch(() => {});
+        }
         setToast({ message: "Book removed." });
     } catch (e) {
         setToast({ message: "Failed to delete book." });
@@ -766,18 +616,29 @@ const App: FC = () => {
                           isCloudSynced={!!user}
                         />
                       )}
-                      {activeTab === 'quotes' && <QuotesView theme={theme} quotes={quotes} library={library} isChatOpen={isChatOpen} setIsChatOpen={setIsChatOpen} onDelete={(id) => { db.deleteQuote(id).then(() => setQuotes(prev => prev.filter(q => q.id !== id))); }} onGoToQuote={async (q) => { 
-                          const meta = library.find(b => b.id === q.bookId);
+                      {activeTab === 'quotes' && <QuotesView theme={theme} quotes={quotes} library={library} isChatOpen={isChatOpen} setIsChatOpen={setIsChatOpen} onDelete={(id) => { 
+                          db.deleteQuote(id).then(() => {
+                              setQuotes(prev => prev.filter(q => q.id !== id));
+                              if (user) {
+                                  deleteDoc(doc(firestore, 'users', user.uid, 'quotes', id)).catch(e => console.error("Cloud quote delete failed", e));
+                              }
+                          }); 
+                      }} onGoToQuote={async (q) => { 
+                          let meta = library.find(b => b.id === q.bookId);
+                          if (!meta && q.bookTitle) {
+                              const qKey = getBookUniqueKey(q.bookTitle, q.author);
+                              meta = library.find(b => getBookUniqueKey(b.title, b.author) === qKey);
+                          }
                           if (meta) {
-                              const content = await db.getBookContent(q.bookId);
+                              const content = await db.getBookContent(meta.id);
                               if (content) {
                                   setInitialReaderNav({ chapterId: q.location, searchText: q.text });
                                   setSelectedBook({ ...meta, ...content });
                               } else {
-                                  setToast({ message: "Book content is missing." });
+                                  setToast({ message: "Book content missing locally. Please re-upload this book." });
                               }
                           } else {
-                              setToast({ message: "Preserved quote from a book since deleted from your library." });
+                              setToast({ message: `Re-upload "${q.bookTitle}" to read in context.` });
                           }
                       }} />}
                       {activeTab === 'profile' && <ProfileView user={user} streak={streak} library={library} onShowAuth={() => setIsAuthModalOpen(true)} activity={[]} onSignOut={async () => { await firebaseLogout(); setUser(null); }} />}
@@ -839,8 +700,8 @@ const App: FC = () => {
           {selectedBook && <ReaderView 
             book={selectedBook} 
             theme={theme} 
-            quotes={quotes.filter(q => q.bookId === selectedBook.id)}
-            notes={notes.filter(n => n.bookId === selectedBook.id)}
+            quotes={quotes}
+            notes={notes.filter(n => n.bookId === selectedBook.id || (n.bookTitle && getBookUniqueKey(n.bookTitle, n.author) === getBookUniqueKey(selectedBook.title, selectedBook.author)))}
             initialChapterId={initialReaderNav?.chapterId}
             initialSearchText={initialReaderNav?.searchText}
             onClose={() => { setSelectedBook(null); setInitialReaderNav(null); }} 
@@ -851,6 +712,7 @@ const App: FC = () => {
               const updates: Partial<BookMetadata> = { 
                   progress: gp, 
                   lastScrollTop: st, 
+                  lastChapterIndex: ci,
                   readingTime: (library[bidx].readingTime || 0) + ts, 
                   lastOpened: Date.now() 
               }; 
@@ -858,24 +720,10 @@ const App: FC = () => {
               // Local update metadata only
               await db.updateBookMetadata(bid, updates);
               setLibrary(prev => prev.map(b => b.id === bid ? { ...b, ...updates } : b)); 
-              
-              // Sync metadata to Firestore in background - Only send changed fields to avoid size limits 
-              // Include id and title to satisfy isValidBook rule in case of a create/upsert
               if (user) {
                   const bookRef = doc(firestore, 'users', user.uid, 'books', bid);
-                  setDoc(bookRef, { 
-                      ...updates, 
-                      id: bid, 
-                      title: library[bidx].title,
-                      userId: user.uid 
-                  }, { merge: true }).catch(err => {
-                      try {
-                          handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/books/${bid}`);
-                      } catch (e) {
-                          console.error("Cloud sync failed", e);
-                      }
-                  });
-              }
+                  setDoc(bookRef, { ...updates, userId: user.uid }, { merge: true }).catch(() => {});
+              } 
           }} onSaveQuote={async (t, c) => { 
               const nq: Quote = { id: crypto.randomUUID(), text: t, bookTitle: selectedBook.title, author: selectedBook.author, bookId: selectedBook.id, location: c, createdAt: Date.now() }; 
               await db.saveQuote(nq); 

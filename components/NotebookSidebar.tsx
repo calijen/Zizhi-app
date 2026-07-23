@@ -15,7 +15,12 @@ import {
   Pencil,
   Highlighter,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  MoreVertical,
+  Bold,
+  Italic,
+  Underline,
+  Strikethrough
 } from 'lucide-react';
 import type { DrawingPath, StickyNote, ImageSticker, NotebookData, NotebookPageData } from '../types';
 import * as db from '../db';
@@ -91,6 +96,11 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
   const [drawToolColor, setDrawToolColor] = useState('#1e293b');
   const [highlightToolColor, setHighlightToolColor] = useState('rgba(253, 224, 71, 0.45)');
   const [activeWidth, setActiveWidth] = useState(2.2);
+
+  // Mobile Popover & Bar States
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
 
   const activeColor = useMemo(() => {
     if (activeTool === 'type') return textToolColor;
@@ -642,7 +652,7 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
       const maxWidth = stickyWidth - 16 * dpr;
       const lineHeight = 14 * dpr;
       
-      const words = sticky.text.split(' ');
+      const words = (sticky?.text || '').split(' ');
       let currentLine = '';
       
       words.forEach((word) => {
@@ -695,12 +705,21 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
           initial={isMobile ? { y: '100%', x: 0 } : { x: '100%', y: 0 }}
           animate={isMobile ? { y: 0, x: 0 } : { x: 0, y: 0 }}
           exit={isMobile ? { y: '100%', x: 0 } : { x: '100%', y: 0 }}
-          transition={{ type: 'spring', damping: 26, stiffness: 170 }}
+          transition={{ type: 'spring', damping: 28, stiffness: 220 }}
+          drag={isMobile ? "y" : false}
+          dragConstraints={{ top: 0, bottom: 0 }}
+          dragElastic={{ top: 0, bottom: 0.6 }}
+          dragSnapToOrigin
+          onDragEnd={(e, info) => {
+            if (isMobile && (info.offset.y > 100 || info.velocity.y > 400)) {
+              onClose();
+            }
+          }}
           className={isMobile 
-            ? "fixed bottom-0 left-0 right-0 h-[70vh] bg-[#fcfbe3] border-t-4 border-black flex flex-col z-[1250] shadow-[0_-8px_24px_rgba(0,0,0,0.15)]"
-            : "bg-[#1e293b]/5 backdrop-blur-md border-l-4 border-black flex flex-col h-full z-[1250] shrink-0 relative shadow-[[-8px_0_0_rgba(0,0,0,0.15)]]"
+            ? "fixed inset-0 h-[100dvh] w-full bg-[#fcfbe3] flex flex-col z-[1500] shadow-2xl select-none"
+            : "fixed top-0 right-0 bottom-0 h-full bg-[#fcfbe3] border-l-4 border-black flex flex-col z-[1500] shadow-[-8px_0_24px_rgba(0,0,0,0.25)] select-none"
           }
-          style={isMobile ? { width: '100%', height: '70vh' } : { width: `${sidebarWidth}px` }}
+          style={isMobile ? { width: '100%', height: '100dvh' } : { width: `${Math.min(sidebarWidth, typeof window !== 'undefined' ? window.innerWidth - 40 : 440)}px`, height: '100%' }}
         >
           {/* Draggable resize handle border on the left edge - ONLY on desktop */}
           {!isMobile && (
@@ -713,319 +732,469 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
             />
           )}
 
-          {/* Decorative Drag Handle for mobile drawer */}
-          {isMobile && (
-            <div className="w-full flex justify-center py-2 bg-orange-100 border-b border-black/5 shrink-0">
-              <div className="w-12 h-1.5 bg-black/20 rounded-full" />
-            </div>
-          )}
+          {/* MOBILE HEADER (Matching reference design: Checkmark done button left, title center, action tools right) */}
+          {isMobile ? (
+            <div className="bg-orange-100 border-b-2 border-black flex flex-col shrink-0 select-none z-[1260] shadow-xs">
+              {/* Drag down indicator handle */}
+              <div className="w-full flex justify-center pt-2 pb-1 bg-orange-100 touch-none cursor-grab active:cursor-grabbing">
+                <div className="w-12 h-1.5 bg-orange-950/30 rounded-full" />
+              </div>
 
-          {/* Notebook Title Bar & Controls */}
-          <div className="h-16 border-b-4 border-black bg-orange-100 flex items-center justify-between px-4 shrink-0 z-[1260] shadow-sm select-none">
-            <Group gap="xs">
-              <BookSpiralIcon className="w-6 h-6 text-orange-800" />
-              <Stack gap={0}>
-                <Text className="text-[11px] font-black uppercase tracking-widest text-orange-950">
-                  Student Notebook
-                </Text>
-                <Text className="text-[10px] font-bold text-orange-800 uppercase tracking-wider line-clamp-1 max-w-[180px]">
-                  {bookTitle}
-                </Text>
-              </Stack>
-            </Group>
+              {/* Header Actions Row */}
+              <div className="h-12 px-3 pb-2 flex items-center justify-between gap-2">
+                {/* Left: Checkmark Done Button */}
+                <button
+                  onClick={onClose}
+                  className="w-8 h-8 rounded-full bg-orange-400 border-2 border-black flex items-center justify-center text-black font-extrabold shadow-[2px_2px_0_black] active:translate-y-0.5 active:shadow-none transition-all hover:bg-orange-300 shrink-0"
+                  title="Done & Close Notebook"
+                >
+                  <Check size={18} strokeWidth={3.5} />
+                </button>
 
-            <Group gap="xs">
-              {/* Local Storage Auto Sync Badge */}
-              <Tooltip label={saveStatus === 'saved' ? 'All changes successfully written to Local Storage' : saveStatus === 'saving' ? 'Saving pages...' : 'Writing error!'}>
-                <div className="flex items-center">
-                  {saveStatus === 'saved' && (
-                    <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-800 px-2 py-0.5 border border-emerald-400">
-                      <Check size={10} strokeWidth={4} /> Saved
-                    </span>
-                  )}
-                  {saveStatus === 'saving' && (
-                    <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest bg-yellow-100 text-yellow-800 px-2 py-0.5 border border-yellow-400">
-                      <Loader size={8} className="animate-spin text-yellow-800" /> Saving
-                    </span>
-                  )}
-                  {saveStatus === 'error' && (
-                    <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest bg-red-100 text-red-800 px-2 py-0.5 border border-red-400">
-                      Error
-                    </span>
-                  )}
-                </div>
-              </Tooltip>
-
-              <ActionIcon 
-                variant="filled" 
-                color="orange" 
-                size="lg"
-                onClick={onClose}
-                className="border-2 border-black rounded-none shadow-[3px_3px_0_black] bg-orange-400 text-black hover:bg-orange-300 active:translate-y-0.5 active:shadow-none transition-all"
-                title="Hide Notebook Drawer"
-              >
-                <X size={20} strokeWidth={3} className="text-black" />
-              </ActionIcon>
-            </Group>
-          </div>
-
-          {/* Wooden Pencil Case Drawer / Stationery Drawer Layout */}
-          <div className="p-3 bg-amber-50 border-b-4 border-black flex flex-col gap-2.5 shrink-0 z-[1260] shadow-[inset_0_-4px_8px_rgba(139,92,26,0.1)]">
-            {/* Primary Simplified Tools Row */}
-            <div className="grid grid-cols-4 gap-2 select-none">
-              {/* 1. Text Tool */}
-              <button
-                onClick={() => {
-                  setActiveTool('type');
-                  setActiveWidth(2.2);
-                }}
-                className={`flex flex-col items-center justify-center py-2 px-1 border-2 relative transition-all ${
-                  activeTool === 'type' 
-                    ? 'bg-amber-200 border-black shadow-[3px_3px_0_black] -translate-y-0.5' 
-                    : 'bg-white border-black/20 hover:border-black hover:-translate-y-0.5'
-                }`}
-                style={{ borderRadius: '4px' }}
-                title="Keyboard Typing Tool"
-              >
-                <Type size={16} className="text-slate-800 mb-1" strokeWidth={2.5} />
-                <Text className="text-[9px] font-black uppercase tracking-tight leading-none">
-                  Text
-                </Text>
-                {activeTool === 'type' && <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45" />}
-              </button>
-
-              {/* 2. Draw Tool */}
-              <button
-                onClick={() => {
-                  setActiveTool('draw');
-                  setActiveWidth(2.2);
-                }}
-                className={`flex flex-col items-center justify-center py-2 px-1 border-2 relative transition-all ${
-                  activeTool === 'draw' 
-                    ? 'bg-amber-200 border-black shadow-[3px_3px_0_black] -translate-y-0.5' 
-                    : 'bg-white border-black/20 hover:border-black hover:-translate-y-0.5'
-                }`}
-                style={{ borderRadius: '4px' }}
-                title="Freehand Sketch Tool"
-              >
-                <Pencil size={16} className="text-slate-800 mb-1" strokeWidth={2.5} />
-                <Text className="text-[9px] font-black uppercase tracking-tight leading-none">
-                  Draw
-                </Text>
-                {activeTool === 'draw' && <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45" />}
-              </button>
-
-              {/* 3. Highlight Tool */}
-              <button
-                onClick={() => {
-                  setActiveTool('highlight');
-                  setActiveWidth(14);
-                }}
-                className={`flex flex-col items-center justify-center py-2 px-1 border-2 relative transition-all ${
-                  activeTool === 'highlight' 
-                    ? 'bg-amber-200 border-black shadow-[3px_3px_0_black] -translate-y-0.5' 
-                    : 'bg-white border-black/20 hover:border-black hover:-translate-y-0.5'
-                }`}
-                style={{ borderRadius: '4px' }}
-                title="Text Highlight Tool"
-              >
-                <Highlighter size={16} className="text-slate-800 mb-1" strokeWidth={2.5} />
-                <Text className="text-[9px] font-black uppercase tracking-tight leading-none">
-                  Highlight
-                </Text>
-                {activeTool === 'highlight' && <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45" />}
-              </button>
-
-              {/* 4. Eraser Tool */}
-              <button
-                onClick={() => {
-                  setActiveTool('eraser');
-                  setActiveWidth(16);
-                }}
-                className={`flex flex-col items-center justify-center py-2 px-1 border-2 relative transition-all ${
-                  activeTool === 'eraser' 
-                    ? 'bg-amber-200 border-black shadow-[3px_3px_0_black] -translate-y-0.5' 
-                    : 'bg-white border-black/20 hover:border-black hover:-translate-y-0.5'
-                }`}
-                style={{ borderRadius: '4px' }}
-                title="Eraser Tool"
-              >
-                <Eraser size={16} className="text-pink-600 mb-1" strokeWidth={2.5} />
-                <Text className="text-[9px] font-black uppercase tracking-tight leading-none">
-                  Eraser
-                </Text>
-                {activeTool === 'eraser' && <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45" />}
-              </button>
-            </div>
-
-            {/* Dynamic Color Palette Row */}
-            {(activeTool === 'type' || activeTool === 'draw' || activeTool === 'highlight') && (
-              <div className="flex flex-col gap-1 border-t border-amber-200/50 pt-2">
-                <div className="flex items-center justify-between px-1">
-                  <span className="text-[8.5px] font-black uppercase tracking-wider text-amber-900/60">
-                    Select {activeTool === 'type' ? 'Text' : activeTool === 'draw' ? 'Ink' : 'Highlight'} Color:
+                {/* Center: Book Title & Page Info */}
+                <div className="flex flex-col items-center justify-center min-w-0 flex-1">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-orange-950 line-clamp-1 text-center">
+                    {bookTitle}
                   </span>
-                  {activeTool === 'highlight' && (
-                    <span className="text-[7.5px] font-bold text-amber-800/80 uppercase">
-                      Drag over words to highlight
-                    </span>
-                  )}
+                  <span className="text-[9px] font-bold text-orange-800 uppercase tracking-tight">
+                    Page {activePageIndex + 1} of {pages.length}
+                  </span>
                 </div>
-                
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
-                  {activeTool === 'type' && TEXT_COLORS.map((tc, idx) => {
-                    const isSelected = activeColor === tc.color;
-                    return (
-                      <button
-                        key={idx}
-                        onMouseDown={(e) => {
-                          e.preventDefault(); // prevent losing contentEditable focus
-                          selectStationery('type', tc.color, 2.2);
-                        }}
-                        className={`flex items-center gap-1.5 px-2 py-1 border-2 transition-all shrink-0 ${
-                          isSelected 
-                            ? 'bg-amber-200 border-black shadow-[2px_2px_0_black] -translate-y-0.5' 
-                            : 'bg-white border-black/20 hover:border-black hover:-translate-y-0.5'
-                        }`}
-                        style={{ borderRadius: '4px' }}
-                        title={tc.name}
-                      >
-                        <div className="w-3 h-3 rounded-full border border-black/30" style={{ backgroundColor: tc.color }} />
-                        <span className="text-[8.5px] font-bold text-slate-800">{tc.name}</span>
-                      </button>
-                    );
-                  })}
 
-                  {activeTool === 'draw' && DRAW_COLORS.map((dc, idx) => {
-                    const isSelected = activeColor === dc.color && activeWidth === dc.width;
-                    return (
-                      <button
-                        key={idx}
-                        onClick={() => selectStationery('draw', dc.color, dc.width)}
-                        className={`flex items-center gap-1.5 px-2 py-1 border-2 transition-all shrink-0 ${
-                          isSelected 
-                            ? 'bg-amber-200 border-black shadow-[2px_2px_0_black] -translate-y-0.5' 
-                            : 'bg-white border-black/20 hover:border-black hover:-translate-y-0.5'
-                        }`}
-                        style={{ borderRadius: '4px' }}
-                        title={dc.name}
-                      >
-                        <div className="w-3 h-3 rounded-full border border-black/30" style={{ backgroundColor: dc.color }} />
-                        <span className="text-[8.5px] font-bold text-slate-800">{dc.name}</span>
-                      </button>
-                    );
-                  })}
+                {/* Right: Quick Action Buttons (Undo, Add +, More ⋮) */}
+                <div className="flex items-center gap-1.5 shrink-0 relative">
+                  {/* Undo */}
+                  <button
+                    onClick={handleUndoSketch}
+                    className="w-8 h-8 rounded-md bg-white border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0_black] active:translate-y-0.5 active:shadow-none transition-all hover:bg-amber-50"
+                    title="Undo sketch line"
+                  >
+                    <RotateCcw size={15} strokeWidth={2.5} />
+                  </button>
 
-                  {activeTool === 'highlight' && HIGHLIGHT_COLORS.map((hc, idx) => {
-                    const isSelected = activeColor === hc.color;
-                    return (
-                      <button
-                        key={idx}
-                        onMouseDown={(e) => {
-                          e.preventDefault(); // prevent losing contentEditable focus
-                          selectStationery('highlight', hc.color, 14);
-                        }}
-                        className={`flex items-center gap-1.5 px-2 py-1 border-2 transition-all shrink-0 ${
-                          isSelected 
-                            ? 'bg-amber-200 border-black shadow-[2px_2px_0_black] -translate-y-0.5' 
-                            : 'bg-white border-black/20 hover:border-black hover:-translate-y-0.5'
-                        }`}
-                        style={{ borderRadius: '4px' }}
-                        title={hc.name}
-                      >
-                        {hc.color === 'transparent' ? (
-                          <div className="w-3 h-3 border border-dashed border-red-500 relative flex items-center justify-center">
-                            <div className="w-4 h-[1px] bg-red-500 rotate-45 absolute" />
-                          </div>
-                        ) : (
-                          <div className="w-4 h-2.5 rounded-sm border border-black/30" style={{ backgroundColor: hc.color }} />
+                  {/* Add + */}
+                  <div className="relative">
+                    <button
+                      onClick={() => {
+                        setShowAddMenu(!showAddMenu);
+                        setShowMoreMenu(false);
+                      }}
+                      className={`w-8 h-8 rounded-md border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0_black] active:translate-y-0.5 active:shadow-none transition-all ${
+                        showAddMenu ? 'bg-amber-300' : 'bg-white hover:bg-amber-50'
+                      }`}
+                      title="Add Item"
+                    >
+                      <Plus size={16} strokeWidth={3} />
+                    </button>
+
+                    {/* Add Dropdown Menu */}
+                    {showAddMenu && (
+                      <div className="absolute right-0 top-10 w-44 bg-white border-2 border-black rounded-lg shadow-[4px_4px_0_black] p-1.5 z-[1300] flex flex-col gap-1 text-slate-800">
+                        <button
+                          onClick={() => {
+                            handleAddSticky();
+                            setShowAddMenu(false);
+                          }}
+                          className="w-full text-left px-2.5 py-1.5 rounded hover:bg-amber-100 font-bold text-xs flex items-center gap-2"
+                        >
+                          <StickyIcon size={14} className="text-yellow-600" />
+                          + Sticky Note
+                        </button>
+                        <button
+                          onClick={() => {
+                            triggerImageUpload();
+                            setShowAddMenu(false);
+                          }}
+                          className="w-full text-left px-2.5 py-1.5 rounded hover:bg-cyan-100 font-bold text-xs flex items-center gap-2"
+                        >
+                          <ImageIcon size={14} className="text-cyan-600" />
+                          + Photo Sticker
+                        </button>
+                        <button
+                          onClick={() => {
+                            addPage();
+                            setShowAddMenu(false);
+                          }}
+                          className="w-full text-left px-2.5 py-1.5 rounded hover:bg-orange-100 font-bold text-xs flex items-center gap-2 border-t border-slate-200 pt-1.5"
+                        >
+                          <Plus size={14} className="text-orange-600" />
+                          + Add New Page
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* More Options ⋮ */}
+                  <div className="relative">
+                    <button
+                      onClick={() => {
+                        setShowMoreMenu(!showMoreMenu);
+                        setShowAddMenu(false);
+                      }}
+                      className={`w-8 h-8 rounded-md border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0_black] active:translate-y-0.5 active:shadow-none transition-all ${
+                        showMoreMenu ? 'bg-amber-300' : 'bg-white hover:bg-amber-50'
+                      }`}
+                      title="More Options"
+                    >
+                      <MoreVertical size={16} strokeWidth={2.5} />
+                    </button>
+
+                    {/* More Options Dropdown Menu */}
+                    {showMoreMenu && (
+                      <div className="absolute right-0 top-10 w-48 bg-white border-2 border-black rounded-lg shadow-[4px_4px_0_black] p-1.5 z-[1300] flex flex-col gap-1 text-slate-800">
+                        <button
+                          onClick={() => {
+                            handleExportPNG();
+                            setShowMoreMenu(false);
+                          }}
+                          className="w-full text-left px-2.5 py-1.5 rounded hover:bg-cyan-100 font-bold text-xs flex items-center gap-2 text-cyan-800"
+                        >
+                          <Download size={14} />
+                          Export Page PNG
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleClearPage();
+                            setShowMoreMenu(false);
+                          }}
+                          className="w-full text-left px-2.5 py-1.5 rounded hover:bg-amber-100 font-bold text-xs flex items-center gap-2 text-amber-800"
+                        >
+                          <Trash2 size={14} />
+                          Clear Active Page
+                        </button>
+                        {pages.length > 1 && (
+                          <button
+                            onClick={() => {
+                              deletePage(activePageIndex);
+                              setShowMoreMenu(false);
+                            }}
+                            className="w-full text-left px-2.5 py-1.5 rounded hover:bg-red-100 font-bold text-xs flex items-center gap-2 text-red-600 border-t border-slate-200 pt-1.5"
+                          >
+                            <X size={14} />
+                            Delete Page
+                          </button>
                         )}
-                        <span className="text-[8.5px] font-bold text-slate-800">{hc.name}</span>
-                      </button>
-                    );
-                  })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            )}
-
-            {/* Sticky widgets & canvas controls */}
-            <div className="flex items-center justify-between border-t border-amber-200/60 pt-2 gap-1.5 flex-wrap select-none">
-              <Group gap={6}>
-                {/* Sticky Note Creator */}
-                <button
-                  onClick={handleAddSticky}
-                  className="px-2 py-1 bg-yellow-100 hover:bg-yellow-200 border-2 border-black text-[8.5px] font-black uppercase tracking-widest flex items-center gap-1 shadow-[2px_2px_0_black] active:translate-y-0.5 active:shadow-none transition-all"
-                  title="Insert sticky note on current page"
-                >
-                  <StickyIcon size={11} strokeWidth={2.5} />
-                  + Sticky
-                </button>
-
-                {/* Image sticker insertor */}
-                <button
-                  onClick={triggerImageUpload}
-                  className="px-2 py-1 bg-cyan-100 hover:bg-cyan-200 border-2 border-black text-[8.5px] font-black uppercase tracking-widest flex items-center gap-1 shadow-[2px_2px_0_black] active:translate-y-0.5 active:shadow-none transition-all"
-                  title="Upload picture sticker on current page"
-                >
-                  <ImageIcon size={11} strokeWidth={2.5} />
-                  + Photo
-                </button>
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  onChange={handleImageFile} 
-                  accept="image/*" 
-                  className="hidden" 
-                />
-              </Group>
-
-              {/* Central canvas tools */}
-              <Group gap={4}>
-                {/* Undo Sketch */}
-                <Tooltip label="Undo last drawing stroke" position="bottom">
-                  <ActionIcon
-                    variant="subtle"
-                    color="gray"
-                    onClick={handleUndoSketch}
-                    className="border-2 border-black bg-white hover:bg-gray-100 text-black rounded-none shadow-[2px_2px_0_black] active:translate-y-0.5 active:shadow-none transition-all"
-                  >
-                    <RotateCcw size={11} strokeWidth={2.5} />
-                  </ActionIcon>
-                </Tooltip>
-
-                {/* Export PNG */}
-                <Tooltip label="Export active notebook page as PNG picture" position="bottom">
-                  <ActionIcon
-                    variant="subtle"
-                    color="cyan"
-                    onClick={handleExportPNG}
-                    className="border-2 border-black bg-white hover:bg-cyan-100 text-black rounded-none shadow-[2px_2px_0_black] active:translate-y-0.5 active:shadow-none transition-all"
-                  >
-                    <Download size={11} strokeWidth={2.5} />
-                  </ActionIcon>
-                </Tooltip>
-
-                {/* Tear/Erase page contents */}
-                <Tooltip label="Erase active page content entirely" position="bottom">
-                  <ActionIcon
-                    variant="subtle"
-                    color="red"
-                    onClick={handleClearPage}
-                    className="border-2 border-black bg-white hover:bg-red-100 text-red-600 rounded-none shadow-[2px_2px_0_black] active:translate-y-0.5 active:shadow-none transition-all"
-                  >
-                    <Trash2 size={11} strokeWidth={2.5} />
-                  </ActionIcon>
-                </Tooltip>
-              </Group>
             </div>
-          </div>
+          ) : (
+            /* DESKTOP HEADER & TITLE BAR */
+            <>
+              <div className="h-16 border-b-4 border-black bg-orange-100 flex items-center justify-between px-4 shrink-0 z-[1260] shadow-sm select-none">
+                <Group gap="xs">
+                  <BookSpiralIcon className="w-6 h-6 text-orange-800" />
+                  <Stack gap={0}>
+                    <Text className="text-[11px] font-black uppercase tracking-widest text-orange-950">
+                      Student Notebook
+                    </Text>
+                    <Text className="text-[10px] font-bold text-orange-800 uppercase tracking-wider line-clamp-1 max-w-[180px]">
+                      {bookTitle}
+                    </Text>
+                  </Stack>
+                </Group>
+
+                <Group gap="xs">
+                  {/* Local Storage Auto Sync Badge */}
+                  <Tooltip label={saveStatus === 'saved' ? 'All changes successfully written to Local Storage' : saveStatus === 'saving' ? 'Saving pages...' : 'Writing error!'}>
+                    <div className="flex items-center">
+                      {saveStatus === 'saved' && (
+                        <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-800 px-2 py-0.5 border border-emerald-400">
+                          <Check size={10} strokeWidth={4} /> Saved
+                        </span>
+                      )}
+                      {saveStatus === 'saving' && (
+                        <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest bg-yellow-100 text-yellow-800 px-2 py-0.5 border border-yellow-400">
+                          <Loader size={8} className="animate-spin text-yellow-800" /> Saving
+                        </span>
+                      )}
+                      {saveStatus === 'error' && (
+                        <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest bg-red-100 text-red-800 px-2 py-0.5 border border-red-400">
+                          Error
+                        </span>
+                      )}
+                    </div>
+                  </Tooltip>
+
+                  <ActionIcon 
+                    variant="filled" 
+                    color="orange" 
+                    size="lg"
+                    onClick={onClose}
+                    className="border-2 border-black rounded-none shadow-[3px_3px_0_black] bg-orange-400 text-black hover:bg-orange-300 active:translate-y-0.5 active:shadow-none transition-all"
+                    title="Hide Notebook Drawer"
+                  >
+                    <X size={20} strokeWidth={3} className="text-black" />
+                  </ActionIcon>
+                </Group>
+              </div>
+
+              {/* DESKTOP WOODEN STATIONERY DRAWER */}
+              <div className="p-3 bg-amber-50 border-b-4 border-black flex flex-col gap-2.5 shrink-0 z-[1260] shadow-[inset_0_-4px_8px_rgba(139,92,26,0.1)]">
+                {/* Primary Simplified Tools Row */}
+                <div className="grid grid-cols-4 gap-2 select-none">
+                  {/* 1. Text Tool */}
+                  <button
+                    onClick={() => {
+                      setActiveTool('type');
+                      setActiveWidth(2.2);
+                    }}
+                    className={`flex flex-col items-center justify-center py-2 px-1 border-2 relative transition-all ${
+                      activeTool === 'type' 
+                        ? 'bg-amber-200 border-black shadow-[3px_3px_0_black] -translate-y-0.5' 
+                        : 'bg-white border-black/20 hover:border-black hover:-translate-y-0.5'
+                    }`}
+                    style={{ borderRadius: '4px' }}
+                    title="Keyboard Typing Tool"
+                  >
+                    <Type size={16} className="text-slate-800 mb-1" strokeWidth={2.5} />
+                    <Text className="text-[9px] font-black uppercase tracking-tight leading-none">
+                      Text
+                    </Text>
+                    {activeTool === 'type' && <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45" />}
+                  </button>
+
+                  {/* 2. Draw Tool */}
+                  <button
+                    onClick={() => {
+                      setActiveTool('draw');
+                      setActiveWidth(2.2);
+                    }}
+                    className={`flex flex-col items-center justify-center py-2 px-1 border-2 relative transition-all ${
+                      activeTool === 'draw' 
+                        ? 'bg-amber-200 border-black shadow-[3px_3px_0_black] -translate-y-0.5' 
+                        : 'bg-white border-black/20 hover:border-black hover:-translate-y-0.5'
+                    }`}
+                    style={{ borderRadius: '4px' }}
+                    title="Freehand Sketch Tool"
+                  >
+                    <Pencil size={16} className="text-slate-800 mb-1" strokeWidth={2.5} />
+                    <Text className="text-[9px] font-black uppercase tracking-tight leading-none">
+                      Draw
+                    </Text>
+                    {activeTool === 'draw' && <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45" />}
+                  </button>
+
+                  {/* 3. Highlight Tool */}
+                  <button
+                    onClick={() => {
+                      setActiveTool('highlight');
+                      setActiveWidth(14);
+                    }}
+                    className={`flex flex-col items-center justify-center py-2 px-1 border-2 relative transition-all ${
+                      activeTool === 'highlight' 
+                        ? 'bg-amber-200 border-black shadow-[3px_3px_0_black] -translate-y-0.5' 
+                        : 'bg-white border-black/20 hover:border-black hover:-translate-y-0.5'
+                    }`}
+                    style={{ borderRadius: '4px' }}
+                    title="Text Highlight Tool"
+                  >
+                    <Highlighter size={16} className="text-slate-800 mb-1" strokeWidth={2.5} />
+                    <Text className="text-[9px] font-black uppercase tracking-tight leading-none">
+                      Highlight
+                    </Text>
+                    {activeTool === 'highlight' && <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45" />}
+                  </button>
+
+                  {/* 4. Eraser Tool */}
+                  <button
+                    onClick={() => {
+                      setActiveTool('eraser');
+                      setActiveWidth(16);
+                    }}
+                    className={`flex flex-col items-center justify-center py-2 px-1 border-2 relative transition-all ${
+                      activeTool === 'eraser' 
+                        ? 'bg-amber-200 border-black shadow-[3px_3px_0_black] -translate-y-0.5' 
+                        : 'bg-white border-black/20 hover:border-black hover:-translate-y-0.5'
+                    }`}
+                    style={{ borderRadius: '4px' }}
+                    title="Eraser Tool"
+                  >
+                    <Eraser size={16} className="text-pink-600 mb-1" strokeWidth={2.5} />
+                    <Text className="text-[9px] font-black uppercase tracking-tight leading-none">
+                      Eraser
+                    </Text>
+                    {activeTool === 'eraser' && <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45" />}
+                  </button>
+                </div>
+
+                {/* Dynamic Color Palette Row */}
+                {(activeTool === 'type' || activeTool === 'draw' || activeTool === 'highlight') && (
+                  <div className="flex flex-col gap-1 border-t border-amber-200/50 pt-2">
+                    <div className="flex items-center justify-between px-1">
+                      <span className="text-[8.5px] font-black uppercase tracking-wider text-amber-900/60">
+                        Select {activeTool === 'type' ? 'Text' : activeTool === 'draw' ? 'Ink' : 'Highlight'} Color:
+                      </span>
+                      {activeTool === 'highlight' && (
+                        <span className="text-[7.5px] font-bold text-amber-800/80 uppercase">
+                          Drag over words to highlight
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+                      {activeTool === 'type' && TEXT_COLORS.map((tc, idx) => {
+                        const isSelected = activeColor === tc.color;
+                        return (
+                          <button
+                            key={idx}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              selectStationery('type', tc.color, 2.2);
+                            }}
+                            className={`flex items-center gap-1.5 px-2 py-1 border-2 transition-all shrink-0 ${
+                              isSelected 
+                                ? 'bg-amber-200 border-black shadow-[2px_2px_0_black] -translate-y-0.5' 
+                                : 'bg-white border-black/20 hover:border-black hover:-translate-y-0.5'
+                            }`}
+                            style={{ borderRadius: '4px' }}
+                            title={tc.name}
+                          >
+                            <div className="w-3 h-3 rounded-full border border-black/30" style={{ backgroundColor: tc.color }} />
+                            <span className="text-[8.5px] font-bold text-slate-800">{tc.name}</span>
+                          </button>
+                        );
+                      })}
+
+                      {activeTool === 'draw' && DRAW_COLORS.map((dc, idx) => {
+                        const isSelected = activeColor === dc.color && activeWidth === dc.width;
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => selectStationery('draw', dc.color, dc.width)}
+                            className={`flex items-center gap-1.5 px-2 py-1 border-2 transition-all shrink-0 ${
+                              isSelected 
+                                ? 'bg-amber-200 border-black shadow-[2px_2px_0_black] -translate-y-0.5' 
+                                : 'bg-white border-black/20 hover:border-black hover:-translate-y-0.5'
+                            }`}
+                            style={{ borderRadius: '4px' }}
+                            title={dc.name}
+                          >
+                            <div className="w-3 h-3 rounded-full border border-black/30" style={{ backgroundColor: dc.color }} />
+                            <span className="text-[8.5px] font-bold text-slate-800">{dc.name}</span>
+                          </button>
+                        );
+                      })}
+
+                      {activeTool === 'highlight' && HIGHLIGHT_COLORS.map((hc, idx) => {
+                        const isSelected = activeColor === hc.color;
+                        return (
+                          <button
+                            key={idx}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              selectStationery('highlight', hc.color, 14);
+                            }}
+                            className={`flex items-center gap-1.5 px-2 py-1 border-2 transition-all shrink-0 ${
+                              isSelected 
+                                ? 'bg-amber-200 border-black shadow-[2px_2px_0_black] -translate-y-0.5' 
+                                : 'bg-white border-black/20 hover:border-black hover:-translate-y-0.5'
+                            }`}
+                            style={{ borderRadius: '4px' }}
+                            title={hc.name}
+                          >
+                            {hc.color === 'transparent' ? (
+                              <div className="w-3 h-3 border border-dashed border-red-500 relative flex items-center justify-center">
+                                <div className="w-4 h-[1px] bg-red-500 rotate-45 absolute" />
+                              </div>
+                            ) : (
+                              <div className="w-4 h-2.5 rounded-sm border border-black/30" style={{ backgroundColor: hc.color }} />
+                            )}
+                            <span className="text-[8.5px] font-bold text-slate-800">{hc.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Sticky widgets & canvas controls */}
+                <div className="flex items-center justify-between border-t border-amber-200/60 pt-2 gap-1.5 flex-wrap select-none">
+                  <Group gap={6}>
+                    <button
+                      onClick={handleAddSticky}
+                      className="px-2 py-1 bg-yellow-100 hover:bg-yellow-200 border-2 border-black text-[8.5px] font-black uppercase tracking-widest flex items-center gap-1 shadow-[2px_2px_0_black] active:translate-y-0.5 active:shadow-none transition-all"
+                      title="Insert sticky note on current page"
+                    >
+                      <StickyIcon size={11} strokeWidth={2.5} />
+                      + Sticky
+                    </button>
+
+                    <button
+                      onClick={triggerImageUpload}
+                      className="px-2 py-1 bg-cyan-100 hover:bg-cyan-200 border-2 border-black text-[8.5px] font-black uppercase tracking-widest flex items-center gap-1 shadow-[2px_2px_0_black] active:translate-y-0.5 active:shadow-none transition-all"
+                      title="Upload picture sticker on current page"
+                    >
+                      <ImageIcon size={11} strokeWidth={2.5} />
+                      + Photo
+                    </button>
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      onChange={handleImageFile} 
+                      accept="image/*" 
+                      className="hidden" 
+                    />
+                  </Group>
+
+                  <Group gap={4}>
+                    <Tooltip label="Undo last drawing stroke" position="bottom">
+                      <ActionIcon
+                        variant="subtle"
+                        color="gray"
+                        onClick={handleUndoSketch}
+                        className="border-2 border-black bg-white hover:bg-gray-100 text-black rounded-none shadow-[2px_2px_0_black] active:translate-y-0.5 active:shadow-none transition-all"
+                      >
+                        <RotateCcw size={11} strokeWidth={2.5} />
+                      </ActionIcon>
+                    </Tooltip>
+
+                    <Tooltip label="Export active notebook page as PNG picture" position="bottom">
+                      <ActionIcon
+                        variant="subtle"
+                        color="cyan"
+                        onClick={handleExportPNG}
+                        className="border-2 border-black bg-white hover:bg-cyan-100 text-black rounded-none shadow-[2px_2px_0_black] active:translate-y-0.5 active:shadow-none transition-all"
+                      >
+                        <Download size={11} strokeWidth={2.5} />
+                      </ActionIcon>
+                    </Tooltip>
+
+                    <Tooltip label="Erase active page content entirely" position="bottom">
+                      <ActionIcon
+                        variant="subtle"
+                        color="red"
+                        onClick={handleClearPage}
+                        className="border-2 border-black bg-white hover:bg-red-100 text-red-600 rounded-none shadow-[2px_2px_0_black] active:translate-y-0.5 active:shadow-none transition-all"
+                      >
+                        <Trash2 size={11} strokeWidth={2.5} />
+                      </ActionIcon>
+                    </Tooltip>
+                  </Group>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Hidden file input for mobile photo sticker upload */}
+          {isMobile && (
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleImageFile} 
+              accept="image/*" 
+              className="hidden" 
+            />
+          )}
 
           {/* Scrollable Container with multi-page notebook stack */}
           <div 
             ref={scrollContainerRef}
             className="flex-1 overflow-y-auto flex flex-col gap-0 scroll-smooth no-scrollbar select-none p-0"
             style={{ 
-              backgroundColor: '#fcfbe3', // Blends perfectly with notebook paper color
+              backgroundColor: '#fcfbe3',
               backgroundImage: 'none',
             }}
           >
@@ -1058,7 +1227,7 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
                 ))}
 
                 {/* Add Page layout footer button */}
-                <div className="py-8 flex flex-col items-center justify-center bg-[#fcfbe3] border-t border-black/10">
+                <div className="py-8 flex flex-col items-center justify-center bg-[#fcfbe3] border-t border-black/10 pb-20">
                   <button
                     onClick={addPage}
                     className="px-6 py-2 bg-amber-100 hover:bg-amber-200 border-2 border-black rounded-none text-xs font-black uppercase tracking-widest flex items-center gap-2 shadow-[4px_4px_0_black] active:translate-y-0.5 active:shadow-none transition-all text-orange-950"
@@ -1073,6 +1242,206 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
               </>
             )}
           </div>
+
+          {/* MOBILE FIXED BOTTOM FORMATTING TOOLBAR */}
+          {isMobile && (
+            <div className="shrink-0 bg-orange-100 border-t-2 border-black p-2 z-[1260] flex flex-col gap-1.5 shadow-[0_-4px_12px_rgba(0,0,0,0.12)] pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+              {/* Format Controls Row */}
+              <div className="flex items-center justify-between gap-1 bg-white border-2 border-black rounded-lg p-1 overflow-x-auto no-scrollbar shadow-[2px_2px_0_black]">
+                {/* Text Formatting buttons */}
+                <div className="flex items-center gap-1">
+                  <button
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      document.execCommand('bold');
+                    }}
+                    className="w-7 h-7 rounded border border-black/20 hover:border-black hover:bg-amber-100 flex items-center justify-center font-black text-xs active:scale-95 transition-all text-slate-800"
+                    title="Bold"
+                  >
+                    <Bold size={13} strokeWidth={3} />
+                  </button>
+                  <button
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      document.execCommand('italic');
+                    }}
+                    className="w-7 h-7 rounded border border-black/20 hover:border-black hover:bg-amber-100 flex items-center justify-center font-bold text-xs active:scale-95 transition-all text-slate-800"
+                    title="Italic"
+                  >
+                    <Italic size={13} strokeWidth={3} />
+                  </button>
+                  <button
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      document.execCommand('underline');
+                    }}
+                    className="w-7 h-7 rounded border border-black/20 hover:border-black hover:bg-amber-100 flex items-center justify-center font-bold text-xs active:scale-95 transition-all text-slate-800"
+                    title="Underline"
+                  >
+                    <Underline size={13} strokeWidth={3} />
+                  </button>
+                  <button
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      document.execCommand('strikeThrough');
+                    }}
+                    className="w-7 h-7 rounded border border-black/20 hover:border-black hover:bg-amber-100 flex items-center justify-center font-bold text-xs active:scale-95 transition-all text-slate-800"
+                    title="Strikethrough"
+                  >
+                    <Strikethrough size={13} strokeWidth={3} />
+                  </button>
+                </div>
+
+                <div className="w-[1px] h-5 bg-black/20 shrink-0" />
+
+                {/* Primary Stationery Tools */}
+                <div className="flex items-center gap-1">
+                  {/* Text Color */}
+                  <button
+                    onClick={() => {
+                      setActiveTool('type');
+                      setShowColorPicker(!showColorPicker);
+                    }}
+                    className={`px-2 h-7 rounded border border-black/20 flex items-center gap-1 text-xs font-black active:scale-95 transition-all ${
+                      activeTool === 'type' ? 'bg-amber-200 border-black' : 'hover:bg-amber-50'
+                    }`}
+                    title="Text Color"
+                  >
+                    <span className="font-serif font-black text-xs border-b-2" style={{ borderColor: textToolColor }}>A</span>
+                    <div className="w-2.5 h-2.5 rounded-full border border-black/30" style={{ backgroundColor: textToolColor }} />
+                  </button>
+
+                  {/* Highlight */}
+                  <button
+                    onClick={() => {
+                      setActiveTool('highlight');
+                      setActiveWidth(14);
+                      setShowColorPicker(!showColorPicker);
+                    }}
+                    className={`px-2 h-7 rounded border border-black/20 flex items-center gap-1 text-xs font-black active:scale-95 transition-all ${
+                      activeTool === 'highlight' ? 'bg-amber-200 border-black' : 'hover:bg-amber-50'
+                    }`}
+                    title="Highlighter"
+                  >
+                    <Highlighter size={13} strokeWidth={2.5} className="text-amber-800" />
+                    <div className="w-3 h-2 rounded-xs border border-black/30" style={{ backgroundColor: highlightToolColor }} />
+                  </button>
+
+                  {/* Draw */}
+                  <button
+                    onClick={() => {
+                      setActiveTool('draw');
+                      setActiveWidth(2.2);
+                      setShowColorPicker(!showColorPicker);
+                    }}
+                    className={`w-7 h-7 rounded border border-black/20 flex items-center justify-center active:scale-95 transition-all ${
+                      activeTool === 'draw' ? 'bg-amber-200 border-black' : 'hover:bg-amber-50'
+                    }`}
+                    title="Pencil Draw"
+                  >
+                    <Pencil size={13} strokeWidth={2.5} />
+                  </button>
+
+                  {/* Eraser */}
+                  <button
+                    onClick={() => {
+                      setActiveTool('eraser');
+                      setActiveWidth(16);
+                    }}
+                    className={`w-7 h-7 rounded border border-black/20 flex items-center justify-center active:scale-95 transition-all ${
+                      activeTool === 'eraser' ? 'bg-amber-200 border-black' : 'hover:bg-amber-50'
+                    }`}
+                    title="Eraser"
+                  >
+                    <Eraser size={13} strokeWidth={2.5} className="text-pink-600" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Color Swatches Bar */}
+              {(showColorPicker || activeTool === 'type' || activeTool === 'draw' || activeTool === 'highlight') && (
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar bg-amber-50 border border-black/15 rounded-md p-1">
+                  {activeTool === 'type' && TEXT_COLORS.map((tc, idx) => (
+                    <button
+                      key={idx}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        selectStationery('type', tc.color, 2.2);
+                      }}
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded border transition-all shrink-0 ${
+                        textToolColor === tc.color ? 'bg-amber-200 border-black font-extrabold' : 'bg-white border-black/20'
+                      }`}
+                    >
+                      <div className="w-2.5 h-2.5 rounded-full border border-black/30" style={{ backgroundColor: tc.color }} />
+                      <span className="text-[9px] text-slate-800">{tc.name}</span>
+                    </button>
+                  ))}
+
+                  {activeTool === 'draw' && DRAW_COLORS.map((dc, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => selectStationery('draw', dc.color, dc.width)}
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded border transition-all shrink-0 ${
+                        drawToolColor === dc.color ? 'bg-amber-200 border-black font-extrabold' : 'bg-white border-black/20'
+                      }`}
+                    >
+                      <div className="w-2.5 h-2.5 rounded-full border border-black/30" style={{ backgroundColor: dc.color }} />
+                      <span className="text-[9px] text-slate-800">{dc.name}</span>
+                    </button>
+                  ))}
+
+                  {activeTool === 'highlight' && HIGHLIGHT_COLORS.map((hc, idx) => (
+                    <button
+                      key={idx}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        selectStationery('highlight', hc.color, 14);
+                      }}
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded border transition-all shrink-0 ${
+                        highlightToolColor === hc.color ? 'bg-amber-200 border-black font-extrabold' : 'bg-white border-black/20'
+                      }`}
+                    >
+                      <div className="w-3 h-2 rounded-xs border border-black/30" style={{ backgroundColor: hc.color === 'transparent' ? 'transparent' : hc.color }} />
+                      <span className="text-[9px] text-slate-800">{hc.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Page Navigation Strip */}
+              <div className="flex items-center justify-between text-xs font-black px-1 text-orange-950">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setActivePageIndex(Math.max(0, activePageIndex - 1))}
+                    disabled={activePageIndex === 0}
+                    className="p-1 rounded border border-black/20 disabled:opacity-30 bg-white hover:bg-amber-100"
+                    title="Previous Page"
+                  >
+                    <ChevronLeft size={14} strokeWidth={3} />
+                  </button>
+                  <span>
+                    Page {activePageIndex + 1} / {pages.length}
+                  </span>
+                  <button
+                    onClick={() => setActivePageIndex(Math.min(pages.length - 1, activePageIndex + 1))}
+                    disabled={activePageIndex === pages.length - 1}
+                    className="p-1 rounded border border-black/20 disabled:opacity-30 bg-white hover:bg-amber-100"
+                    title="Next Page"
+                  >
+                    <ChevronRight size={14} strokeWidth={3} />
+                  </button>
+                </div>
+
+                <button
+                  onClick={addPage}
+                  className="px-2.5 py-1 bg-amber-300 hover:bg-amber-400 border border-black rounded text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-[1.5px_1.5px_0_black]"
+                >
+                  <Plus size={12} strokeWidth={3} />
+                  New Page
+                </button>
+              </div>
+            </div>
+          )}
         </motion.div>
       )}
     </AnimatePresence>

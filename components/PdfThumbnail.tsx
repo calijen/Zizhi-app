@@ -4,7 +4,9 @@ import { Box, Center, Text, Loader } from '@mantine/core';
 interface PdfThumbnailProps {
   pdfDocument: any;
   pageNumber: number;
+  totalPages?: number;
   isActive: boolean;
+  isRead?: boolean;
   onClick: () => void;
 }
 
@@ -49,7 +51,7 @@ export const PdfThumbnail: React.FC<PdfThumbnailProps> = ({
         if (!isMounted) return;
 
         const originalViewport = page.getViewport({ scale: 1.0 });
-        const targetWidth = 120; // Beautiful thumbnail width matching sidebar
+        const targetWidth = 160; // Crisp, scan-able thumbnail width
         const scale = targetWidth / originalViewport.width;
         const viewport = page.getViewport({ scale });
 
@@ -108,19 +110,16 @@ export const PdfThumbnail: React.FC<PdfThumbnailProps> = ({
     <Box
       ref={containerRef}
       onClick={onClick}
-      className={`group flex flex-col items-center p-3 cursor-pointer transition-all border-4 select-none ${
+      data-active={isActive ? 'true' : undefined}
+      className={`group flex flex-col items-center p-2.5 cursor-pointer transition-all border-2 select-none w-full ${
         isActive
-          ? 'bg-cyan-400/20 border-black shadow-[4px_4px_0_black] -translate-y-1'
-          : 'bg-transparent border-transparent hover:border-black/40'
+          ? 'bg-cyan-400 border-black shadow-[4px_4px_0_black] -translate-y-0.5'
+          : 'bg-white dark:bg-stone-900 border-black/20 hover:border-black hover:shadow-[3px_3px_0_black]'
       }`}
-      style={{ width: '100%', borderRadius: '0px' }}
+      style={{ borderRadius: '0px' }}
     >
       <Box
-        className="relative bg-white shadow-sm border-2 border-black overflow-hidden flex items-center justify-center bg-stone-100"
-        style={{
-          width: '120px',
-          aspectRatio: '3/4',
-        }}
+        className="relative bg-white shadow-sm border-2 border-black overflow-hidden flex items-center justify-center bg-stone-100 w-full aspect-[3/4]"
       >
         {!isRendered && !error && (
           <Center className="absolute inset-0">
@@ -134,12 +133,13 @@ export const PdfThumbnail: React.FC<PdfThumbnailProps> = ({
         )}
         <canvas
           ref={canvasRef}
-          className={`block w-full h-full object-contain transition-opacity duration-300 ${
+          className={`block max-w-full max-h-full object-contain transition-opacity duration-300 ${
             isRendered ? 'opacity-100' : 'opacity-0'
           }`}
         />
       </Box>
-      <Text className={`text-[10px] font-black uppercase tracking-wider mt-2 transition-colors ${isActive ? 'text-black font-extrabold' : 'text-[var(--text-color)] opacity-70 group-hover:opacity-100'}`}>
+
+      <Text className={`text-[11px] font-black uppercase tracking-wider text-center mt-2.5 ${isActive ? 'text-black' : 'text-[var(--text-color)]'}`}>
         Page {pageNumber}
       </Text>
     </Box>
