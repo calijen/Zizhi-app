@@ -290,7 +290,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShow
         const counts: Record<string, number> = {};
         library.forEach(b => {
             if (b.genre) {
-                b.genre.split(',').forEach(g => {
+                (b.genre || '').split(',').forEach(g => {
                     const clean = g.trim().replace(/^pdf document$/i, '').trim();
                     if (clean && clean.toLowerCase() !== "unknown" && clean.toLowerCase() !== "epub" && clean.toLowerCase() !== "pdf") {
                         const capitalized = clean.charAt(0).toUpperCase() + clean.slice(1);
@@ -410,7 +410,7 @@ You must return a valid JSON object ONLY. Do not output any thinking block, comm
             <header className="flex flex-col md:flex-row justify-between items-start md:items-end border-b-8 border-[var(--color-border-color)] pb-10">
                 <Stack gap={0}>
                     <Text className="text-[10px] font-black uppercase tracking-[0.5em] text-pink-500 mb-2">The Archive of</Text>
-                    <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tighter leading-none text-[var(--color-primary-text)]">{user.email.split('@')[0]}</h2>
+                    <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tighter leading-none text-[var(--color-primary-text)]">{(user?.email || '').split('@')[0] || user?.displayName || 'Reader'}</h2>
                 </Stack>
                 <button onClick={onSignOut} className="mt-8 md:mt-0 bg-[var(--color-surface)] border-4 border-[var(--color-border-color)] px-8 py-4 text-[11px] font-black uppercase tracking-[0.3em] shadow-[6px_6px_0_var(--color-border-color)] hover:translate-y-[-2px] transition-all text-[var(--color-primary-text)] rounded-none">Sign Out</button>
             </header>

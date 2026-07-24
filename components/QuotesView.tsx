@@ -79,7 +79,7 @@ const EmptyQuotesGraphic = () => (
 
 const QuoteCard: FC<{ quote: Quote; onDelete: (id: string) => void; onGoToQuote: (q: Quote) => void; onShare: (q: Quote) => void; }> = ({ quote, onDelete, onGoToQuote, onShare }) => {
     const [expanded, setExpanded] = useState(false);
-    const words = useMemo(() => quote.text.trim().split(/\s+/), [quote.text]);
+    const words = useMemo(() => (quote?.text || '').trim().split(/\s+/), [quote?.text]);
     const isLong = words.length > 20;
     const displayText = expanded || !isLong ? quote.text : words.slice(0, 20).join(' ') + '...';
     return (

@@ -107,20 +107,26 @@ const BookCard: FC<{
     const progressPercent = Math.round((book.progress || 0) * 100);
 
     return (
-        <Box bg="var(--color-surface)" className="relative group border-4 border-[var(--color-border-color)] shadow-[4px_4px_0_var(--color-border-color)] hover:translate-x-[-1px] transition-all overflow-hidden">
-            <Box className={`${isList ? 'flex flex-row' : 'flex flex-col'}`}>
-                <Box className={`relative cursor-pointer overflow-hidden ${isList ? 'w-24 md:w-32 flex-shrink-0 border-r-4 border-[var(--color-border-color)]' : 'aspect-[3/4] border-b-4 border-[var(--color-border-color)]'}`} onClick={() => onSelect(book.id)}>
-                    {book.coverImageUrl ? <Image src={book.coverImageUrl} className="w-full h-full object-cover" /> : <Box className="w-full h-full bg-slate-100 flex items-center justify-center font-black text-slate-300">EPUB</Box>}
+        <Box bg="var(--color-surface)" className="relative group border-4 border-[var(--color-border-color)] shadow-[4px_4px_0_var(--color-border-color)] hover:translate-x-[-1px] transition-all overflow-hidden h-full flex flex-col">
+            <Box className={`h-full ${isList ? 'flex flex-row' : 'flex flex-col flex-1'}`}>
+                <Box className={`relative cursor-pointer overflow-hidden flex-shrink-0 ${isList ? 'w-28 md:w-36 aspect-[3/4] border-r-4 border-[var(--color-border-color)]' : 'w-full aspect-[3/4] border-b-4 border-[var(--color-border-color)]'}`} onClick={() => onSelect(book.id)}>
+                    {book.coverImageUrl ? (
+                        <img src={book.coverImageUrl} className="w-full h-full object-cover aspect-[3/4] block" alt={book.title || 'Book Cover'} />
+                    ) : (
+                        <Box className="w-full h-full aspect-[3/4] bg-slate-100 flex items-center justify-center font-black text-slate-300 text-xs uppercase">
+                            {book.isPdf ? 'PDF' : 'EPUB'}
+                        </Box>
+                    )}
                 </Box>
                 <Stack p="md" gap="xs" className="flex-1 justify-between min-w-0">
                     <Stack gap={2}>
                         <Group justify="space-between" align="start" wrap="nowrap">
                             <Text className="font-black text-[14px] md:text-[16px] leading-tight truncate text-[var(--color-primary-text)]" title={book.title}>{book.title}</Text>
-                            <ActionIcon variant="filled" color="red" size="sm" className="border-2 border-black rounded-none" onClick={(e) => { e.stopPropagation(); onDelete(book.id); }}>
+                            <ActionIcon variant="filled" color="red" size="sm" className="border-2 border-black rounded-none flex-shrink-0" onClick={(e) => { e.stopPropagation(); onDelete(book.id); }}>
                                 <IconClose className="w-4 h-4 text-white" />
                             </ActionIcon>
                         </Group>
-                        <Text className="text-[10px] font-bold text-[var(--color-secondary-text)] truncate uppercase tracking-widest">{book.author}</Text>
+                        <Text className="text-[10px] font-bold text-[var(--color-secondary-text)] truncate uppercase tracking-widest">{book.author || 'Unknown Author'}</Text>
                     </Stack>
                     <Stack gap={4}>
                         <Group justify="space-between" align="center">

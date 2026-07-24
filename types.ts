@@ -67,6 +67,7 @@ export interface BookMetadata {
     coverImageUrl: string | null;
     progress: number;
     lastScrollTop: number;
+    lastChapterIndex?: number;
     lastOpened?: number;
     readingTime: number; 
     genre?: string;

@@ -175,6 +175,8 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
   const [isDrawing, setIsDrawing] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const pageContentRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
 
   const [selectionRect, setSelectionRect] = useState<DOMRect | null>(null);
@@ -434,7 +436,7 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
 
   // Set Canvas Resolution (High DPI / Retina Support) using ResizeObserver on the container
   useEffect(() => {
-    const container = containerRef.current;
+    const container = pageContentRef.current || containerRef.current;
     if (!container) return;
 
     const observer = new ResizeObserver(() => {
@@ -553,7 +555,7 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
   // Drag and drop of widgets
   const handleDragStart = (e: React.MouseEvent | React.TouchEvent, id: string, type: 'sticky' | 'sticker') => {
     e.stopPropagation();
-    const container = containerRef.current;
+    const container = pageContentRef.current || containerRef.current;
     if (!container) return;
     
     const rect = container.getBoundingClientRect();
@@ -586,7 +588,7 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
 
   const handleGlobalDragMove = useCallback((e: MouseEvent | TouchEvent) => {
     if (!isDraggingRef.current || !activeDragIdRef.current) return;
-    const container = containerRef.current;
+    const container = pageContentRef.current || containerRef.current;
     if (!container) return;
     
     const rect = container.getBoundingClientRect();
@@ -795,15 +797,11 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
         </button>
       )}
 
-      {/* Background paper lines layout */}
-      <div className="pointer-events-none notebook-lines" />
-
-      {/* Scrollable text & image flow wrapper */}
+      {/* Scrollable container holding page content, canvas, and sticky notes */}
       <div 
-        className="absolute inset-0 overflow-y-auto pr-4 pl-[48px] pt-[30px] pb-8 z-[15] select-text notebook-editor-scroll no-scrollbar"
-        style={{
-          scrollbarWidth: 'none',
-        }}
+        ref={scrollContainerRef}
+        className="absolute inset-0 overflow-y-auto notebook-editor-scroll no-scrollbar z-[15]"
+        style={{ scrollbarWidth: 'none' }}
         onClick={(e) => {
           if (activeTool !== 'type' || !editorRef.current) return;
           
@@ -852,126 +850,134 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
           }
         }}
       >
-        {/* Render floated image stickers first so text wraps around them */}
-        {(pageData.imageStickers || []).map((sticker) => (
-          <ImageStickerComponent
-            key={sticker.id}
-            sticker={sticker}
-            activeTool={activeTool}
-            onChange={(updatedSticker) => {
-              const updated = (pageData.imageStickers || []).map(s => s.id === sticker.id ? updatedSticker : s);
-              onChange({ ...pageData, imageStickers: updated });
+        <div 
+          ref={pageContentRef}
+          className="relative min-h-full w-full pr-4 pl-[48px] pt-[30px] pb-8 select-text"
+        >
+          {/* Background paper lines layout */}
+          <div className="pointer-events-none notebook-lines" />
+
+          {/* Render floated image stickers first so text wraps around them */}
+          {(pageData.imageStickers || []).map((sticker) => (
+            <ImageStickerComponent
+              key={sticker.id}
+              sticker={sticker}
+              activeTool={activeTool}
+              onChange={(updatedSticker) => {
+                const updated = (pageData.imageStickers || []).map(s => s.id === sticker.id ? updatedSticker : s);
+                onChange({ ...pageData, imageStickers: updated });
+              }}
+              onDelete={() => {
+                const updated = (pageData.imageStickers || []).filter(s => s.id !== sticker.id);
+                onChange({ ...pageData, imageStickers: updated });
+              }}
+            />
+          ))}
+
+          {/* contentEditable text block */}
+          <div
+            ref={editorRef}
+            contentEditable={activeTool === 'type' || activeTool === 'highlight'}
+            onInput={handleTextChange}
+            onMouseUp={() => {
+              handleSelectionHighlight();
+              handleSelectionChange();
             }}
-            onDelete={() => {
-              const updated = (pageData.imageStickers || []).filter(s => s.id !== sticker.id);
-              onChange({ ...pageData, imageStickers: updated });
+            onKeyUp={() => {
+              handleSelectionHighlight();
+              handleSelectionChange();
+            }}
+            onClick={handleEditorClick}
+            onFocus={() => {
+              if (activeTool === 'type') {
+                document.execCommand('foreColor', false, activeColor);
+              }
+            }}
+            data-placeholder={activeTool === 'type' ? 'Start typing directly on notebook lines...' : activeTool === 'highlight' ? 'Drag cursor over text to highlight it...' : ''}
+            className="outline-none font-sans font-bold text-[14px] leading-[24px] select-text min-h-[500px] w-full break-words notebook-editor relative z-10"
+            style={{
+              color: activeTool === 'type' ? (activeColor || '#1e293b') : '#1e293b',
+              caretColor: activeTool === 'type' ? (activeColor || '#1e293b') : '#1e293b',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              pointerEvents: (activeTool === 'type' || activeTool === 'highlight') ? 'auto' : 'none',
             }}
           />
-        ))}
 
-        {/* contentEditable text block */}
-        <div
-          ref={editorRef}
-          contentEditable={activeTool === 'type' || activeTool === 'highlight'}
-          onInput={handleTextChange}
-          onMouseUp={() => {
-            handleSelectionHighlight();
-            handleSelectionChange();
-          }}
-          onKeyUp={() => {
-            handleSelectionHighlight();
-            handleSelectionChange();
-          }}
-          onClick={handleEditorClick}
-          onFocus={() => {
-            if (activeTool === 'type') {
-              document.execCommand('foreColor', false, activeColor);
-            }
-          }}
-          data-placeholder={activeTool === 'type' ? 'Start typing directly on notebook lines...' : activeTool === 'highlight' ? 'Drag cursor over text to highlight it...' : ''}
-          className="outline-none font-sans font-bold text-[14px] leading-[24px] select-text min-h-[500px] w-full break-words notebook-editor"
-          style={{
-            color: activeTool === 'type' ? (activeColor || '#1e293b') : '#1e293b',
-            caretColor: activeTool === 'type' ? (activeColor || '#1e293b') : '#1e293b',
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-            pointerEvents: (activeTool === 'type' || activeTool === 'highlight') ? 'auto' : 'none',
-          }}
-        />
-      </div>
-
-      {/* Drawing Sketch Canvas */}
-      <canvas
-        ref={canvasRef}
-        onMouseDown={handleStartDrawing}
-        onTouchStart={handleStartDrawing}
-        className="absolute inset-0 w-full h-full touch-none"
-        style={{
-          zIndex: (activeTool === 'draw' || activeTool === 'eraser') ? 25 : 10,
-          pointerEvents: (activeTool === 'draw' || activeTool === 'eraser') ? 'auto' : 'none',
-          cursor: activeTool === 'eraser' ? 'cell' : 'crosshair'
-        }}
-      />
-
-      {/* Sticky Notes Layer */}
-      {pageData.stickyNotes.map((sticky) => {
-        const colorMeta = STICKY_COLORS.find(c => c.name === sticky.color) || STICKY_COLORS[0];
-        return (
-          <div
-            key={sticky.id}
-            className="absolute z-30 group interactive-sticker"
+          {/* Drawing Sketch Canvas */}
+          <canvas
+            ref={canvasRef}
+            onMouseDown={handleStartDrawing}
+            onTouchStart={handleStartDrawing}
+            className="absolute inset-0 w-full h-full touch-none"
             style={{
-              left: `${sticky.x * 100}%`,
-              top: `${sticky.y * 100}%`,
-              transform: `translate(-50%, -50%) rotate(${sticky.rotation}deg)`,
-              width: '135px',
+              zIndex: (activeTool === 'draw' || activeTool === 'eraser') ? 25 : 5,
+              pointerEvents: (activeTool === 'draw' || activeTool === 'eraser') ? 'auto' : 'none',
+              cursor: activeTool === 'eraser' ? 'cell' : 'crosshair'
             }}
-          >
-            <div 
-              className="border-2 border-black p-2 shadow-[4px_4px_0_black] flex flex-col h-28 relative text-left"
-              style={{ backgroundColor: colorMeta.bg }}
-            >
-              {/* Drag Handle Top Bar */}
-              <div 
-                onMouseDown={(e) => handleDragStart(e, sticky.id, 'sticky')}
-                onTouchStart={(e) => handleDragStart(e, sticky.id, 'sticky')}
-                className="h-3.5 absolute top-0 left-0 right-0 cursor-move border-b border-black/10 flex items-center justify-center"
-                style={{ backgroundColor: colorMeta.border }}
-                title="Drag to move sticky"
+          />
+
+          {/* Sticky Notes Layer */}
+          {pageData.stickyNotes.map((sticky) => {
+            const colorMeta = STICKY_COLORS.find(c => c.name === sticky.color) || STICKY_COLORS[0];
+            return (
+              <div
+                key={sticky.id}
+                className="absolute z-30 group interactive-sticker"
+                style={{
+                  left: `${sticky.x * 100}%`,
+                  top: `${sticky.y * 100}%`,
+                  transform: `translate(-50%, -50%) rotate(${sticky.rotation}deg)`,
+                  width: '135px',
+                }}
               >
-                <GripHorizontal size={10} className="text-black/30" />
-              </div>
-
-              {/* Editable note content */}
-              <textarea
-                value={sticky.text}
-                onChange={(e) => updateStickyText(sticky.id, e.target.value)}
-                placeholder="Write inside sticky note..."
-                className="w-full flex-1 bg-transparent border-0 resize-none outline-none font-sans font-bold text-[11px] leading-relaxed pt-2.5 focus:ring-0"
-                style={{ color: colorMeta.text }}
-              />
-
-              {/* Inline action selectors */}
-              <div className="absolute bottom-1 right-1 flex gap-1 bg-white/80 border border-black/10 rounded-sm p-0.5 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  onClick={() => cycleStickyColor(sticky.id)}
-                  className="w-3.5 h-3.5 rounded-full border border-black bg-white flex items-center justify-center hover:scale-105 active:scale-95 transition-all"
-                  title="Cycle color"
+                <div 
+                  className="border-2 border-black p-2 shadow-[4px_4px_0_black] flex flex-col h-28 relative text-left"
+                  style={{ backgroundColor: colorMeta.bg }}
                 >
-                  <Palette size={8} className="text-black" />
-                </button>
-                <button
-                  onClick={() => deleteSticky(sticky.id)}
-                  className="w-3.5 h-3.5 rounded-full border border-black bg-red-400 flex items-center justify-center hover:bg-red-500 hover:scale-105 active:scale-95 transition-all"
-                  title="Delete sticky"
-                >
-                  <X size={8} strokeWidth={3} className="text-black" />
-                </button>
+                  {/* Drag Handle Top Bar */}
+                  <div 
+                    onMouseDown={(e) => handleDragStart(e, sticky.id, 'sticky')}
+                    onTouchStart={(e) => handleDragStart(e, sticky.id, 'sticky')}
+                    className="h-3.5 absolute top-0 left-0 right-0 cursor-move border-b border-black/10 flex items-center justify-center"
+                    style={{ backgroundColor: colorMeta.border }}
+                    title="Drag to move sticky"
+                  >
+                    <GripHorizontal size={10} className="text-black/30" />
+                  </div>
+
+                  {/* Editable note content */}
+                  <textarea
+                    value={sticky.text}
+                    onChange={(e) => updateStickyText(sticky.id, e.target.value)}
+                    placeholder="Write inside sticky note..."
+                    className="w-full flex-1 bg-transparent border-0 resize-none outline-none font-sans font-bold text-[11px] leading-relaxed pt-2.5 focus:ring-0"
+                    style={{ color: colorMeta.text }}
+                  />
+
+                  {/* Inline action selectors */}
+                  <div className="absolute bottom-1 right-1 flex gap-1 bg-white/80 border border-black/10 rounded-sm p-0.5 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => cycleStickyColor(sticky.id)}
+                      className="w-3.5 h-3.5 rounded-full border border-black bg-white flex items-center justify-center hover:scale-105 active:scale-95 transition-all"
+                      title="Cycle color"
+                    >
+                      <Palette size={8} className="text-black" />
+                    </button>
+                    <button
+                      onClick={() => deleteSticky(sticky.id)}
+                      className="w-3.5 h-3.5 rounded-full border border-black bg-red-400 flex items-center justify-center hover:bg-red-500 hover:scale-105 active:scale-95 transition-all"
+                      title="Delete sticky"
+                    >
+                      <X size={8} strokeWidth={3} className="text-black" />
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        );
-      })}
+            );
+          })}
+        </div>
+      </div>
 
       {selectionRect && (
         <Portal>

@@ -13,8 +13,8 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
 };
 
 const normalizePath = (base: string, relative: string): string => {
-    const stack = base.split("/");
-    const parts = relative.split("/");
+    const stack = (base || '').split("/");
+    const parts = (relative || '').split("/");
     stack.pop(); 
     for (const part of parts) {
         if (part === ".") continue;
@@ -119,7 +119,7 @@ export const parseEpub = async (file: File): Promise<Book> => {
         }
         
         if (!label) {
-            label = item.href.split('/').pop()?.replace(/\.(xhtml|html|xml|htm)$/i, '') || 'Chapter';
+            label = (item?.href || '').split('/').pop()?.replace(/\.(xhtml|html|xml|htm)$/i, '') || 'Chapter';
         }
 
         chapters.push({

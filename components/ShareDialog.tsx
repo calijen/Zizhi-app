@@ -99,7 +99,7 @@ const ShareDialog: FC<ShareDialogProps> = ({ text, bookTitle, author, coverImage
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     const wrapText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number) => {
-        const words = text.split(' ');
+        const words = (text || '').split(' ');
         const lines = [];
         let currentLine = words[0];
         for (let i = 1; i < words.length; i++) {
