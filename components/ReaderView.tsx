@@ -148,8 +148,6 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
     const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1280);
     const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(window.innerWidth >= 1280);
     const [selection, setSelection] = useState<{ text: string, rect: DOMRect } | null>(null);
-    const [noteInput, setNoteInput] = useState<{ text: string } | null>(null);
-    const [noteValue, setNoteValue] = useState('');
     const [showShareDialog, setShowShareDialog] = useState<string | null>(null);
     const [scrollProgress, setScrollProgress] = useState(book.progress || 0);
     const [isInitialScrollDone, setIsInitialScrollDone] = useState(false);
@@ -445,28 +443,66 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
         return () => observer.disconnect();
     }, [isInitialScrollDone, book.chapters.length, book.isPdf]);
 
-    const handleCloseReader = () => {
+    const latestScrollRef = useRef<{ scrollTop: number; progress: number; currentChapterIndex: number } | null>(null);
+
+    const flushProgress = useCallback(() => {
+        if (!scrollViewportRef.current && !latestScrollRef.current) return;
+        
+        let scrollTop = 0;
+        let progress = 0;
+        let chapIdx = currentChapterIndex;
+
         if (scrollViewportRef.current) {
             const viewport = scrollViewportRef.current;
-            const { scrollHeight, clientHeight, scrollTop } = viewport;
-            const progress = scrollHeight > clientHeight ? scrollTop / (scrollHeight - clientHeight) : 0;
-            const timeSpent = Math.max(0, Math.floor((Date.now() - lastUpdateRef.current) / 1000));
-            onUpdateProgress(book.id, currentChapterIndex, scrollTop, timeSpent, progress);
+            const { scrollHeight, clientHeight } = viewport;
+            scrollTop = viewport.scrollTop;
+            progress = scrollHeight > clientHeight ? scrollTop / (scrollHeight - clientHeight) : 0;
+        } else if (latestScrollRef.current) {
+            scrollTop = latestScrollRef.current.scrollTop;
+            progress = latestScrollRef.current.progress;
+            chapIdx = latestScrollRef.current.currentChapterIndex;
         }
+
+        const now = Date.now();
+        const timeSpent = Math.max(0, Math.floor((now - lastUpdateRef.current) / 1000));
+        if (timeSpent > 0 || progress > 0) {
+            onUpdateProgress(book.id, chapIdx, scrollTop, timeSpent, progress);
+            lastUpdateRef.current = now;
+        }
+    }, [book.id, currentChapterIndex, onUpdateProgress]);
+
+    const handleCloseReader = () => {
+        flushProgress();
         onClose();
     };
 
+    // Optimized cloud save interval: Flush on app exit / tab switch / page unload or every 5 minutes
     useEffect(() => {
-        return () => {
-            if (scrollViewportRef.current) {
-                const viewport = scrollViewportRef.current;
-                const { scrollHeight, clientHeight, scrollTop } = viewport;
-                const progress = scrollHeight > clientHeight ? scrollTop / (scrollHeight - clientHeight) : 0;
-                const timeSpent = Math.max(0, Math.floor((Date.now() - lastUpdateRef.current) / 1000));
-                onUpdateProgress(book.id, currentChapterIndex, scrollTop, timeSpent, progress);
+        const handleVisibilityOrUnload = () => {
+            if (document.visibilityState === 'hidden') {
+                flushProgress();
             }
         };
-    }, [book.id, currentChapterIndex, onUpdateProgress]);
+
+        const handleBeforeUnload = () => {
+            flushProgress();
+        };
+
+        // Periodic 5-minute background save safety net
+        const periodicTimer = setInterval(() => {
+            flushProgress();
+        }, 300000);
+
+        document.addEventListener('visibilitychange', handleVisibilityOrUnload);
+        window.addEventListener('beforeunload', handleBeforeUnload);
+
+        return () => {
+            clearInterval(periodicTimer);
+            document.removeEventListener('visibilitychange', handleVisibilityOrUnload);
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            flushProgress(); // Flush on unmount
+        };
+    }, [flushProgress]);
 
     useEffect(() => {
         if (sidebarTab === 'chapters' && (isDesktopSidebarOpen || showToc)) {
@@ -591,12 +627,11 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
             }
         }
 
-        const now = Date.now();
-        if (now - lastUpdateRef.current > 2000) {
-            const timeSpent = Math.floor((now - lastUpdateRef.current) / 1000);
-            onUpdateProgress(book.id, currentChapterIndex, position.y, timeSpent, progress);
-            lastUpdateRef.current = now;
-        }
+        latestScrollRef.current = {
+            scrollTop: position.y,
+            progress,
+            currentChapterIndex
+        };
     };
 
     const styleVariables = {
@@ -897,7 +932,14 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
             {selection && (
                 <TextSelectionPopup 
                     rect={selection.rect}
-                    onNote={() => { setNoteInput({ text: selection.text }); setSelection(null); }}
+                    onNote={() => { 
+                        window.dispatchEvent(new CustomEvent('add-notebook-text', {
+                            detail: { text: selection.text }
+                        }));
+                        setIsNotebookOpen(true);
+                        setToast({ message: "Note added to notebook!" });
+                        setSelection(null); 
+                    }}
                     onQuote={() => { onSaveQuote(selection.text, book.chapters[currentChapterIndex].id); setSelection(null); }}
                     onSearch={() => { onSearch(selection.text); setSelection(null); }}
                     onShare={() => { setShowShareDialog(selection.text); setSelection(null); }}
@@ -920,42 +962,6 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
                     action={toast.action}
                     onClose={() => setToast(null)}
                 />
-            )}
-
-            {noteInput && (
-                <Box className="fixed inset-0 z-[2000] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm animate-fade-in">
-                    <Box className="bg-[var(--bg-color)] border-4 border-black p-8 shadow-[12px_12px_0_black] max-w-md w-full animate-pop-in">
-                        <h3 className="text-xl font-black uppercase mb-4 text-[var(--text-color)]">Add Note</h3>
-                        <Box className="mb-6 p-4 bg-black/5 border-l-4 border-cyan-400 italic text-sm text-[var(--sec-text)]">
-                            "{noteInput.text}"
-                        </Box>
-                        <textarea 
-                            autoFocus
-                            value={noteValue}
-                            onChange={(e) => setNoteValue(e.target.value)}
-                            placeholder="Type your note here..."
-                            className="w-full h-32 p-4 bg-[var(--bg-color)] border-2 border-black font-bold text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400 mb-6 text-[var(--text-color)]"
-                        />
-                        <Group grow gap="md">
-                            <button 
-                                onClick={() => { setNoteInput(null); setNoteValue(''); }}
-                                className="px-6 py-3 border-2 border-black font-black uppercase text-xs hover:bg-black/5 transition-all"
-                            >
-                                Cancel
-                            </button>
-                            <button 
-                                onClick={() => { 
-                                    onSaveNote(noteInput.text, noteValue, book.chapters[currentChapterIndex].id); 
-                                    setNoteInput(null); 
-                                    setNoteValue(''); 
-                                }}
-                                className="px-6 py-3 bg-cyan-400 border-2 border-black font-black uppercase text-xs shadow-[4px_4px_0_black] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all"
-                            >
-                                Save Note
-                            </button>
-                        </Group>
-                    </Box>
-                </Box>
             )}
 
             <Transition mounted={showToc && !isDesktop} transition="slide-right" duration={300}>
@@ -1243,6 +1249,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
                 bookTitle={book.title}
                 isOpen={isNotebookOpen} 
                 onClose={() => setIsNotebookOpen(false)} 
+                theme={theme}
             />
 
             <style>{`
@@ -1307,6 +1314,14 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
                 .pdf-page-container img {
                     margin: 0 !important;
                     box-shadow: 0 20px 50px rgba(0,0,0,0.15) !important;
+                }
+                .dark .notebook-editor font[color="#000000"],
+                .dark .notebook-editor font[color="#1e293b"],
+                .dark .notebook-editor font[color="#000"],
+                .dark .notebook-editor font[color="black"],
+                .dark .notebook-editor span[style*="color: rgb(0, 0, 0)"],
+                .dark .notebook-editor span[style*="color: rgb(30, 41, 59)"] {
+                    color: #f8fafc !important;
                 }
             `}</style>
         </Box>

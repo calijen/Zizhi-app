@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Box, Group, Stack, Text, ActionIcon, Loader, Tooltip } from '@mantine/core';
 import { motion, AnimatePresence } from 'framer-motion';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { 
   Eraser, 
   StickyNote as StickyIcon, 
@@ -16,13 +18,14 @@ import {
   Highlighter,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   MoreVertical,
   Bold,
   Italic,
   Underline,
   Strikethrough
 } from 'lucide-react';
-import type { DrawingPath, StickyNote, ImageSticker, NotebookData, NotebookPageData } from '../types';
+import type { DrawingPath, StickyNote, ImageSticker, NotebookData, NotebookPageData, Theme } from '../types';
 import * as db from '../db';
 import { NotebookPage } from './NotebookPage';
 
@@ -31,7 +34,79 @@ interface NotebookSidebarProps {
   bookTitle: string;
   onClose: () => void;
   isOpen: boolean;
+  theme?: Theme;
 }
+
+const isLightColor = (color: string) => {
+  if (!color || color === 'transparent') return true;
+  if (color.startsWith('rgba')) {
+    const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+    if (match) {
+      const r = parseInt(match[1], 10);
+      const g = parseInt(match[2], 10);
+      const b = parseInt(match[3], 10);
+      return (r * 299 + g * 587 + b * 114) / 1000 > 165;
+    }
+  }
+  const cleanHex = color.replace('#', '');
+  if (cleanHex.length === 3) {
+    const r = parseInt(cleanHex[0] + cleanHex[0], 16);
+    const g = parseInt(cleanHex[1] + cleanHex[1], 16);
+    const b = parseInt(cleanHex[2] + cleanHex[2], 16);
+    return (r * 299 + g * 587 + b * 114) / 1000 > 165;
+  }
+  if (cleanHex.length === 6) {
+    const r = parseInt(cleanHex.substring(0, 2), 16);
+    const g = parseInt(cleanHex.substring(2, 4), 16);
+    const b = parseInt(cleanHex.substring(4, 6), 16);
+    return (r * 299 + g * 587 + b * 114) / 1000 > 165;
+  }
+  return false;
+};
+
+const isColorMatch = (c1: string, c2: string) => {
+  if (!c1 || !c2) return false;
+  if (c1 === c2) return true;
+  return c1.toLowerCase().trim() === c2.toLowerCase().trim();
+};
+
+const GRID_GRAYSCALE = [
+  { name: 'Black', color: '#000000' },
+  { name: 'Charcoal', color: '#262626' },
+  { name: 'Dark Gray', color: '#404040' },
+  { name: 'Medium Dark', color: '#525252' },
+  { name: 'Slate Gray', color: '#737373' },
+  { name: 'Gray', color: '#a3a3a3' },
+  { name: 'Light Gray', color: '#d4d4d4' },
+  { name: 'Soft Gray', color: '#e5e5e5' },
+  { name: 'Off White', color: '#f5f5f5' },
+  { name: 'White', color: '#ffffff' },
+];
+
+const GRID_VIBRANT = [
+  { name: 'Dark Red', color: '#7f1d1d' },
+  { name: 'Red', color: '#dc2626' },
+  { name: 'Orange', color: '#ea580c' },
+  { name: 'Yellow', color: '#eab308' },
+  { name: 'Green', color: '#16a34a' },
+  { name: 'Cyan', color: '#06b6d4' },
+  { name: 'Blue', color: '#2563eb' },
+  { name: 'Royal Blue', color: '#1d4ed8' },
+  { name: 'Purple', color: '#9333ea' },
+  { name: 'Magenta', color: '#d946ef' },
+];
+
+const HIGHLIGHT_GRID = [
+  { name: 'Yellow', color: 'rgba(253, 224, 71, 0.5)', solid: '#fde047' },
+  { name: 'Orange', color: 'rgba(253, 186, 116, 0.5)', solid: '#fdba74' },
+  { name: 'Pink', color: 'rgba(244, 114, 182, 0.5)', solid: '#f472b6' },
+  { name: 'Red', color: 'rgba(252, 165, 165, 0.5)', solid: '#fca5a5' },
+  { name: 'Green', color: 'rgba(74, 222, 128, 0.5)', solid: '#4ade80' },
+  { name: 'Cyan', color: 'rgba(103, 232, 249, 0.5)', solid: '#67e8f9' },
+  { name: 'Blue', color: 'rgba(147, 197, 253, 0.5)', solid: '#93c5fd' },
+  { name: 'Purple', color: 'rgba(192, 132, 252, 0.5)', solid: '#c084fc' },
+  { name: 'Transparent', color: 'transparent', solid: 'transparent' },
+];
 
 const TEXT_COLORS = [
   { name: 'Charcoal', color: '#1e293b' },
@@ -70,7 +145,12 @@ const getPlainText = (html: string) => {
   return temp.innerText || temp.textContent || "";
 };
 
-export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTitle, onClose, isOpen }) => {
+export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTitle, onClose, isOpen, theme }) => {
+  const isDarkTheme = theme?.id === 'nocturne' || (theme?.colors?.background && (theme.colors.background === '#0a0a0b' || theme.colors.background.startsWith('#1') || theme.colors.background.startsWith('#0')));
+  const pageBgColor = theme?.colors?.background || '#fcfbe3';
+  const pageSurfaceColor = theme?.colors?.surface || '#f1f5f9';
+  const pageTextColor = theme?.colors?.['primary-text'] || (isDarkTheme ? '#f8fafc' : '#1e293b');
+  const pageBorderColor = theme?.colors?.['border-color'] || 'rgba(0,0,0,0.12)';
   const [pages, setPages] = useState<NotebookPageData[]>([]);
   const [activePageIndex, setActivePageIndex] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -89,26 +169,87 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Keyboard offset listener for mobile soft keyboard
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+
+  useEffect(() => {
+    if (!isMobile || typeof window === 'undefined' || !window.visualViewport) return;
+
+    const handleViewportChange = () => {
+      const vv = window.visualViewport;
+      if (!vv) return;
+      const offset = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
+      setKeyboardOffset(offset);
+    };
+
+    window.visualViewport.addEventListener('resize', handleViewportChange);
+    window.visualViewport.addEventListener('scroll', handleViewportChange);
+    handleViewportChange();
+
+    return () => {
+      window.visualViewport?.removeEventListener('resize', handleViewportChange);
+      window.visualViewport?.removeEventListener('scroll', handleViewportChange);
+    };
+  }, [isMobile]);
   
   // Stationery drawer tool configuration
   const [activeTool, setActiveTool] = useState<'type' | 'draw' | 'highlight' | 'eraser'>('type');
-  const [textToolColor, setTextToolColor] = useState('#1e293b');
-  const [drawToolColor, setDrawToolColor] = useState('#1e293b');
-  const [highlightToolColor, setHighlightToolColor] = useState('rgba(253, 224, 71, 0.45)');
+  const [textToolColor, setTextToolColor] = useState(isDarkTheme ? '#f8fafc' : '#1e293b');
+  const [drawToolColor, setDrawToolColor] = useState(isDarkTheme ? '#f8fafc' : '#1e293b');
+  const [highlightToolColor, setHighlightToolColor] = useState('rgba(253, 224, 71, 0.5)');
   const [activeWidth, setActiveWidth] = useState(2.2);
+
+  // Dropdown & Popover States
+  const [activeDropdownTool, setActiveDropdownTool] = useState<'type' | 'draw' | 'highlight' | null>(null);
+  const toolbarContainerRef = useRef<HTMLDivElement>(null);
 
   // Mobile Popover & Bar States
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
 
+  // Automatically update text and draw colors if dark mode changes
+  useEffect(() => {
+    if (isDarkTheme) {
+      if (['#1e293b', '#000000', '#262626', '#404040', '#000'].includes(textToolColor)) {
+        setTextToolColor('#f8fafc');
+      }
+      if (['#1e293b', '#000000', '#262626', '#404040', '#000'].includes(drawToolColor)) {
+        setDrawToolColor('#f8fafc');
+      }
+    } else {
+      if (['#f8fafc', '#ffffff', '#fff', '#fafafa'].includes(textToolColor)) {
+        setTextToolColor('#1e293b');
+      }
+      if (['#f8fafc', '#ffffff', '#fff', '#fafafa'].includes(drawToolColor)) {
+        setDrawToolColor('#1e293b');
+      }
+    }
+  }, [isDarkTheme]);
+
+  // Click outside listener to close color dropdown
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (toolbarContainerRef.current && !toolbarContainerRef.current.contains(e.target as Node)) {
+        setActiveDropdownTool(null);
+      }
+    };
+    if (activeDropdownTool) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [activeDropdownTool]);
+
   const activeColor = useMemo(() => {
     if (activeTool === 'type') return textToolColor;
     if (activeTool === 'draw') return drawToolColor;
     if (activeTool === 'highlight') return highlightToolColor;
     if (activeTool === 'eraser') return 'eraser';
-    return '#1e293b';
-  }, [activeTool, textToolColor, drawToolColor, highlightToolColor]);
+    return isDarkTheme ? '#f8fafc' : '#1e293b';
+  }, [activeTool, textToolColor, drawToolColor, highlightToolColor, isDarkTheme]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -192,7 +333,81 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
 
 
 
-  // Handle updates to individual pages
+  const triggerSaveImmediate = useCallback(async (updatedPages: NotebookPageData[]) => {
+    if (lastSaveTimerRef.current) {
+      window.clearTimeout(lastSaveTimerRef.current);
+      lastSaveTimerRef.current = null;
+    }
+    try {
+      const notebookObj: NotebookData = {
+        bookId,
+        userId: 'local_student',
+        drawings: '[]',
+        stickyNotes: '[]',
+        pages: JSON.stringify(updatedPages),
+        updatedAt: Date.now(),
+      };
+      await db.saveNotebook(notebookObj);
+      setSaveStatus('saved');
+    } catch (err) {
+      console.error('Error saving notebook immediately:', err);
+      setSaveStatus('error');
+    }
+  }, [bookId]);
+
+  // Flush pending save on unmount or tab hide
+  const pagesRef = useRef(pages);
+  pagesRef.current = pages;
+
+  useEffect(() => {
+    const handleUnloadOrHide = () => {
+      if (lastSaveTimerRef.current && pagesRef.current) {
+        triggerSaveImmediate(pagesRef.current);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleUnloadOrHide);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') handleUnloadOrHide();
+    });
+
+    return () => {
+      window.removeEventListener('beforeunload', handleUnloadOrHide);
+      handleUnloadOrHide();
+    };
+  }, [triggerSaveImmediate]);
+
+  // Listen for custom add-notebook-text events to copy selected text into the active page
+  useEffect(() => {
+    const handleAddTextEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<{ text: string }>;
+      const text = customEvent.detail?.text;
+      if (!text) return;
+
+      const formattedBlock = `<blockquote style="margin:12px 0; padding:10px 14px; border-left:4px solid #06b6d4; background:rgba(236,254,255,0.8); font-family:serif; font-style:italic; font-size:14px; color:#164e63; border-radius:0 6px 6px 0;">"${text}"</blockquote><p><br></p>`;
+
+      setPages((prevPages) => {
+        if (prevPages.length === 0) return prevPages;
+        const targetIdx = activePageIndex < prevPages.length ? activePageIndex : 0;
+        const currentPage = prevPages[targetIdx];
+
+        const updatedPage = {
+          ...currentPage,
+          text: (currentPage.text || '') + formattedBlock,
+        };
+
+        const copy = [...prevPages];
+        copy[targetIdx] = updatedPage;
+        triggerSave(copy);
+        return copy;
+      });
+    };
+
+    window.addEventListener('add-notebook-text', handleAddTextEvent);
+    return () => {
+      window.removeEventListener('add-notebook-text', handleAddTextEvent);
+    };
+  }, [activePageIndex, triggerSave]);
   const handlePageChange = (index: number, updatedPage: NotebookPageData) => {
     setPages((prev) => {
       const copy = [...prev];
@@ -276,25 +491,31 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
   // Stationery selectors
   const selectStationery = (tool: 'type' | 'draw' | 'highlight' | 'eraser', color: string, width: number) => {
     setActiveTool(tool);
+    let targetColor = color;
+    if (isDarkTheme && (tool === 'type' || tool === 'draw')) {
+      if (['#000000', '#1e293b', '#262626', '#404040', '#000', '#171717', '#0f172a', '#111827', 'black'].includes(color.toLowerCase())) {
+        targetColor = '#f8fafc';
+      }
+    }
     if (tool === 'type') {
-      setTextToolColor(color);
+      setTextToolColor(targetColor);
     } else if (tool === 'draw') {
-      setDrawToolColor(color);
+      setDrawToolColor(targetColor);
     } else if (tool === 'highlight') {
-      setHighlightToolColor(color);
+      setHighlightToolColor(targetColor);
     }
     setActiveWidth(width);
 
-    // Proactively apply color formatting if text is selected inside the editor
-    if (tool === 'type' && color !== 'eraser') {
+    // Proactively apply color formatting if text is selected inside the editor or active
+    if (tool === 'type' && targetColor !== 'eraser') {
       const selection = window.getSelection();
       if (selection && !selection.isCollapsed) {
-        document.execCommand('foreColor', false, color);
+        document.execCommand('foreColor', false, targetColor);
       }
     } else if (tool === 'highlight') {
       const selection = window.getSelection();
       if (selection && !selection.isCollapsed) {
-        document.execCommand('backColor', false, color);
+        document.execCommand('backColor', false, targetColor);
       }
     }
   };
@@ -391,11 +612,57 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
     handlePageChange(activePageIndex, updatedPage);
   };
 
+  const [isExporting, setIsExporting] = useState(false);
+
+  // High-fidelity PDF export ensuring exact DOM rendering (no cutting, no extra shadows, no bolder ink, precise colors)
+  const handleExportPDF = async (pageIdx = activePageIndex) => {
+    const pageEl = document.querySelector(`[data-notebook-page-index="${pageIdx}"]`) as HTMLElement;
+    if (!pageEl) {
+      alert('Could not find notebook page to export.');
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const canvas = await html2canvas(pageEl, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#fcfbe3',
+        logging: false,
+        windowWidth: pageEl.scrollWidth,
+        windowHeight: pageEl.scrollHeight,
+        onclone: (clonedDoc) => {
+          const clonedPage = clonedDoc.querySelector(`[data-notebook-page-index="${pageIdx}"]`) as HTMLElement;
+          if (clonedPage) {
+            // Remove tear buttons and interactive overlays from cloned DOM
+            const interactiveEls = clonedPage.querySelectorAll('button, .delete-img-btn, .align-left-btn, .align-center-btn, .align-right-btn, .resize-smaller-btn, .resize-larger-btn, .interactive-sticker button');
+            interactiveEls.forEach((el) => ((el as HTMLElement).style.display = 'none'));
+          }
+        },
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'pt',
+        format: [canvas.width / 2, canvas.height / 2],
+      });
+
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+      pdf.save(`${bookTitle.toLowerCase().replace(/\s+/g, '_')}_page_${pageIdx + 1}.pdf`);
+    } catch (err) {
+      console.error('PDF Export error:', err);
+      alert('PDF generation failed. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   // Export current page to PNG
   const handleExportPNG = async () => {
     const activePage = pages[activePageIndex];
     const baseW = 400;
-    const baseH = 680;
+    const baseH = 1360;
     const dpr = window.devicePixelRatio || 1;
 
     // Helper to load an image as a Promise
@@ -475,7 +742,7 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
     // 2. Calculate drawing stroke height
     (activePage.drawings || []).forEach((path) => {
       path.points.forEach((pt) => {
-        const ptY = pt.y * baseH;
+        const ptY = pt.y <= 1.0 ? pt.y * baseH : pt.y;
         if (ptY > maxContentY) {
           maxContentY = ptY;
         }
@@ -516,11 +783,11 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
     const h = exportCanvas.height;
 
     // Lined paper background
-    ctx.fillStyle = '#fcfbe3';
+    ctx.fillStyle = pageBgColor;
     ctx.fillRect(0, 0, w, h);
 
     // Horizontal lines grid (ruled paper lines)
-    ctx.strokeStyle = '#e1e0cb';
+    ctx.strokeStyle = isDarkTheme ? 'rgba(255, 255, 255, 0.12)' : '#e1e0cb';
     ctx.lineWidth = 1.5 * dpr;
     for (let y = 30 * dpr; y < h; y += 24 * dpr) {
       ctx.beginPath();
@@ -677,16 +944,23 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
     (activePage.drawings || []).forEach((path) => {
       if (path.points.length === 0) return;
       ctx.beginPath();
-      ctx.strokeStyle = path.color === 'eraser' ? '#fcfbe3' : path.color;
+      ctx.strokeStyle = path.color === 'eraser' ? pageBgColor : path.color;
       ctx.lineWidth = path.width * dpr;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       
-      const p0 = path.points[0];
-      ctx.moveTo(p0.x * baseW * dpr, p0.y * baseH * dpr);
+      const getPt = (pt: { x: number; y: number }) => {
+        if (pt.x <= 1.0 && pt.y <= 1.0) {
+          return { x: pt.x * baseW * dpr, y: pt.y * baseH * dpr };
+        }
+        return { x: pt.x * dpr, y: pt.y * dpr };
+      };
+
+      const p0 = getPt(path.points[0]);
+      ctx.moveTo(p0.x, p0.y);
       for (let i = 1; i < path.points.length; i++) {
-        const p = path.points[i];
-        ctx.lineTo(p.x * baseW * dpr, p.y * baseH * dpr);
+        const p = getPt(path.points[i]);
+        ctx.lineTo(p.x, p.y);
       }
       ctx.stroke();
     });
@@ -716,10 +990,10 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
             }
           }}
           className={isMobile 
-            ? "fixed inset-0 h-[100dvh] w-full bg-[#fcfbe3] flex flex-col z-[1500] shadow-2xl select-none"
-            : "fixed top-0 right-0 bottom-0 h-full bg-[#fcfbe3] border-l-4 border-black flex flex-col z-[1500] shadow-[-8px_0_24px_rgba(0,0,0,0.25)] select-none"
+            ? "fixed inset-0 h-[100dvh] w-full flex flex-col z-[1500] shadow-2xl select-none transition-colors"
+            : "fixed top-0 right-0 bottom-0 h-full border-l-2 flex flex-col z-[1500] shadow-[-8px_0_24px_rgba(0,0,0,0.25)] select-none transition-colors"
           }
-          style={isMobile ? { width: '100%', height: '100dvh' } : { width: `${Math.min(sidebarWidth, typeof window !== 'undefined' ? window.innerWidth - 40 : 440)}px`, height: '100%' }}
+          style={isMobile ? { width: '100%', height: '100dvh', backgroundColor: pageBgColor } : { width: `${Math.min(sidebarWidth, typeof window !== 'undefined' ? window.innerWidth - 40 : 440)}px`, height: '100%', backgroundColor: pageBgColor, borderColor: pageBorderColor }}
         >
           {/* Draggable resize handle border on the left edge - ONLY on desktop */}
           {!isMobile && (
@@ -732,451 +1006,438 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
             />
           )}
 
-          {/* MOBILE HEADER (Matching reference design: Checkmark done button left, title center, action tools right) */}
-          {isMobile ? (
-            <div className="bg-orange-100 border-b-2 border-black flex flex-col shrink-0 select-none z-[1260] shadow-xs">
-              {/* Drag down indicator handle */}
-              <div className="w-full flex justify-center pt-2 pb-1 bg-orange-100 touch-none cursor-grab active:cursor-grabbing">
-                <div className="w-12 h-1.5 bg-orange-950/30 rounded-full" />
-              </div>
-
-              {/* Header Actions Row */}
-              <div className="h-12 px-3 pb-2 flex items-center justify-between gap-2">
-                {/* Left: Checkmark Done Button */}
-                <button
-                  onClick={onClose}
-                  className="w-8 h-8 rounded-full bg-orange-400 border-2 border-black flex items-center justify-center text-black font-extrabold shadow-[2px_2px_0_black] active:translate-y-0.5 active:shadow-none transition-all hover:bg-orange-300 shrink-0"
-                  title="Done & Close Notebook"
-                >
-                  <Check size={18} strokeWidth={3.5} />
-                </button>
-
-                {/* Center: Book Title & Page Info */}
-                <div className="flex flex-col items-center justify-center min-w-0 flex-1">
-                  <span className="text-[11px] font-black uppercase tracking-wider text-orange-950 line-clamp-1 text-center">
-                    {bookTitle}
-                  </span>
-                  <span className="text-[9px] font-bold text-orange-800 uppercase tracking-tight">
-                    Page {activePageIndex + 1} of {pages.length}
-                  </span>
-                </div>
-
-                {/* Right: Quick Action Buttons (Undo, Add +, More ⋮) */}
-                <div className="flex items-center gap-1.5 shrink-0 relative">
-                  {/* Undo */}
-                  <button
-                    onClick={handleUndoSketch}
-                    className="w-8 h-8 rounded-md bg-white border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0_black] active:translate-y-0.5 active:shadow-none transition-all hover:bg-amber-50"
-                    title="Undo sketch line"
-                  >
-                    <RotateCcw size={15} strokeWidth={2.5} />
-                  </button>
-
-                  {/* Add + */}
-                  <div className="relative">
-                    <button
-                      onClick={() => {
-                        setShowAddMenu(!showAddMenu);
-                        setShowMoreMenu(false);
-                      }}
-                      className={`w-8 h-8 rounded-md border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0_black] active:translate-y-0.5 active:shadow-none transition-all ${
-                        showAddMenu ? 'bg-amber-300' : 'bg-white hover:bg-amber-50'
-                      }`}
-                      title="Add Item"
-                    >
-                      <Plus size={16} strokeWidth={3} />
-                    </button>
-
-                    {/* Add Dropdown Menu */}
-                    {showAddMenu && (
-                      <div className="absolute right-0 top-10 w-44 bg-white border-2 border-black rounded-lg shadow-[4px_4px_0_black] p-1.5 z-[1300] flex flex-col gap-1 text-slate-800">
-                        <button
-                          onClick={() => {
-                            handleAddSticky();
-                            setShowAddMenu(false);
-                          }}
-                          className="w-full text-left px-2.5 py-1.5 rounded hover:bg-amber-100 font-bold text-xs flex items-center gap-2"
-                        >
-                          <StickyIcon size={14} className="text-yellow-600" />
-                          + Sticky Note
-                        </button>
-                        <button
-                          onClick={() => {
-                            triggerImageUpload();
-                            setShowAddMenu(false);
-                          }}
-                          className="w-full text-left px-2.5 py-1.5 rounded hover:bg-cyan-100 font-bold text-xs flex items-center gap-2"
-                        >
-                          <ImageIcon size={14} className="text-cyan-600" />
-                          + Photo Sticker
-                        </button>
-                        <button
-                          onClick={() => {
-                            addPage();
-                            setShowAddMenu(false);
-                          }}
-                          className="w-full text-left px-2.5 py-1.5 rounded hover:bg-orange-100 font-bold text-xs flex items-center gap-2 border-t border-slate-200 pt-1.5"
-                        >
-                          <Plus size={14} className="text-orange-600" />
-                          + Add New Page
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* More Options ⋮ */}
-                  <div className="relative">
-                    <button
-                      onClick={() => {
-                        setShowMoreMenu(!showMoreMenu);
-                        setShowAddMenu(false);
-                      }}
-                      className={`w-8 h-8 rounded-md border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0_black] active:translate-y-0.5 active:shadow-none transition-all ${
-                        showMoreMenu ? 'bg-amber-300' : 'bg-white hover:bg-amber-50'
-                      }`}
-                      title="More Options"
-                    >
-                      <MoreVertical size={16} strokeWidth={2.5} />
-                    </button>
-
-                    {/* More Options Dropdown Menu */}
-                    {showMoreMenu && (
-                      <div className="absolute right-0 top-10 w-48 bg-white border-2 border-black rounded-lg shadow-[4px_4px_0_black] p-1.5 z-[1300] flex flex-col gap-1 text-slate-800">
-                        <button
-                          onClick={() => {
-                            handleExportPNG();
-                            setShowMoreMenu(false);
-                          }}
-                          className="w-full text-left px-2.5 py-1.5 rounded hover:bg-cyan-100 font-bold text-xs flex items-center gap-2 text-cyan-800"
-                        >
-                          <Download size={14} />
-                          Export Page PNG
-                        </button>
-                        <button
-                          onClick={() => {
-                            handleClearPage();
-                            setShowMoreMenu(false);
-                          }}
-                          className="w-full text-left px-2.5 py-1.5 rounded hover:bg-amber-100 font-bold text-xs flex items-center gap-2 text-amber-800"
-                        >
-                          <Trash2 size={14} />
-                          Clear Active Page
-                        </button>
-                        {pages.length > 1 && (
-                          <button
-                            onClick={() => {
-                              deletePage(activePageIndex);
-                              setShowMoreMenu(false);
-                            }}
-                            className="w-full text-left px-2.5 py-1.5 rounded hover:bg-red-100 font-bold text-xs flex items-center gap-2 text-red-600 border-t border-slate-200 pt-1.5"
-                          >
-                            <X size={14} />
-                            Delete Page
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
+          {/* UNIVERSAL HEADER */}
+          <div 
+            className="h-12 border-b flex items-center justify-between px-3 shrink-0 z-[1260] select-none transition-colors"
+            style={{
+              backgroundColor: pageSurfaceColor,
+              borderColor: pageBorderColor,
+              color: pageTextColor
+            }}
+          >
+            <div className="flex items-center gap-2">
+              <BookSpiralIcon className="w-5 h-5 opacity-80" />
+              <div className="flex flex-col leading-tight">
+                <span className="text-[11px] font-extrabold uppercase tracking-widest opacity-90">
+                  Notebook
+                </span>
+                <span className="text-[10px] font-semibold opacity-70 line-clamp-1 max-w-[160px]">
+                  {bookTitle}
+                </span>
               </div>
             </div>
-          ) : (
-            /* DESKTOP HEADER & TITLE BAR */
-            <>
-              <div className="h-16 border-b-4 border-black bg-orange-100 flex items-center justify-between px-4 shrink-0 z-[1260] shadow-sm select-none">
-                <Group gap="xs">
-                  <BookSpiralIcon className="w-6 h-6 text-orange-800" />
-                  <Stack gap={0}>
-                    <Text className="text-[11px] font-black uppercase tracking-widest text-orange-950">
-                      Student Notebook
-                    </Text>
-                    <Text className="text-[10px] font-bold text-orange-800 uppercase tracking-wider line-clamp-1 max-w-[180px]">
-                      {bookTitle}
-                    </Text>
-                  </Stack>
-                </Group>
 
-                <Group gap="xs">
-                  {/* Local Storage Auto Sync Badge */}
-                  <Tooltip label={saveStatus === 'saved' ? 'All changes successfully written to Local Storage' : saveStatus === 'saving' ? 'Saving pages...' : 'Writing error!'}>
-                    <div className="flex items-center">
-                      {saveStatus === 'saved' && (
-                        <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-800 px-2 py-0.5 border border-emerald-400">
-                          <Check size={10} strokeWidth={4} /> Saved
-                        </span>
-                      )}
-                      {saveStatus === 'saving' && (
-                        <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest bg-yellow-100 text-yellow-800 px-2 py-0.5 border border-yellow-400">
-                          <Loader size={8} className="animate-spin text-yellow-800" /> Saving
-                        </span>
-                      )}
-                      {saveStatus === 'error' && (
-                        <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest bg-red-100 text-red-800 px-2 py-0.5 border border-red-400">
-                          Error
-                        </span>
-                      )}
-                    </div>
-                  </Tooltip>
-
-                  <ActionIcon 
-                    variant="filled" 
-                    color="orange" 
-                    size="lg"
-                    onClick={onClose}
-                    className="border-2 border-black rounded-none shadow-[3px_3px_0_black] bg-orange-400 text-black hover:bg-orange-300 active:translate-y-0.5 active:shadow-none transition-all"
-                    title="Hide Notebook Drawer"
-                  >
-                    <X size={20} strokeWidth={3} className="text-black" />
-                  </ActionIcon>
-                </Group>
+            <div className="flex items-center gap-2">
+              {/* Page Navigator */}
+              <div className="flex items-center gap-1 bg-black/5 dark:bg-white/10 px-2 py-0.5 rounded-md text-[10px] font-bold">
+                <button 
+                  disabled={activePageIndex === 0} 
+                  onClick={() => setActivePageIndex(p => Math.max(0, p - 1))}
+                  className="hover:opacity-100 opacity-60 disabled:opacity-20 p-0.5"
+                  title="Previous page"
+                >
+                  <ChevronLeft size={12} />
+                </button>
+                <span>{activePageIndex + 1} / {pages.length}</span>
+                <button 
+                  disabled={activePageIndex >= pages.length - 1} 
+                  onClick={() => setActivePageIndex(p => Math.min(pages.length - 1, p + 1))}
+                  className="hover:opacity-100 opacity-60 disabled:opacity-20 p-0.5"
+                  title="Next page"
+                >
+                  <ChevronRight size={12} />
+                </button>
               </div>
 
-              {/* DESKTOP WOODEN STATIONERY DRAWER */}
-              <div className="p-3 bg-amber-50 border-b-4 border-black flex flex-col gap-2.5 shrink-0 z-[1260] shadow-[inset_0_-4px_8px_rgba(139,92,26,0.1)]">
-                {/* Primary Simplified Tools Row */}
-                <div className="grid grid-cols-4 gap-2 select-none">
-                  {/* 1. Text Tool */}
-                  <button
-                    onClick={() => {
-                      setActiveTool('type');
-                      setActiveWidth(2.2);
-                    }}
-                    className={`flex flex-col items-center justify-center py-2 px-1 border-2 relative transition-all ${
-                      activeTool === 'type' 
-                        ? 'bg-amber-200 border-black shadow-[3px_3px_0_black] -translate-y-0.5' 
-                        : 'bg-white border-black/20 hover:border-black hover:-translate-y-0.5'
-                    }`}
-                    style={{ borderRadius: '4px' }}
-                    title="Keyboard Typing Tool"
-                  >
-                    <Type size={16} className="text-slate-800 mb-1" strokeWidth={2.5} />
-                    <Text className="text-[9px] font-black uppercase tracking-tight leading-none">
-                      Text
-                    </Text>
-                    {activeTool === 'type' && <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45" />}
-                  </button>
+              {/* Save Status Badge */}
+              <Tooltip label={saveStatus === 'saved' ? 'All changes saved' : saveStatus === 'saving' ? 'Saving pages...' : 'Writing error!'}>
+                <div className="flex items-center">
+                  {saveStatus === 'saved' && (
+                    <span className="flex items-center gap-1 text-[9px] font-extrabold uppercase tracking-wider bg-emerald-500/15 text-emerald-600 px-2 py-0.5 rounded border border-emerald-500/30">
+                      <Check size={10} strokeWidth={3.5} /> Saved
+                    </span>
+                  )}
+                  {saveStatus === 'saving' && (
+                    <span className="flex items-center gap-1 text-[9px] font-extrabold uppercase tracking-wider bg-amber-500/15 text-amber-600 px-2 py-0.5 rounded border border-amber-500/30">
+                      <Loader size={8} className="animate-spin" /> Saving
+                    </span>
+                  )}
+                  {saveStatus === 'error' && (
+                    <span className="flex items-center gap-1 text-[9px] font-extrabold uppercase tracking-wider bg-red-500/15 text-red-600 px-2 py-0.5 rounded border border-red-500/30">
+                      Error
+                    </span>
+                  )}
+                </div>
+              </Tooltip>
 
-                  {/* 2. Draw Tool */}
-                  <button
-                    onClick={() => {
-                      setActiveTool('draw');
-                      setActiveWidth(2.2);
-                    }}
-                    className={`flex flex-col items-center justify-center py-2 px-1 border-2 relative transition-all ${
-                      activeTool === 'draw' 
-                        ? 'bg-amber-200 border-black shadow-[3px_3px_0_black] -translate-y-0.5' 
-                        : 'bg-white border-black/20 hover:border-black hover:-translate-y-0.5'
-                    }`}
-                    style={{ borderRadius: '4px' }}
-                    title="Freehand Sketch Tool"
-                  >
-                    <Pencil size={16} className="text-slate-800 mb-1" strokeWidth={2.5} />
-                    <Text className="text-[9px] font-black uppercase tracking-tight leading-none">
-                      Draw
-                    </Text>
-                    {activeTool === 'draw' && <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45" />}
-                  </button>
+              <button
+                onClick={onClose}
+                className="p-1.5 rounded-md hover:bg-black/10 transition-all opacity-80 hover:opacity-100"
+                title="Close Notebook"
+              >
+                <X size={16} strokeWidth={2.5} />
+              </button>
+            </div>
+          </div>
 
-                  {/* 3. Highlight Tool */}
-                  <button
-                    onClick={() => {
-                      setActiveTool('highlight');
-                      setActiveWidth(14);
-                    }}
-                    className={`flex flex-col items-center justify-center py-2 px-1 border-2 relative transition-all ${
-                      activeTool === 'highlight' 
-                        ? 'bg-amber-200 border-black shadow-[3px_3px_0_black] -translate-y-0.5' 
-                        : 'bg-white border-black/20 hover:border-black hover:-translate-y-0.5'
-                    }`}
-                    style={{ borderRadius: '4px' }}
-                    title="Text Highlight Tool"
-                  >
-                    <Highlighter size={16} className="text-slate-800 mb-1" strokeWidth={2.5} />
-                    <Text className="text-[9px] font-black uppercase tracking-tight leading-none">
-                      Highlight
-                    </Text>
-                    {activeTool === 'highlight' && <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45" />}
-                  </button>
+          {/* TOP ACTIONS STATIONERY TOOLBAR */}
+          <div 
+            ref={toolbarContainerRef}
+            className="px-2.5 py-2 border-b flex items-center gap-1.5 shrink-0 z-[2000] select-none text-xs transition-colors overflow-visible relative flex-wrap sm:flex-nowrap"
+            style={{
+              backgroundColor: pageSurfaceColor,
+              borderColor: pageBorderColor,
+              color: pageTextColor
+            }}
+          >
+            {/* Backdrop for closing popups when clicking outside */}
+            {activeDropdownTool && (
+              <div className="fixed inset-0 z-[2500]" onClick={() => setActiveDropdownTool(null)} />
+            )}
 
-                  {/* 4. Eraser Tool */}
+                {/* 1. Primary Tools Group */}
+                <div className="flex items-center gap-1 bg-black/5 dark:bg-white/10 p-0.5 rounded-lg border border-black/5 dark:border-white/10 shrink-0">
+                  
+                  {/* TEXT TOOL BUTTON WITH DROPDOWN */}
+                  <div className="relative shrink-0">
+                    <button
+                      onClick={() => {
+                        setActiveTool('type');
+                        setActiveWidth(2.2);
+                        setActiveDropdownTool(v => v === 'type' ? null : 'type');
+                      }}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-extrabold flex items-center gap-1.5 transition-all ${
+                        activeTool === 'type'
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'hover:bg-black/5 dark:hover:bg-white/10 opacity-80 hover:opacity-100'
+                      }`}
+                      style={activeTool === 'type' && theme?.colors?.primary ? { backgroundColor: theme.colors.primary, color: '#fff' } : {}}
+                      title="Text Tool (Click to select & open color picker)"
+                    >
+                      <Type size={13} strokeWidth={2.5} />
+                      <span className="flex items-center gap-1">
+                        Text
+                        <div 
+                          className="w-2.5 h-2.5 rounded-full border border-black/20 dark:border-white/20 inline-block shrink-0"
+                          style={{ backgroundColor: textToolColor }}
+                        />
+                      </span>
+                      <ChevronDown size={11} className={`opacity-70 transition-transform ${activeDropdownTool === 'type' ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {/* Popover for Text Color */}
+                    {activeDropdownTool === 'type' && (
+                      <div className="absolute top-full left-0 mt-2 z-[3000] bg-white dark:bg-slate-900 border-2 border-black dark:border-slate-700 rounded-2xl p-3 flex flex-col gap-2 min-w-[280px] shadow-2xl">
+                        <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1 flex justify-between items-center">
+                          <span>Text Color</span>
+                          <button onClick={() => setActiveDropdownTool(null)} className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                            <X size={12} />
+                          </button>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <div className="grid grid-cols-10 gap-1.5">
+                            {GRID_GRAYSCALE.map((item, idx) => {
+                              const isSelected = isColorMatch(textToolColor, item.color);
+                              const isLight = isLightColor(item.color);
+                              return (
+                                <button
+                                  key={idx}
+                                  onClick={() => {
+                                    setTextToolColor(item.color);
+                                    selectStationery('type', item.color, activeWidth);
+                                    setActiveDropdownTool(null);
+                                  }}
+                                  className={`w-6 h-6 rounded-full flex items-center justify-center transition-transform hover:scale-110 active:scale-95 ${
+                                    isLight ? 'border border-slate-300 dark:border-slate-600' : ''
+                                  }`}
+                                  style={{ backgroundColor: item.color }}
+                                  title={item.name}
+                                >
+                                  {isSelected && (
+                                    <Check size={13} strokeWidth={3.5} className={isLight ? 'text-slate-900' : 'text-white'} />
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div className="grid grid-cols-10 gap-1.5">
+                            {GRID_VIBRANT.map((item, idx) => {
+                              const isSelected = isColorMatch(textToolColor, item.color);
+                              const isLight = isLightColor(item.color);
+                              return (
+                                <button
+                                  key={idx}
+                                  onClick={() => {
+                                    setTextToolColor(item.color);
+                                    selectStationery('type', item.color, activeWidth);
+                                    setActiveDropdownTool(null);
+                                  }}
+                                  className={`w-6 h-6 rounded-full flex items-center justify-center transition-transform hover:scale-110 active:scale-95 ${
+                                    isLight ? 'border border-slate-300 dark:border-slate-600' : ''
+                                  }`}
+                                  style={{ backgroundColor: item.color }}
+                                  title={item.name}
+                                >
+                                  {isSelected && (
+                                    <Check size={13} strokeWidth={3.5} className={isLight ? 'text-slate-900' : 'text-white'} />
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* DRAW TOOL BUTTON WITH DROPDOWN */}
+                  <div className="relative shrink-0">
+                    <button
+                      onClick={() => {
+                        setActiveTool('draw');
+                        setActiveWidth(2.2);
+                        setActiveDropdownTool(v => v === 'draw' ? null : 'draw');
+                      }}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-extrabold flex items-center gap-1.5 transition-all ${
+                        activeTool === 'draw'
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'hover:bg-black/5 dark:hover:bg-white/10 opacity-80 hover:opacity-100'
+                      }`}
+                      style={activeTool === 'draw' && theme?.colors?.primary ? { backgroundColor: theme.colors.primary, color: '#fff' } : {}}
+                      title="Draw Tool (Click to select & open color picker)"
+                    >
+                      <Pencil size={13} strokeWidth={2.5} />
+                      <span className="flex items-center gap-1">
+                        Draw
+                        <div 
+                          className="w-2.5 h-2.5 rounded-full border border-black/20 dark:border-white/20 inline-block shrink-0"
+                          style={{ backgroundColor: drawToolColor }}
+                        />
+                      </span>
+                      <ChevronDown size={11} className={`opacity-70 transition-transform ${activeDropdownTool === 'draw' ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {/* Popover for Draw Color */}
+                    {activeDropdownTool === 'draw' && (
+                      <div className="absolute top-full left-0 mt-2 z-[3000] bg-white dark:bg-slate-900 border-2 border-black dark:border-slate-700 rounded-2xl p-3 flex flex-col gap-2 min-w-[280px] shadow-2xl">
+                        <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1 flex justify-between items-center">
+                          <span>Ink Color</span>
+                          <button onClick={() => setActiveDropdownTool(null)} className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                            <X size={12} />
+                          </button>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <div className="grid grid-cols-10 gap-1.5">
+                            {GRID_GRAYSCALE.map((item, idx) => {
+                              const isSelected = isColorMatch(drawToolColor, item.color);
+                              const isLight = isLightColor(item.color);
+                              return (
+                                <button
+                                  key={idx}
+                                  onClick={() => {
+                                    setDrawToolColor(item.color);
+                                    selectStationery('draw', item.color, activeWidth);
+                                    setActiveDropdownTool(null);
+                                  }}
+                                  className={`w-6 h-6 rounded-full flex items-center justify-center transition-transform hover:scale-110 active:scale-95 ${
+                                    isLight ? 'border border-slate-300 dark:border-slate-600' : ''
+                                  }`}
+                                  style={{ backgroundColor: item.color }}
+                                  title={item.name}
+                                >
+                                  {isSelected && (
+                                    <Check size={13} strokeWidth={3.5} className={isLight ? 'text-slate-900' : 'text-white'} />
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div className="grid grid-cols-10 gap-1.5">
+                            {GRID_VIBRANT.map((item, idx) => {
+                              const isSelected = isColorMatch(drawToolColor, item.color);
+                              const isLight = isLightColor(item.color);
+                              return (
+                                <button
+                                  key={idx}
+                                  onClick={() => {
+                                    setDrawToolColor(item.color);
+                                    selectStationery('draw', item.color, activeWidth);
+                                    setActiveDropdownTool(null);
+                                  }}
+                                  className={`w-6 h-6 rounded-full flex items-center justify-center transition-transform hover:scale-110 active:scale-95 ${
+                                    isLight ? 'border border-slate-300 dark:border-slate-600' : ''
+                                  }`}
+                                  style={{ backgroundColor: item.color }}
+                                  title={item.name}
+                                >
+                                  {isSelected && (
+                                    <Check size={13} strokeWidth={3.5} className={isLight ? 'text-slate-900' : 'text-white'} />
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* HIGHLIGHT TOOL BUTTON WITH DROPDOWN */}
+                  <div className="relative shrink-0">
+                    <button
+                      onClick={() => {
+                        setActiveTool('highlight');
+                        setActiveWidth(14);
+                        setActiveDropdownTool(v => v === 'highlight' ? null : 'highlight');
+                      }}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-extrabold flex items-center gap-1.5 transition-all ${
+                        activeTool === 'highlight'
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'hover:bg-black/5 dark:hover:bg-white/10 opacity-80 hover:opacity-100'
+                      }`}
+                      style={activeTool === 'highlight' && theme?.colors?.primary ? { backgroundColor: theme.colors.primary, color: '#fff' } : {}}
+                      title="Highlight Tool (Click to select & open color picker)"
+                    >
+                      <Highlighter size={13} strokeWidth={2.5} />
+                      <span className="flex items-center gap-1">
+                        Highlight
+                        <div 
+                          className="w-2.5 h-2.5 rounded-full border border-black/20 dark:border-white/20 inline-block shrink-0"
+                          style={{ backgroundColor: highlightToolColor === 'transparent' ? '#cbd5e1' : highlightToolColor }}
+                        />
+                      </span>
+                      <ChevronDown size={11} className={`opacity-70 transition-transform ${activeDropdownTool === 'highlight' ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {/* Popover for Highlight Color */}
+                    {activeDropdownTool === 'highlight' && (
+                      <div className="absolute top-full left-0 mt-2 z-[3000] bg-white dark:bg-slate-900 border-2 border-black dark:border-slate-700 rounded-2xl p-3 flex flex-col gap-2 min-w-[280px] shadow-2xl">
+                        <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1 flex justify-between items-center">
+                          <span>Highlight Color</span>
+                          <button onClick={() => setActiveDropdownTool(null)} className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                            <X size={12} />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-9 gap-1.5">
+                          {HIGHLIGHT_GRID.map((item, idx) => {
+                            const isSelected = isColorMatch(highlightToolColor, item.color);
+                            return (
+                              <button
+                                key={idx}
+                                onClick={() => {
+                                  setHighlightToolColor(item.color);
+                                  selectStationery('highlight', item.color, 14);
+                                  setActiveDropdownTool(null);
+                                }}
+                                className="w-6 h-6 rounded-full flex items-center justify-center border border-slate-300 dark:border-slate-700 transition-transform hover:scale-110 active:scale-95 relative overflow-hidden"
+                                style={{ backgroundColor: item.solid === 'transparent' ? '#ffffff' : item.solid }}
+                                title={item.name}
+                              >
+                                {item.color === 'transparent' && (
+                                  <div className="w-full h-[1.5px] bg-red-500 rotate-45 absolute" />
+                                )}
+                                {isSelected && (
+                                  <Check size={13} strokeWidth={3.5} className="text-slate-900 relative z-10" />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ERASER TOOL BUTTON */}
                   <button
                     onClick={() => {
                       setActiveTool('eraser');
                       setActiveWidth(16);
+                      setActiveDropdownTool(null);
                     }}
-                    className={`flex flex-col items-center justify-center py-2 px-1 border-2 relative transition-all ${
-                      activeTool === 'eraser' 
-                        ? 'bg-amber-200 border-black shadow-[3px_3px_0_black] -translate-y-0.5' 
-                        : 'bg-white border-black/20 hover:border-black hover:-translate-y-0.5'
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-extrabold flex items-center gap-1 transition-all ${
+                      activeTool === 'eraser'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'hover:bg-black/5 dark:hover:bg-white/10 opacity-80 hover:opacity-100'
                     }`}
-                    style={{ borderRadius: '4px' }}
+                    style={activeTool === 'eraser' && theme?.colors?.primary ? { backgroundColor: theme.colors.primary, color: '#fff' } : {}}
                     title="Eraser Tool"
                   >
-                    <Eraser size={16} className="text-pink-600 mb-1" strokeWidth={2.5} />
-                    <Text className="text-[9px] font-black uppercase tracking-tight leading-none">
-                      Eraser
-                    </Text>
-                    {activeTool === 'eraser' && <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-black rotate-45" />}
+                    <Eraser size={13} strokeWidth={2.5} />
+                    <span>Eraser</span>
                   </button>
                 </div>
 
-                {/* Dynamic Color Palette Row */}
-                {(activeTool === 'type' || activeTool === 'draw' || activeTool === 'highlight') && (
-                  <div className="flex flex-col gap-1 border-t border-amber-200/50 pt-2">
-                    <div className="flex items-center justify-between px-1">
-                      <span className="text-[8.5px] font-black uppercase tracking-wider text-amber-900/60">
-                        Select {activeTool === 'type' ? 'Text' : activeTool === 'draw' ? 'Ink' : 'Highlight'} Color:
-                      </span>
-                      {activeTool === 'highlight' && (
-                        <span className="text-[7.5px] font-bold text-amber-800/80 uppercase">
-                          Drag over words to highlight
-                        </span>
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
-                      {activeTool === 'type' && TEXT_COLORS.map((tc, idx) => {
-                        const isSelected = activeColor === tc.color;
-                        return (
-                          <button
-                            key={idx}
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              selectStationery('type', tc.color, 2.2);
-                            }}
-                            className={`flex items-center gap-1.5 px-2 py-1 border-2 transition-all shrink-0 ${
-                              isSelected 
-                                ? 'bg-amber-200 border-black shadow-[2px_2px_0_black] -translate-y-0.5' 
-                                : 'bg-white border-black/20 hover:border-black hover:-translate-y-0.5'
-                            }`}
-                            style={{ borderRadius: '4px' }}
-                            title={tc.name}
-                          >
-                            <div className="w-3 h-3 rounded-full border border-black/30" style={{ backgroundColor: tc.color }} />
-                            <span className="text-[8.5px] font-bold text-slate-800">{tc.name}</span>
-                          </button>
-                        );
-                      })}
+                {/* Divider */}
+                <div className="w-[1px] h-5 bg-black/15 dark:bg-white/20 mx-0.5 shrink-0" />
 
-                      {activeTool === 'draw' && DRAW_COLORS.map((dc, idx) => {
-                        const isSelected = activeColor === dc.color && activeWidth === dc.width;
-                        return (
-                          <button
-                            key={idx}
-                            onClick={() => selectStationery('draw', dc.color, dc.width)}
-                            className={`flex items-center gap-1.5 px-2 py-1 border-2 transition-all shrink-0 ${
-                              isSelected 
-                                ? 'bg-amber-200 border-black shadow-[2px_2px_0_black] -translate-y-0.5' 
-                                : 'bg-white border-black/20 hover:border-black hover:-translate-y-0.5'
-                            }`}
-                            style={{ borderRadius: '4px' }}
-                            title={dc.name}
-                          >
-                            <div className="w-3 h-3 rounded-full border border-black/30" style={{ backgroundColor: dc.color }} />
-                            <span className="text-[8.5px] font-bold text-slate-800">{dc.name}</span>
-                          </button>
-                        );
-                      })}
+                {/* 3. Widgets (Sticky & Photo) */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={handleAddSticky}
+                    className="px-2 py-1 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 text-[10px] font-extrabold flex items-center gap-1 border border-amber-500/30 transition-all active:scale-95"
+                    title="Add Sticky Note"
+                  >
+                    <StickyIcon size={12} />
+                    <span>Sticky</span>
+                  </button>
 
-                      {activeTool === 'highlight' && HIGHLIGHT_COLORS.map((hc, idx) => {
-                        const isSelected = activeColor === hc.color;
-                        return (
-                          <button
-                            key={idx}
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              selectStationery('highlight', hc.color, 14);
-                            }}
-                            className={`flex items-center gap-1.5 px-2 py-1 border-2 transition-all shrink-0 ${
-                              isSelected 
-                                ? 'bg-amber-200 border-black shadow-[2px_2px_0_black] -translate-y-0.5' 
-                                : 'bg-white border-black/20 hover:border-black hover:-translate-y-0.5'
-                            }`}
-                            style={{ borderRadius: '4px' }}
-                            title={hc.name}
-                          >
-                            {hc.color === 'transparent' ? (
-                              <div className="w-3 h-3 border border-dashed border-red-500 relative flex items-center justify-center">
-                                <div className="w-4 h-[1px] bg-red-500 rotate-45 absolute" />
-                              </div>
-                            ) : (
-                              <div className="w-4 h-2.5 rounded-sm border border-black/30" style={{ backgroundColor: hc.color }} />
-                            )}
-                            <span className="text-[8.5px] font-bold text-slate-800">{hc.name}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                  <button
+                    onClick={triggerImageUpload}
+                    className="px-2 py-1 rounded-md bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 hover:bg-cyan-500/25 text-[10px] font-extrabold flex items-center gap-1 border border-cyan-500/30 transition-all active:scale-95"
+                    title="Add Photo Sticker"
+                  >
+                    <ImageIcon size={12} />
+                    <span>Photo</span>
+                  </button>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleImageFile} 
+                    accept="image/*" 
+                    className="hidden" 
+                  />
+                </div>
 
-                {/* Sticky widgets & canvas controls */}
-                <div className="flex items-center justify-between border-t border-amber-200/60 pt-2 gap-1.5 flex-wrap select-none">
-                  <Group gap={6}>
-                    <button
-                      onClick={handleAddSticky}
-                      className="px-2 py-1 bg-yellow-100 hover:bg-yellow-200 border-2 border-black text-[8.5px] font-black uppercase tracking-widest flex items-center gap-1 shadow-[2px_2px_0_black] active:translate-y-0.5 active:shadow-none transition-all"
-                      title="Insert sticky note on current page"
-                    >
-                      <StickyIcon size={11} strokeWidth={2.5} />
-                      + Sticky
-                    </button>
+                {/* Divider */}
+                <div className="w-[1px] h-5 bg-black/15 dark:bg-white/20 mx-0.5 shrink-0" />
 
-                    <button
-                      onClick={triggerImageUpload}
-                      className="px-2 py-1 bg-cyan-100 hover:bg-cyan-200 border-2 border-black text-[8.5px] font-black uppercase tracking-widest flex items-center gap-1 shadow-[2px_2px_0_black] active:translate-y-0.5 active:shadow-none transition-all"
-                      title="Upload picture sticker on current page"
-                    >
-                      <ImageIcon size={11} strokeWidth={2.5} />
-                      + Photo
-                    </button>
-                    <input 
-                      type="file" 
-                      ref={fileInputRef} 
-                      onChange={handleImageFile} 
-                      accept="image/*" 
-                      className="hidden" 
-                    />
-                  </Group>
+                {/* 4. Canvas Actions */}
+                <div className="flex items-center gap-1 shrink-0 ml-auto">
+                  <button
+                    onClick={handleUndoSketch}
+                    className="p-1 hover:bg-black/10 rounded transition-all"
+                    title="Undo drawing stroke"
+                  >
+                    <RotateCcw size={13} strokeWidth={2.5} />
+                  </button>
 
-                  <Group gap={4}>
-                    <Tooltip label="Undo last drawing stroke" position="bottom">
-                      <ActionIcon
-                        variant="subtle"
-                        color="gray"
-                        onClick={handleUndoSketch}
-                        className="border-2 border-black bg-white hover:bg-gray-100 text-black rounded-none shadow-[2px_2px_0_black] active:translate-y-0.5 active:shadow-none transition-all"
-                      >
-                        <RotateCcw size={11} strokeWidth={2.5} />
-                      </ActionIcon>
-                    </Tooltip>
+                  <button
+                    onClick={() => handleExportPDF()}
+                    disabled={isExporting}
+                    className="p-1 hover:bg-black/10 rounded transition-all"
+                    title="Download PDF Notes"
+                  >
+                    <Download size={13} strokeWidth={2.5} />
+                  </button>
 
-                    <Tooltip label="Export active notebook page as PNG picture" position="bottom">
-                      <ActionIcon
-                        variant="subtle"
-                        color="cyan"
-                        onClick={handleExportPNG}
-                        className="border-2 border-black bg-white hover:bg-cyan-100 text-black rounded-none shadow-[2px_2px_0_black] active:translate-y-0.5 active:shadow-none transition-all"
-                      >
-                        <Download size={11} strokeWidth={2.5} />
-                      </ActionIcon>
-                    </Tooltip>
+                  <button
+                    onClick={handleClearPage}
+                    className="p-1 hover:bg-red-500/10 text-red-600 rounded transition-all"
+                    title="Clear Active Page"
+                  >
+                    <Trash2 size={13} strokeWidth={2.5} />
+                  </button>
 
-                    <Tooltip label="Erase active page content entirely" position="bottom">
-                      <ActionIcon
-                        variant="subtle"
-                        color="red"
-                        onClick={handleClearPage}
-                        className="border-2 border-black bg-white hover:bg-red-100 text-red-600 rounded-none shadow-[2px_2px_0_black] active:translate-y-0.5 active:shadow-none transition-all"
-                      >
-                        <Trash2 size={11} strokeWidth={2.5} />
-                      </ActionIcon>
-                    </Tooltip>
-                  </Group>
+                  <button
+                    onClick={addPage}
+                    className="px-2 py-1 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25 rounded-md text-[10px] font-extrabold flex items-center gap-1 border border-emerald-500/30 transition-all active:scale-95"
+                    title="Add New Page"
+                  >
+                    <Plus size={12} strokeWidth={3} />
+                    <span>Page</span>
+                  </button>
                 </div>
               </div>
-            </>
-          )}
 
           {/* Hidden file input for mobile photo sticker upload */}
           {isMobile && (
@@ -1192,17 +1453,17 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
           {/* Scrollable Container with multi-page notebook stack */}
           <div 
             ref={scrollContainerRef}
-            className="flex-1 overflow-y-auto flex flex-col gap-0 scroll-smooth no-scrollbar select-none p-0"
+            className="flex-1 overflow-y-auto flex flex-col gap-0 scroll-smooth no-scrollbar select-none p-0 transition-colors"
             style={{ 
-              backgroundColor: '#fcfbe3',
+              backgroundColor: pageBgColor,
               backgroundImage: 'none',
             }}
           >
             {isLoading ? (
-              <Box className="flex-1 flex flex-col items-center justify-center p-8 bg-orange-50/90 rounded border-2 border-black max-w-sm mx-auto my-12 shadow-md">
-                <Loader color="orange" size="lg" />
-                <Text className="text-[10px] font-black uppercase tracking-widest text-orange-950 mt-4">
-                  Opening Student Notebook...
+              <Box className="flex-1 flex flex-col items-center justify-center p-8 bg-black/5 dark:bg-white/5 rounded max-w-sm mx-auto my-12 border border-black/10">
+                <Loader size="lg" />
+                <Text className="text-[10px] font-black uppercase tracking-widest opacity-80 mt-4">
+                  Opening Notebook...
                 </Text>
               </Box>
             ) : (
@@ -1222,226 +1483,36 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
                       onChange={(updated) => handlePageChange(index, updated)}
                       onDelete={pages.length > 1 ? () => deletePage(index) : undefined}
                       isActive={index === activePageIndex}
+                      isMobile={isMobile}
+                      theme={theme}
                     />
                   </div>
                 ))}
 
                 {/* Add Page layout footer button */}
-                <div className="py-8 flex flex-col items-center justify-center bg-[#fcfbe3] border-t border-black/10 pb-20">
+                <div 
+                  className="py-8 flex flex-col items-center justify-center border-t transition-colors pb-20"
+                  style={{
+                    backgroundColor: pageBgColor,
+                    borderColor: pageBorderColor,
+                    color: pageTextColor
+                  }}
+                >
                   <button
                     onClick={addPage}
-                    className="px-6 py-2 bg-amber-100 hover:bg-amber-200 border-2 border-black rounded-none text-xs font-black uppercase tracking-widest flex items-center gap-2 shadow-[4px_4px_0_black] active:translate-y-0.5 active:shadow-none transition-all text-orange-950"
+                    className="px-5 py-2 bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 rounded-lg text-xs font-black uppercase tracking-widest flex items-center gap-2 border border-black/15 dark:border-white/20 transition-all active:scale-95"
+                    style={{ color: pageTextColor }}
                   >
                     <Plus size={14} strokeWidth={3} />
                     Add New Page
                   </button>
-                  <Text className="text-[10px] font-black text-orange-950/60 uppercase tracking-widest mt-3">
+                  <Text className="text-[10px] font-bold uppercase tracking-widest mt-3 opacity-60" style={{ color: pageTextColor }}>
                     Total: {pages.length} Pages
                   </Text>
                 </div>
               </>
             )}
           </div>
-
-          {/* MOBILE FIXED BOTTOM FORMATTING TOOLBAR */}
-          {isMobile && (
-            <div className="shrink-0 bg-orange-100 border-t-2 border-black p-2 z-[1260] flex flex-col gap-1.5 shadow-[0_-4px_12px_rgba(0,0,0,0.12)] pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
-              {/* Format Controls Row */}
-              <div className="flex items-center justify-between gap-1 bg-white border-2 border-black rounded-lg p-1 overflow-x-auto no-scrollbar shadow-[2px_2px_0_black]">
-                {/* Text Formatting buttons */}
-                <div className="flex items-center gap-1">
-                  <button
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      document.execCommand('bold');
-                    }}
-                    className="w-7 h-7 rounded border border-black/20 hover:border-black hover:bg-amber-100 flex items-center justify-center font-black text-xs active:scale-95 transition-all text-slate-800"
-                    title="Bold"
-                  >
-                    <Bold size={13} strokeWidth={3} />
-                  </button>
-                  <button
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      document.execCommand('italic');
-                    }}
-                    className="w-7 h-7 rounded border border-black/20 hover:border-black hover:bg-amber-100 flex items-center justify-center font-bold text-xs active:scale-95 transition-all text-slate-800"
-                    title="Italic"
-                  >
-                    <Italic size={13} strokeWidth={3} />
-                  </button>
-                  <button
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      document.execCommand('underline');
-                    }}
-                    className="w-7 h-7 rounded border border-black/20 hover:border-black hover:bg-amber-100 flex items-center justify-center font-bold text-xs active:scale-95 transition-all text-slate-800"
-                    title="Underline"
-                  >
-                    <Underline size={13} strokeWidth={3} />
-                  </button>
-                  <button
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      document.execCommand('strikeThrough');
-                    }}
-                    className="w-7 h-7 rounded border border-black/20 hover:border-black hover:bg-amber-100 flex items-center justify-center font-bold text-xs active:scale-95 transition-all text-slate-800"
-                    title="Strikethrough"
-                  >
-                    <Strikethrough size={13} strokeWidth={3} />
-                  </button>
-                </div>
-
-                <div className="w-[1px] h-5 bg-black/20 shrink-0" />
-
-                {/* Primary Stationery Tools */}
-                <div className="flex items-center gap-1">
-                  {/* Text Color */}
-                  <button
-                    onClick={() => {
-                      setActiveTool('type');
-                      setShowColorPicker(!showColorPicker);
-                    }}
-                    className={`px-2 h-7 rounded border border-black/20 flex items-center gap-1 text-xs font-black active:scale-95 transition-all ${
-                      activeTool === 'type' ? 'bg-amber-200 border-black' : 'hover:bg-amber-50'
-                    }`}
-                    title="Text Color"
-                  >
-                    <span className="font-serif font-black text-xs border-b-2" style={{ borderColor: textToolColor }}>A</span>
-                    <div className="w-2.5 h-2.5 rounded-full border border-black/30" style={{ backgroundColor: textToolColor }} />
-                  </button>
-
-                  {/* Highlight */}
-                  <button
-                    onClick={() => {
-                      setActiveTool('highlight');
-                      setActiveWidth(14);
-                      setShowColorPicker(!showColorPicker);
-                    }}
-                    className={`px-2 h-7 rounded border border-black/20 flex items-center gap-1 text-xs font-black active:scale-95 transition-all ${
-                      activeTool === 'highlight' ? 'bg-amber-200 border-black' : 'hover:bg-amber-50'
-                    }`}
-                    title="Highlighter"
-                  >
-                    <Highlighter size={13} strokeWidth={2.5} className="text-amber-800" />
-                    <div className="w-3 h-2 rounded-xs border border-black/30" style={{ backgroundColor: highlightToolColor }} />
-                  </button>
-
-                  {/* Draw */}
-                  <button
-                    onClick={() => {
-                      setActiveTool('draw');
-                      setActiveWidth(2.2);
-                      setShowColorPicker(!showColorPicker);
-                    }}
-                    className={`w-7 h-7 rounded border border-black/20 flex items-center justify-center active:scale-95 transition-all ${
-                      activeTool === 'draw' ? 'bg-amber-200 border-black' : 'hover:bg-amber-50'
-                    }`}
-                    title="Pencil Draw"
-                  >
-                    <Pencil size={13} strokeWidth={2.5} />
-                  </button>
-
-                  {/* Eraser */}
-                  <button
-                    onClick={() => {
-                      setActiveTool('eraser');
-                      setActiveWidth(16);
-                    }}
-                    className={`w-7 h-7 rounded border border-black/20 flex items-center justify-center active:scale-95 transition-all ${
-                      activeTool === 'eraser' ? 'bg-amber-200 border-black' : 'hover:bg-amber-50'
-                    }`}
-                    title="Eraser"
-                  >
-                    <Eraser size={13} strokeWidth={2.5} className="text-pink-600" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Color Swatches Bar */}
-              {(showColorPicker || activeTool === 'type' || activeTool === 'draw' || activeTool === 'highlight') && (
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar bg-amber-50 border border-black/15 rounded-md p-1">
-                  {activeTool === 'type' && TEXT_COLORS.map((tc, idx) => (
-                    <button
-                      key={idx}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        selectStationery('type', tc.color, 2.2);
-                      }}
-                      className={`flex items-center gap-1 px-2 py-0.5 rounded border transition-all shrink-0 ${
-                        textToolColor === tc.color ? 'bg-amber-200 border-black font-extrabold' : 'bg-white border-black/20'
-                      }`}
-                    >
-                      <div className="w-2.5 h-2.5 rounded-full border border-black/30" style={{ backgroundColor: tc.color }} />
-                      <span className="text-[9px] text-slate-800">{tc.name}</span>
-                    </button>
-                  ))}
-
-                  {activeTool === 'draw' && DRAW_COLORS.map((dc, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => selectStationery('draw', dc.color, dc.width)}
-                      className={`flex items-center gap-1 px-2 py-0.5 rounded border transition-all shrink-0 ${
-                        drawToolColor === dc.color ? 'bg-amber-200 border-black font-extrabold' : 'bg-white border-black/20'
-                      }`}
-                    >
-                      <div className="w-2.5 h-2.5 rounded-full border border-black/30" style={{ backgroundColor: dc.color }} />
-                      <span className="text-[9px] text-slate-800">{dc.name}</span>
-                    </button>
-                  ))}
-
-                  {activeTool === 'highlight' && HIGHLIGHT_COLORS.map((hc, idx) => (
-                    <button
-                      key={idx}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        selectStationery('highlight', hc.color, 14);
-                      }}
-                      className={`flex items-center gap-1 px-2 py-0.5 rounded border transition-all shrink-0 ${
-                        highlightToolColor === hc.color ? 'bg-amber-200 border-black font-extrabold' : 'bg-white border-black/20'
-                      }`}
-                    >
-                      <div className="w-3 h-2 rounded-xs border border-black/30" style={{ backgroundColor: hc.color === 'transparent' ? 'transparent' : hc.color }} />
-                      <span className="text-[9px] text-slate-800">{hc.name}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Page Navigation Strip */}
-              <div className="flex items-center justify-between text-xs font-black px-1 text-orange-950">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setActivePageIndex(Math.max(0, activePageIndex - 1))}
-                    disabled={activePageIndex === 0}
-                    className="p-1 rounded border border-black/20 disabled:opacity-30 bg-white hover:bg-amber-100"
-                    title="Previous Page"
-                  >
-                    <ChevronLeft size={14} strokeWidth={3} />
-                  </button>
-                  <span>
-                    Page {activePageIndex + 1} / {pages.length}
-                  </span>
-                  <button
-                    onClick={() => setActivePageIndex(Math.min(pages.length - 1, activePageIndex + 1))}
-                    disabled={activePageIndex === pages.length - 1}
-                    className="p-1 rounded border border-black/20 disabled:opacity-30 bg-white hover:bg-amber-100"
-                    title="Next Page"
-                  >
-                    <ChevronRight size={14} strokeWidth={3} />
-                  </button>
-                </div>
-
-                <button
-                  onClick={addPage}
-                  className="px-2.5 py-1 bg-amber-300 hover:bg-amber-400 border border-black rounded text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-[1.5px_1.5px_0_black]"
-                >
-                  <Plus size={12} strokeWidth={3} />
-                  New Page
-                </button>
-              </div>
-            </div>
-          )}
         </motion.div>
       )}
     </AnimatePresence>
