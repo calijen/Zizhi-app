@@ -104,3 +104,39 @@
 .textLayer ::selection {
   background: rgba(0, 0, 255, 0.2);
 }
+
+/* Dark Mode Notebook Text Visibility Overrides */
+.notebook-editor-dark,
+.notebook-editor-dark * {
+  caret-color: #f8fafc !important;
+}
+
+.notebook-editor-dark font[color="#000000"],
+.notebook-editor-dark font[color="#000"],
+.notebook-editor-dark font[color="#1e293b"],
+.notebook-editor-dark font[color="#0f172a"],
+.notebook-editor-dark font[color="#111827"],
+.notebook-editor-dark font[color="#171717"],
+.notebook-editor-dark font[color="#262626"],
+.notebook-editor-dark font[color="#404040"],
+.notebook-editor-dark font[color="black"],
+.notebook-editor-dark span[style*="color: rgb(0, 0, 0)"],
+.notebook-editor-dark span[style*="color: rgb(0,0,0)"],
+.notebook-editor-dark span[style*="color: rgb(30, 41, 59)"],
+.notebook-editor-dark span[style*="color: rgb(30,41,59)"],
+.notebook-editor-dark span[style*="color: rgb(15, 23, 42)"],
+.notebook-editor-dark span[style*="color: rgb(17, 24, 39)"],
+.notebook-editor-dark span[style*="color: rgb(23, 23, 23)"],
+.notebook-editor-dark span[style*="color: rgb(38, 38, 38)"],
+.notebook-editor-dark span[style*="color: rgb(64, 64, 64)"],
+.notebook-editor-dark span[style*="color: #000000"],
+.notebook-editor-dark span[style*="color: #000"],
+.notebook-editor-dark span[style*="color: #1e293b"],
+.notebook-editor-dark span[style*="color: #0f172a"],
+.notebook-editor-dark span[style*="color: #111827"],
+.notebook-editor-dark span[style*="color: #171717"],
+.notebook-editor-dark span[style*="color: #262626"],
+.notebook-editor-dark span[style*="color: #404040"],
+.notebook-editor-dark span[style*="color: black"] {
+  color: #f8fafc !important;
+}

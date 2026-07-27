@@ -16,7 +16,7 @@ import ReloadPrompt from './components/ReloadPrompt';
 import SearchSidebar from './components/SearchSidebar';
 import { Logo, LogoIcon, IconSettings, IconUser, IconLibrary, IconQuote, IconUpload, IconLayoutGrid, IconLayoutList, IconSpinner, IconMenu, IconNote } from './components/icons';
 import * as db from './db';
-import { auth, signInWithGoogle, logout as firebaseLogout, db as firestore, storage, handleFirestoreError, OperationType } from './firebase';
+import { auth, signInWithGoogle, logout as firebaseLogout, db as firestore, storage, handleFirestoreError, isQuotaExceeded, OperationType } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, setDoc, getDoc, collection, getDocs, query, where, writeBatch, deleteDoc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL, getBlob } from 'firebase/storage';
@@ -119,7 +119,16 @@ const App: FC = () => {
   const [generationStatuses, setGenerationStatuses] = useState<Record<string, GenerationStatus>>({});
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
+  const [quotaExceeded, setQuotaExceeded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleQuota = () => {
+      setQuotaExceeded(true);
+    };
+    window.addEventListener('firestore-quota-exceeded', handleQuota);
+    return () => window.removeEventListener('firestore-quota-exceeded', handleQuota);
+  }, []);
 
   const updateStreak = useCallback(() => {
     const lastVisit = localStorage.getItem('zizhi-last-visit');
@@ -188,16 +197,21 @@ const App: FC = () => {
           duplicateIdsToDeleteOffline.forEach(id => db.deleteBook(id).catch(() => {}));
       }
 
-      if (currentUser) {
+      if (currentUser && !isQuotaExceeded()) {
           // Sync books, quotes, and notes with Firestore
           const booksRef = collection(firestore, 'users', currentUser.uid, 'books');
           const quotesRef = collection(firestore, 'users', currentUser.uid, 'quotes');
           const notesRef = collection(firestore, 'users', currentUser.uid, 'notes');
 
+          const handleDocsError = (e: any) => {
+              handleFirestoreError(e, OperationType.LIST, 'user_data');
+              return null;
+          };
+
           const [cloudBooksSnap, cloudQuotesSnap, cloudNotesSnap] = await Promise.all([
-              getDocs(booksRef).catch(() => null),
-              getDocs(quotesRef).catch(() => null),
-              getDocs(notesRef).catch(() => null)
+              getDocs(booksRef).catch(handleDocsError),
+              getDocs(quotesRef).catch(handleDocsError),
+              getDocs(notesRef).catch(handleDocsError)
           ]);
 
           const cloudBooks = cloudBooksSnap ? cloudBooksSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as BookMetadata) })) : [];
@@ -235,27 +249,29 @@ const App: FC = () => {
           const mergedNotes = Array.from(mergedNotesMap.values());
 
           // Asynchronously upload local items to cloud if missing in Cloud
-          localQuotes.forEach(async (q) => {
-              const inCloud = cloudQuotes.some(cq => cq.id === q.id);
-              if (!inCloud) {
-                  const quoteRef = doc(firestore, 'users', currentUser.uid, 'quotes', q.id);
-                  setDoc(quoteRef, { ...q, userId: currentUser.uid }, { merge: true }).catch(() => {});
-              }
-          });
-          localNotes.forEach(async (n) => {
-              const inCloud = cloudNotes.some(cn => cn.id === n.id);
-              if (!inCloud) {
-                  const noteRef = doc(firestore, 'users', currentUser.uid, 'notes', n.id);
-                  setDoc(noteRef, { ...n, userId: currentUser.uid }, { merge: true }).catch(() => {});
-              }
-          });
-          deduplicatedLocalBooks.forEach(async (b) => {
-              const inCloud = cloudBooks.some(cb => cb.id === b.id);
-              if (!inCloud) {
-                  const bookRef = doc(firestore, 'users', currentUser.uid, 'books', b.id);
-                  setDoc(bookRef, { ...b, userId: currentUser.uid }, { merge: true }).catch(() => {});
-              }
-          });
+          if (!isQuotaExceeded()) {
+              localQuotes.forEach(async (q) => {
+                  const inCloud = cloudQuotes.some(cq => cq.id === q.id);
+                  if (!inCloud && !isQuotaExceeded()) {
+                      const quoteRef = doc(firestore, 'users', currentUser.uid, 'quotes', q.id);
+                      setDoc(quoteRef, { ...q, userId: currentUser.uid }, { merge: true }).catch(e => handleFirestoreError(e, OperationType.WRITE, 'quotes'));
+                  }
+              });
+              localNotes.forEach(async (n) => {
+                  const inCloud = cloudNotes.some(cn => cn.id === n.id);
+                  if (!inCloud && !isQuotaExceeded()) {
+                      const noteRef = doc(firestore, 'users', currentUser.uid, 'notes', n.id);
+                      setDoc(noteRef, { ...n, userId: currentUser.uid }, { merge: true }).catch(e => handleFirestoreError(e, OperationType.WRITE, 'notes'));
+                  }
+              });
+              deduplicatedLocalBooks.forEach(async (b) => {
+                  const inCloud = cloudBooks.some(cb => cb.id === b.id);
+                  if (!inCloud && !isQuotaExceeded()) {
+                      const bookRef = doc(firestore, 'users', currentUser.uid, 'books', b.id);
+                      setDoc(bookRef, { ...b, userId: currentUser.uid }, { merge: true }).catch(e => handleFirestoreError(e, OperationType.WRITE, 'books'));
+                  }
+              });
+          }
 
           // Asynchronously persist missing cloud quotes & notes to IndexedDB for offline access
           mergedQuotes.forEach(async (q) => {
@@ -371,9 +387,9 @@ const App: FC = () => {
         setLibrary(prev => [metaWithFlags, ...prev]);
 
         // Sync metadata to Firestore for authenticated users
-        if (user) {
+        if (user && !isQuotaExceeded()) {
             const bookRef = doc(firestore, 'users', user.uid, 'books', newBook.id);
-            setDoc(bookRef, { ...metaWithFlags, userId: user.uid }, { merge: true }).catch(err => console.error("Cloud book sync failed", err));
+            setDoc(bookRef, { ...metaWithFlags, userId: user.uid }, { merge: true }).catch(err => handleFirestoreError(err, OperationType.WRITE, 'books'));
         }
         
         // Release the UI lock
@@ -385,8 +401,8 @@ const App: FC = () => {
             if (q.bookTitle && getBookUniqueKey(q.bookTitle, q.author) === newBookKey && q.bookId !== newBook.id) {
                 const updated = { ...q, bookId: newBook.id };
                 db.saveQuote(updated);
-                if (user) {
-                    setDoc(doc(firestore, 'users', user.uid, 'quotes', q.id), { ...updated, userId: user.uid }, { merge: true }).catch(() => {});
+                if (user && !isQuotaExceeded()) {
+                    setDoc(doc(firestore, 'users', user.uid, 'quotes', q.id), { ...updated, userId: user.uid }, { merge: true }).catch(err => handleFirestoreError(err, OperationType.WRITE, 'quotes'));
                 }
                 return updated;
             }
@@ -396,8 +412,8 @@ const App: FC = () => {
             if (n.bookTitle && getBookUniqueKey(n.bookTitle, n.author) === newBookKey && n.bookId !== newBook.id) {
                 const updated = { ...n, bookId: newBook.id };
                 db.saveNote(updated);
-                if (user) {
-                    setDoc(doc(firestore, 'users', user.uid, 'notes', n.id), { ...updated, userId: user.uid }, { merge: true }).catch(() => {});
+                if (user && !isQuotaExceeded()) {
+                    setDoc(doc(firestore, 'users', user.uid, 'notes', n.id), { ...updated, userId: user.uid }, { merge: true }).catch(err => handleFirestoreError(err, OperationType.WRITE, 'notes'));
                 }
                 return updated;
             }
@@ -478,9 +494,9 @@ const App: FC = () => {
         setLibrary(prev => prev.map(b => b.id === bookId ? metaWithFlags : b));
 
         // Sync flags to Firestore in background
-        if (user) {
+        if (user && !isQuotaExceeded()) {
             const bookRef = doc(firestore, 'users', user.uid, 'books', bookId);
-            setDoc(bookRef, { hasSummary: true, hasAudio: true }, { merge: true }).catch(err => console.error("Cloud status sync failed", err));
+            setDoc(bookRef, { hasSummary: true, hasAudio: true }, { merge: true }).catch(err => handleFirestoreError(err, OperationType.WRITE, 'books'));
         }
         
         setToast({ message: "Insight generated successfully." });
@@ -496,8 +512,8 @@ const App: FC = () => {
     try {
         await db.deleteBook(id);
         setLibrary(prev => prev.filter(b => b.id !== id));
-        if (user) {
-            deleteDoc(doc(firestore, 'users', user.uid, 'books', id)).catch(() => {});
+        if (user && !isQuotaExceeded()) {
+            deleteDoc(doc(firestore, 'users', user.uid, 'books', id)).catch(err => handleFirestoreError(err, OperationType.DELETE, 'books'));
         }
         setToast({ message: "Book removed." });
     } catch (e) {
@@ -579,6 +595,19 @@ const App: FC = () => {
 
           </aside>
           <Box className="flex-1 flex flex-col h-full overflow-hidden relative">
+              {quotaExceeded && (
+                <div className="bg-amber-200 border-b-2 border-black p-2.5 px-6 text-xs font-bold text-amber-950 flex flex-wrap items-center justify-between gap-2 z-[200]">
+                  <span>⚡ Firestore free daily quota reached. Notebooks and library are saved locally on your device. Quota resets tomorrow.</span>
+                  <a 
+                    href="https://console.firebase.google.com/project/gen-lang-client-0846626494/firestore/databases/ai-studio-a274686c-85b1-4469-b210-76c1a7c17abf/data?openUpgradeDialog=true" 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="underline text-orange-950 font-black hover:text-black transition-colors"
+                  >
+                    View Firestore Console & Quota →
+                  </a>
+                </div>
+              )}
               <header className="h-16 md:h-20 bg-[var(--color-surface)] z-[100] px-8 flex items-center justify-between border-b-4 border-black">
                   <div className="flex items-center gap-4">
                     <div className="md:hidden"><Logo /></div>
@@ -619,8 +648,8 @@ const App: FC = () => {
                       {activeTab === 'quotes' && <QuotesView theme={theme} quotes={quotes} library={library} isChatOpen={isChatOpen} setIsChatOpen={setIsChatOpen} onDelete={(id) => { 
                           db.deleteQuote(id).then(() => {
                               setQuotes(prev => prev.filter(q => q.id !== id));
-                              if (user) {
-                                  deleteDoc(doc(firestore, 'users', user.uid, 'quotes', id)).catch(e => console.error("Cloud quote delete failed", e));
+                              if (user && !isQuotaExceeded()) {
+                                  deleteDoc(doc(firestore, 'users', user.uid, 'quotes', id)).catch(e => handleFirestoreError(e, OperationType.DELETE, 'quotes'));
                               }
                           }); 
                       }} onGoToQuote={async (q) => { 
@@ -720,14 +749,14 @@ const App: FC = () => {
               // Local update metadata only
               await db.updateBookMetadata(bid, updates);
               setLibrary(prev => prev.map(b => b.id === bid ? { ...b, ...updates } : b)); 
-              if (user) {
+              if (user && !isQuotaExceeded()) {
                   const bookRef = doc(firestore, 'users', user.uid, 'books', bid);
-                  setDoc(bookRef, { ...updates, userId: user.uid }, { merge: true }).catch(() => {});
+                  setDoc(bookRef, { ...updates, userId: user.uid }, { merge: true }).catch(err => handleFirestoreError(err, OperationType.WRITE, 'books'));
               } 
           }} onSaveQuote={async (t, c) => { 
               const nq: Quote = { id: crypto.randomUUID(), text: t, bookTitle: selectedBook.title, author: selectedBook.author, bookId: selectedBook.id, location: c, createdAt: Date.now() }; 
               await db.saveQuote(nq); 
-              if (user) {
+              if (user && !isQuotaExceeded()) {
                   const quoteRef = doc(firestore, 'users', user.uid, 'quotes', nq.id);
                   await setDoc(quoteRef, { ...nq, userId: user.uid }).catch(e => handleFirestoreError(e, OperationType.CREATE, 'quotes'));
               }
@@ -736,7 +765,7 @@ const App: FC = () => {
           }} onSaveNote={async (t, n, c) => { 
               const nn: Note = { id: crypto.randomUUID(), text: t, note: n, bookTitle: selectedBook.title, author: selectedBook.author, bookId: selectedBook.id, location: c, createdAt: Date.now() }; 
               await db.saveNote(nn); 
-              if (user) {
+              if (user && !isQuotaExceeded()) {
                   const noteRef = doc(firestore, 'users', user.uid, 'notes', nn.id);
                   await setDoc(noteRef, { ...nn, userId: user.uid }).catch(e => handleFirestoreError(e, OperationType.CREATE, 'notes'));
               }

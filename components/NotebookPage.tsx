@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Group, Text, ActionIcon, Tooltip, Portal } from '@mantine/core';
 import { Trash2, X, Palette, GripHorizontal, Bold, Italic, Underline, Strikethrough, Highlighter } from 'lucide-react';
-import type { DrawingPath, StickyNote, ImageSticker, NotebookPageData } from '../types';
+import type { DrawingPath, StickyNote, ImageSticker, NotebookPageData, Theme } from '../types';
 
 interface NotebookPageProps {
   pageData: NotebookPageData;
@@ -12,6 +12,8 @@ interface NotebookPageProps {
   onChange: (updated: NotebookPageData) => void;
   onDelete?: () => void;
   isActive?: boolean;
+  isMobile?: boolean;
+  theme?: Theme;
 }
 
 interface NotebookTextSelectionPopupProps {
@@ -102,13 +104,6 @@ const NotebookTextSelectionPopup: React.FC<NotebookTextSelectionPopupProps> = ({
           >
             <Strikethrough size={13} strokeWidth={3} />
           </button>
-          <button
-            onClick={() => setShowHighlightPalette(!showHighlightPalette)}
-            className={`p-1.5 rounded transition-all active:scale-95 ${showHighlightPalette ? 'bg-amber-100 text-amber-800 font-extrabold shadow-xs border border-amber-300' : 'hover:bg-white hover:shadow-xs text-slate-700 hover:text-slate-900'}`}
-            title="Highlight Options"
-          >
-            <Highlighter size={13} strokeWidth={3} />
-          </button>
         </div>
 
         <div className="w-[1px] h-5 bg-slate-200" />
@@ -127,30 +122,6 @@ const NotebookTextSelectionPopup: React.FC<NotebookTextSelectionPopupProps> = ({
           ))}
         </div>
       </div>
-
-      {showHighlightPalette && (
-        <div className="flex items-center gap-2 mt-1.5 py-1.5 border-t border-slate-100 px-1 justify-between">
-          <span className="text-[8.5px] font-black uppercase text-slate-500">Color:</span>
-          <div className="flex items-center gap-1.5">
-            {HIGHLIGHT_OPTS.map((opt, idx) => (
-              <button
-                key={idx}
-                onClick={() => {
-                  onAction('backColor', opt.color);
-                  setShowHighlightPalette(false);
-                }}
-                className="w-5 h-3.5 rounded-sm border border-slate-300 flex items-center justify-center hover:scale-110 active:scale-95 transition-all relative overflow-hidden"
-                title={opt.name}
-                style={{ backgroundColor: opt.color === 'transparent' ? 'transparent' : opt.color }}
-              >
-                {opt.color === 'transparent' && (
-                  <div className="w-5 h-[1.5px] bg-red-500 rotate-45 absolute" />
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -171,7 +142,14 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
   onChange,
   onDelete,
   isActive = false,
+  isMobile = false,
+  theme,
 }) => {
+  const isDarkTheme = theme?.id === 'nocturne' || (theme?.colors?.background && (theme.colors.background === '#0a0a0b' || theme.colors.background.startsWith('#1') || theme.colors.background.startsWith('#0')));
+  const pageBgColor = theme?.colors?.background || '#fcfbe3';
+  const pageTextColor = theme?.colors?.['primary-text'] || (isDarkTheme ? '#f8fafc' : '#1e293b');
+  const lineGradient = isDarkTheme ? 'rgba(255, 255, 255, 0.12)' : '#e1e0cb';
+  const marginLineColor = isDarkTheme ? 'rgba(239, 68, 68, 0.5)' : '#ffb3b3';
   const [isDrawing, setIsDrawing] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -182,6 +160,12 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
   const [selectionRect, setSelectionRect] = useState<DOMRect | null>(null);
 
   const handleSelectionChange = useCallback(() => {
+    // Hide popup selection menu on mobile or when highlighting
+    if (isMobile || activeTool === 'highlight') {
+      setSelectionRect(null);
+      return;
+    }
+
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed || !editorRef.current) {
       setSelectionRect(null);
@@ -201,7 +185,7 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
     } else {
       setSelectionRect(rect);
     }
-  }, []);
+  }, [isMobile, activeTool]);
 
   const lastRangeRef = useRef<Range | null>(null);
   const lastSyncedTextRef = useRef<string>('');
@@ -379,11 +363,12 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
     }
   }, [pageData.text, pageData.id]);
 
-  // Set typing color dynamically when activeColor changes
+    // Set typing color dynamically when activeColor changes ONLY if user has a text selection
   useEffect(() => {
     if (!isActive || activeTool !== 'type' || !editorRef.current) return;
     
-    if (document.activeElement === editorRef.current) {
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed && editorRef.current.contains(sel.anchorNode)) {
       document.execCommand('foreColor', false, activeColor);
     }
   }, [activeColor, isActive, activeTool]);
@@ -400,15 +385,23 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const w = canvas.width / (window.devicePixelRatio || 1);
-    const h = canvas.height / (window.devicePixelRatio || 1);
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.width / dpr;
+    const h = canvas.height / dpr;
 
     ctx.clearRect(0, 0, w, h);
 
     const drawPath = (path: DrawingPath) => {
       if (path.points.length === 0) return;
       ctx.beginPath();
-      ctx.strokeStyle = path.color;
+      
+      let strokeColor = path.color;
+      if (isDarkTheme && strokeColor !== 'eraser' && !path.isHighlighter) {
+        if (['#000000', '#1e293b', '#262626', '#404040', '#000'].includes(strokeColor)) {
+          strokeColor = '#f8fafc';
+        }
+      }
+      ctx.strokeStyle = strokeColor;
       ctx.lineWidth = path.width;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
@@ -420,19 +413,29 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
         ctx.globalCompositeOperation = 'source-over';
       }
 
-      const p0 = path.points[0];
-      ctx.moveTo(p0.x * w, p0.y * h);
+      // Convert normalized ratio points (legacy 0..1) to pixel points if needed
+      const getPt = (pt: { x: number; y: number }) => {
+        if (pt.x <= 1.0 && pt.y <= 1.0) {
+          const refW = w || 800;
+          const refH = h || 1200;
+          return { x: pt.x * refW, y: pt.y * refH };
+        }
+        return { x: pt.x, y: pt.y };
+      };
+
+      const p0 = getPt(path.points[0]);
+      ctx.moveTo(p0.x, p0.y);
 
       for (let i = 1; i < path.points.length; i++) {
-        const p = path.points[i];
-        ctx.lineTo(p.x * w, p.y * h);
+        const p = getPt(path.points[i]);
+        ctx.lineTo(p.x, p.y);
       }
       ctx.stroke();
     };
 
     pageData.drawings.forEach(drawPath);
     ctx.globalCompositeOperation = 'source-over'; // restore default
-  }, [pageData.drawings]);
+  }, [pageData.drawings, isDarkTheme]);
 
   // Set Canvas Resolution (High DPI / Retina Support) using ResizeObserver on the container
   useEffect(() => {
@@ -466,7 +469,7 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
     drawAll();
   }, [pageData.drawings, drawAll]);
 
-  // Get Relative Mouse/Touch Coordinates (0 to 1)
+  // Get Relative Canvas Pixel Coordinates
   const getCanvasCoords = (e: React.MouseEvent | React.TouchEvent | TouchEvent | MouseEvent) => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
@@ -482,9 +485,9 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
       clientY = e.clientY;
     }
 
-    const x = (clientX - rect.left) / rect.width;
-    const y = (clientY - rect.top) / rect.height;
-    return { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) };
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    return { x: Math.max(0, x), y: Math.max(0, y) };
   };
 
   // Canvas Drawing Events
@@ -777,13 +780,18 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
   return (
     <div 
       ref={containerRef}
-      className="w-full relative flex-shrink-0 bg-[#fcfbe3] border-b border-black/10 transition-all rounded-none overflow-hidden"
+      data-notebook-page-index={pageNumber - 1}
+      className="w-full relative flex-shrink-0 border-b border-black/10 transition-colors rounded-none overflow-hidden"
       style={{ 
-        height: '680px',
+        height: '1360px',
+        backgroundColor: pageBgColor,
       }}
     >
       {/* Page number at bottom left */}
-      <div className="absolute bottom-4 left-[48px] text-[12px] font-black text-black/40 select-none z-30">
+      <div 
+        className="absolute bottom-4 left-[48px] text-[12px] font-black select-none z-30 opacity-40 transition-colors"
+        style={{ color: pageTextColor }}
+      >
         {pageNumber}
       </div>
 
@@ -855,7 +863,13 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
           className="relative min-h-full w-full pr-4 pl-[48px] pt-[30px] pb-8 select-text"
         >
           {/* Background paper lines layout */}
-          <div className="pointer-events-none notebook-lines" />
+          <div 
+            className="pointer-events-none notebook-lines" 
+            style={{
+              backgroundImage: `linear-gradient(${lineGradient} 1px, transparent 1px)`,
+              ['--margin-line-color' as any]: marginLineColor,
+            }}
+          />
 
           {/* Render floated image stickers first so text wraps around them */}
           {(pageData.imageStickers || []).map((sticker) => (
@@ -888,16 +902,27 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
               handleSelectionChange();
             }}
             onClick={handleEditorClick}
+            onKeyDown={(e) => {
+              if (activeTool === 'type' && activeColor && activeColor !== 'eraser') {
+                const sel = window.getSelection();
+                if (sel && sel.isCollapsed && editorRef.current?.contains(sel.anchorNode)) {
+                  document.execCommand('foreColor', false, activeColor);
+                }
+              }
+            }}
             onFocus={() => {
-              if (activeTool === 'type') {
-                document.execCommand('foreColor', false, activeColor);
+              const sel = window.getSelection();
+              if (sel && !sel.isCollapsed && editorRef.current?.contains(sel.anchorNode)) {
+                if (activeTool === 'type' && activeColor && activeColor !== 'eraser') {
+                  document.execCommand('foreColor', false, activeColor);
+                }
               }
             }}
             data-placeholder={activeTool === 'type' ? 'Start typing directly on notebook lines...' : activeTool === 'highlight' ? 'Drag cursor over text to highlight it...' : ''}
-            className="outline-none font-sans font-bold text-[14px] leading-[24px] select-text min-h-[500px] w-full break-words notebook-editor relative z-10"
+            className={`outline-none font-sans font-bold text-[14px] leading-[24px] select-text min-h-[1200px] w-full break-words notebook-editor ${isDarkTheme ? 'notebook-editor-dark' : ''} relative z-10`}
             style={{
-              color: activeTool === 'type' ? (activeColor || '#1e293b') : '#1e293b',
-              caretColor: activeTool === 'type' ? (activeColor || '#1e293b') : '#1e293b',
+              color: pageTextColor,
+              caretColor: activeTool === 'type' ? (activeColor || pageTextColor) : pageTextColor,
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
               pointerEvents: (activeTool === 'type' || activeTool === 'highlight') ? 'auto' : 'none',
@@ -911,7 +936,7 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
             onTouchStart={handleStartDrawing}
             className="absolute inset-0 w-full h-full touch-none"
             style={{
-              zIndex: (activeTool === 'draw' || activeTool === 'eraser') ? 25 : 5,
+              zIndex: (activeTool === 'draw' || activeTool === 'eraser') ? 25 : 15,
               pointerEvents: (activeTool === 'draw' || activeTool === 'eraser') ? 'auto' : 'none',
               cursor: activeTool === 'eraser' ? 'cell' : 'crosshair'
             }}

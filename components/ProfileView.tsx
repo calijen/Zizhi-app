@@ -152,11 +152,11 @@ const BookCover: React.FC<{ title: string; author: string }> = ({ title, author 
         <div id="book-cover-fallback" className={`w-28 h-40 border-4 border-black shadow-[4px_4px_0_black] p-3 flex flex-col justify-between shrink-0 select-none ${currentColors.bg} ${currentColors.text} relative overflow-hidden`}>
             {/* Elegant spine indicator */}
             <div className="absolute top-0 left-0 w-2 h-full bg-black/10 border-r border-black/15" />
-            <div className="pl-2 flex-1 flex flex-col justify-between h-full">
-                <div className="font-serif italic font-black text-[11px] leading-tight line-clamp-3 uppercase mt-1">
+            <div className="pl-2 flex-1 flex flex-col justify-between h-full min-h-0 overflow-hidden">
+                <div className="font-serif italic font-black text-[10px] leading-snug uppercase mt-1 break-words">
                     {title}
                 </div>
-                <div className="font-sans font-black tracking-widest text-[8px] truncate opacity-80 uppercase leading-none mb-1">
+                <div className="font-sans font-black tracking-widest text-[8px] opacity-80 uppercase leading-tight mb-1 break-words">
                     {author}
                 </div>
             </div>
@@ -504,28 +504,30 @@ You must return a valid JSON object ONLY. Do not output any thinking block, comm
                         <Text className="text-[11px] font-black uppercase tracking-widest">Studying book charts...</Text>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
                         {recommendations.map((rec, i) => (
                             <div 
                                 key={i} 
-                                className="bg-white border-4 border-black p-5 flex gap-4 text-black shadow-[6px_6px_0_pink] hover:translate-y-[-2px] hover:shadow-[8px_8px_0_pink] transition-all duration-300"
+                                className="bg-white border-4 border-black p-5 sm:p-6 flex flex-row gap-5 text-black shadow-[6px_6px_0_pink] hover:translate-y-[-2px] hover:shadow-[8px_8px_0_pink] transition-all duration-300 h-full items-start"
                             >
-                                <BookCover title={rec.title} author={rec.author} />
-                                <div className="flex-1 flex flex-col justify-between min-w-0 py-1">
+                                <div className="shrink-0">
+                                    <BookCover title={rec.title} author={rec.author} />
+                                </div>
+                                <div className="flex-1 flex flex-col justify-between min-w-0 py-0.5 space-y-3 h-full">
                                     <div className="space-y-2">
-                                        <div className="flex justify-between items-start gap-1">
-                                            <span className="text-[8px] font-black uppercase tracking-widest bg-cyan-100 text-cyan-800 px-2.5 py-1 border border-cyan-300 truncate">
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                            <span className="text-[9px] font-black uppercase tracking-wider bg-cyan-100 text-cyan-900 px-2.5 py-1 border border-cyan-400 font-sans inline-block">
                                                 {rec.genre || "Essential study"}
                                             </span>
                                         </div>
-                                        <h4 className="text-[14px] font-black uppercase italic leading-tight line-clamp-2">
+                                        <h4 className="text-base sm:text-lg font-black uppercase italic leading-snug break-words text-black">
                                             {rec.title}
                                         </h4>
-                                        <p className="text-[10px] font-black text-pink-600 uppercase tracking-wide">
+                                        <p className="text-xs font-black text-pink-600 uppercase tracking-wide break-words">
                                             by {rec.author}
                                         </p>
                                     </div>
-                                    <p className="font-serif italic text-xs text-black/75 leading-relaxed line-clamp-3 mt-3 border-t border-black/10 pt-2">
+                                    <p className="font-serif italic text-xs text-black/80 leading-relaxed border-t-2 border-black/10 pt-3 mt-1 break-words">
                                         {rec.reason || `Essential expansion for your library.`}
                                     </p>
                                 </div>

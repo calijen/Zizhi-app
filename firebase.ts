@@ -45,9 +45,25 @@ export interface FirestoreErrorInfo {
     }
 }
 
+let quotaExceededFlag = false;
+
+export function setQuotaExceeded() {
+    quotaExceededFlag = true;
+    if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('firestore-quota-exceeded'));
+    }
+}
+
+export function isQuotaExceeded(): boolean {
+    return quotaExceededFlag;
+}
+
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+    const message = error instanceof Error ? error.message : String(error);
+    const isQuotaError = message.toLowerCase().includes('quota') || message.toLowerCase().includes('resource-exhausted');
+
     const errInfo: FirestoreErrorInfo = {
-        error: error instanceof Error ? error.message : String(error),
+        error: message,
         authInfo: {
             userId: auth.currentUser?.uid,
             email: auth.currentUser?.email,
@@ -56,6 +72,16 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
         operationType,
         path
     };
+
+    if (isQuotaError) {
+        quotaExceededFlag = true;
+        console.warn('Firestore daily quota limit reached. Falling back to local IndexedDB storage.');
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('firestore-quota-exceeded', { detail: { message } }));
+        }
+        return;
+    }
+
     console.error('Firestore Error: ', JSON.stringify(errInfo));
     throw new Error(JSON.stringify(errInfo));
 }
