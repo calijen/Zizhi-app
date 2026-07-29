@@ -28,10 +28,14 @@ import {
 import type { DrawingPath, StickyNote, ImageSticker, NotebookData, NotebookPageData, Theme } from '../types';
 import * as db from '../db';
 import { NotebookPage } from './NotebookPage';
+import { auth, db as firestore } from '../firebase';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { getBookUniqueKey } from '../App';
 
 interface NotebookSidebarProps {
   bookId: string;
   bookTitle: string;
+  author?: string;
   onClose: () => void;
   isOpen: boolean;
   theme?: Theme;
@@ -145,7 +149,7 @@ const getPlainText = (html: string) => {
   return temp.innerText || temp.textContent || "";
 };
 
-export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTitle, onClose, isOpen, theme }) => {
+export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTitle, author, onClose, isOpen, theme }) => {
   const isDarkTheme = theme?.id === 'nocturne' || (theme?.colors?.background && (theme.colors.background === '#0a0a0b' || theme.colors.background.startsWith('#1') || theme.colors.background.startsWith('#0')));
   const pageBgColor = theme?.colors?.background || '#fcfbe3';
   const pageSurfaceColor = theme?.colors?.surface || '#f1f5f9';
@@ -254,12 +258,42 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   
-  // Load local IndexedDB notebook data
+  // Load local IndexedDB notebook data or synced cloud notebook
   useEffect(() => {
     const loadNotebookData = async () => {
       setIsLoading(true);
       try {
-        const localData = await db.getNotebook(bookId);
+        let localData = await db.getNotebook(bookId);
+        const bookKey = getBookUniqueKey(bookTitle, author || '');
+
+        // If not found by bookId, search local DB by bookKey or title/author
+        if (!localData && bookTitle) {
+          const allLocal = await db.getAllNotebooks();
+          const matched = allLocal.find(nb => 
+            (nb.bookKey && nb.bookKey === bookKey) || 
+            (nb.bookTitle && getBookUniqueKey(nb.bookTitle, nb.author) === bookKey)
+          );
+          if (matched) {
+            localData = { ...matched, bookId };
+            await db.saveNotebook(localData);
+          }
+        }
+
+        // If still not found, check Firestore for synced notebook if user is logged in
+        if (!localData && auth.currentUser) {
+          try {
+            const userUid = auth.currentUser.uid;
+            const cloudDocRef = doc(firestore, 'users', userUid, 'notebooks', bookKey);
+            const cloudSnap = await getDoc(cloudDocRef);
+            if (cloudSnap.exists()) {
+              const cloudNb = cloudSnap.data() as NotebookData;
+              localData = { ...cloudNb, bookId };
+              await db.saveNotebook(localData);
+            }
+          } catch (e) {
+            console.error('Failed to fetch cloud notebook:', e);
+          }
+        }
         
         if (localData) {
           if (localData.pages) {
@@ -301,9 +335,9 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
     if (isOpen) {
       loadNotebookData();
     }
-  }, [bookId, isOpen]);
+  }, [bookId, bookTitle, author, isOpen]);
 
-  // Debounced Auto Save to IndexedDB
+  // Debounced Auto Save to IndexedDB and Firestore
   const lastSaveTimerRef = useRef<number | null>(null);
 
   const triggerSave = useCallback((updatedPages: NotebookPageData[]) => {
@@ -314,24 +348,31 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
 
     lastSaveTimerRef.current = window.setTimeout(async () => {
       try {
+        const user = auth.currentUser;
+        const bookKey = getBookUniqueKey(bookTitle, author || '');
         const notebookObj: NotebookData = {
           bookId,
-          userId: 'local_student',
+          userId: user ? user.uid : 'local_student',
           drawings: '[]', // retained for retro schemas
           stickyNotes: '[]',
           pages: JSON.stringify(updatedPages),
           updatedAt: Date.now(),
+          bookTitle,
+          author,
+          bookKey
         };
         await db.saveNotebook(notebookObj);
+        if (user) {
+          const nbDocId = bookKey || bookId;
+          setDoc(doc(firestore, 'users', user.uid, 'notebooks', nbDocId), { ...notebookObj, userId: user.uid }, { merge: true }).catch(() => {});
+        }
         setSaveStatus('saved');
       } catch (err) {
         console.error('Error saving notebook:', err);
         setSaveStatus('error');
       }
     }, 1200);
-  }, [bookId]);
-
-
+  }, [bookId, bookTitle, author]);
 
   const triggerSaveImmediate = useCallback(async (updatedPages: NotebookPageData[]) => {
     if (lastSaveTimerRef.current) {
@@ -339,21 +380,30 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
       lastSaveTimerRef.current = null;
     }
     try {
+      const user = auth.currentUser;
+      const bookKey = getBookUniqueKey(bookTitle, author || '');
       const notebookObj: NotebookData = {
         bookId,
-        userId: 'local_student',
+        userId: user ? user.uid : 'local_student',
         drawings: '[]',
         stickyNotes: '[]',
         pages: JSON.stringify(updatedPages),
         updatedAt: Date.now(),
+        bookTitle,
+        author,
+        bookKey
       };
       await db.saveNotebook(notebookObj);
+      if (user) {
+        const nbDocId = bookKey || bookId;
+        setDoc(doc(firestore, 'users', user.uid, 'notebooks', nbDocId), { ...notebookObj, userId: user.uid }, { merge: true }).catch(() => {});
+      }
       setSaveStatus('saved');
     } catch (err) {
       console.error('Error saving notebook immediately:', err);
       setSaveStatus('error');
     }
-  }, [bookId]);
+  }, [bookId, bookTitle, author]);
 
   // Flush pending save on unmount or tab hide
   const pagesRef = useRef(pages);

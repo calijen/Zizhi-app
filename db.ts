@@ -271,3 +271,14 @@ export const getNotebook = async (bookId: string): Promise<NotebookData | null> 
         request.onerror = () => resolve(null);
     });
 };
+
+export const getAllNotebooks = async (): Promise<NotebookData[]> => {
+    const db = await initDB();
+    return new Promise((resolve) => {
+        const transaction = db.transaction(NOTEBOOK_STORE, 'readonly');
+        const request = transaction.objectStore(NOTEBOOK_STORE).getAll();
+        request.onsuccess = (e) => resolve((e.target as any).result || []);
+        request.onerror = () => resolve([]);
+    });
+};
+
