@@ -795,16 +795,6 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
         {pageNumber}
       </div>
 
-      {onDelete && (
-        <button
-          onClick={onDelete}
-          className="absolute top-2 right-4 text-[10.5px] font-black text-red-600 hover:text-red-800 uppercase tracking-widest z-40 bg-white/80 border border-black/20 hover:border-black px-1.5 py-0.5 shadow-sm transition-all active:scale-95"
-          title="Tear out this page"
-        >
-          Tear Page
-        </button>
-      )}
-
       {/* Scrollable container holding page content, canvas, and sticky notes */}
       <div 
         ref={scrollContainerRef}
