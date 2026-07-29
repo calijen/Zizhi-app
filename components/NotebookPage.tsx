@@ -815,7 +815,7 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
           // Adjust for scroll position to find absolute y within the page
           const clickY = e.clientY - rect.top + container.scrollTop;
           
-          const clickedLine = Math.floor((clickY - 30) / 24);
+          const clickedLine = Math.floor((clickY - 30) / 28);
           
           // Only pad if they click below the existing text lines
           const currentText = editorRef.current.innerText || "";
@@ -909,7 +909,7 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
               }
             }}
             data-placeholder={activeTool === 'type' ? 'Start typing directly on notebook lines...' : activeTool === 'highlight' ? 'Drag cursor over text to highlight it...' : ''}
-            className={`outline-none font-sans font-bold text-[14px] leading-[24px] select-text min-h-[1200px] w-full break-words notebook-editor ${isDarkTheme ? 'notebook-editor-dark' : ''} relative z-10`}
+            className={`outline-none font-sans font-bold text-[14px] leading-[28px] select-text min-h-[1200px] w-full break-words notebook-editor ${isDarkTheme ? 'notebook-editor-dark' : ''} relative z-10`}
             style={{
               color: pageTextColor,
               caretColor: activeTool === 'type' ? (activeColor || pageTextColor) : pageTextColor,

@@ -167,8 +167,10 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
   const [isLoading, setIsLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
   
-  // Custom Sidebar Resizing State
-  const [sidebarWidth, setSidebarWidth] = useState<number>(440);
+  // Custom Sidebar Resizing State - defaults to approx 1/3 viewport width on desktop
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => 
+    typeof window !== 'undefined' ? Math.max(340, Math.min(540, Math.round(window.innerWidth * 0.32))) : 420
+  );
   const [isResizing, setIsResizing] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
   
@@ -579,8 +581,10 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
   const handleResizeMove = useCallback((e: MouseEvent) => {
     if (!isResizing) return;
     const newWidth = window.innerWidth - e.clientX;
-    // Keep width constraints between 320px and 85% of screen width
-    if (newWidth > 320 && newWidth < window.innerWidth * 0.85) {
+    // Keep width constraints between 300px and 60% of screen width on desktop
+    const minW = 300;
+    const maxW = Math.round(window.innerWidth * 0.60);
+    if (newWidth >= minW && newWidth <= maxW) {
       setSidebarWidth(newWidth);
     }
   }, [isResizing]);
@@ -1087,10 +1091,10 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
     <AnimatePresence>
       {isOpen && (
         <motion.div 
-          initial={isMobile ? { y: '100%', x: 0 } : { x: '100%', y: 0 }}
-          animate={isMobile ? { y: 0, x: 0 } : { x: 0, y: 0 }}
-          exit={isMobile ? { y: '100%', x: 0 } : { x: '100%', y: 0 }}
-          transition={{ type: 'spring', damping: 28, stiffness: 220 }}
+          initial={isMobile ? { y: '100%', opacity: 0 } : { width: 0, opacity: 0 }}
+          animate={isMobile ? { y: 0, opacity: 1 } : { width: sidebarWidth, opacity: 1 }}
+          exit={isMobile ? { y: '100%', opacity: 0 } : { width: 0, opacity: 0 }}
+          transition={isResizing ? { duration: 0 } : { duration: 0.2, ease: 'easeOut' }}
           drag={isMobile ? "y" : false}
           dragConstraints={{ top: 0, bottom: 0 }}
           dragElastic={{ top: 0, bottom: 0.6 }}
@@ -1101,19 +1105,22 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
             }
           }}
           className={isMobile 
-            ? "fixed inset-0 h-[100dvh] w-full flex flex-col z-[1500] shadow-2xl select-none transition-colors"
-            : "fixed top-0 right-0 bottom-0 h-full border-l-2 flex flex-col z-[1500] shadow-[-8px_0_24px_rgba(0,0,0,0.25)] select-none transition-colors"
+            ? "fixed inset-0 h-[100dvh] w-full flex flex-col z-[1500] shadow-2xl select-none transition-colors overflow-hidden"
+            : "relative h-full border-l-4 border-black flex flex-col z-[1100] shrink-0 select-none transition-colors overflow-hidden shadow-[-4px_0_16px_rgba(0,0,0,0.12)]"
           }
-          style={isMobile ? { width: '100%', height: '100dvh', backgroundColor: pageBgColor } : { width: `${Math.min(sidebarWidth, typeof window !== 'undefined' ? window.innerWidth - 40 : 440)}px`, height: '100%', backgroundColor: pageBgColor, borderColor: pageBorderColor }}
+          style={isMobile 
+            ? { width: '100%', height: '100dvh', backgroundColor: pageBgColor } 
+            : { width: `${sidebarWidth}px`, height: '100%', backgroundColor: pageBgColor, borderColor: pageBorderColor }
+          }
         >
           {/* Draggable resize handle border on the left edge - ONLY on desktop */}
           {!isMobile && (
             <div 
               onMouseDown={handleResizeStart}
-              className={`absolute left-[-5px] top-0 bottom-0 w-2 cursor-col-resize z-[1310] transition-colors ${
-                isResizing ? 'bg-orange-500 w-1.5' : 'bg-transparent hover:bg-orange-400/50'
+              className={`absolute left-[-5px] top-0 bottom-0 w-2.5 cursor-col-resize z-[1310] transition-colors ${
+                isResizing ? 'bg-orange-500 w-2' : 'bg-transparent hover:bg-orange-400/60'
               }`}
-              title="Drag to resize notebook drawer"
+              title="Drag left/right to resize notebook side-by-side"
             />
           )}
 
