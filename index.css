@@ -140,3 +140,48 @@
 .notebook-editor-dark span[style*="color: black"] {
   color: #f8fafc !important;
 }
+
+/* Notebook Paper Ruled Lines and Baseline Alignment */
+.notebook-lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-size: 100% 28px;
+  background-position: 0 28px;
+  pointer-events: none;
+}
+
+.notebook-lines::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 42px;
+  width: 2px;
+  background-color: var(--margin-line-color, #ffb3b3);
+}
+
+.notebook-editor {
+  line-height: 28px !important;
+  font-size: 14px;
+}
+
+.notebook-editor p,
+.notebook-editor div,
+.notebook-editor span,
+.notebook-editor font {
+  line-height: 28px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.notebook-editor:empty::before,
+.notebook-editor[data-placeholder]:empty::before {
+  content: attr(data-placeholder);
+  opacity: 0.45;
+  pointer-events: none;
+  display: block;
+}
+
