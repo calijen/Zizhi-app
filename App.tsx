@@ -338,9 +338,22 @@ const App: FC = () => {
       handleFirestoreError(err, OperationType.LIST, 'notes');
     });
 
+    const notebooksRef = collection(firestore, 'users', user.uid, 'notebooks');
+    const unsubscribeNotebooks = onSnapshot(notebooksRef, (snapshot) => {
+      snapshot.docs.forEach(docSnap => {
+        const cloudNb = docSnap.data() as NotebookData;
+        if (cloudNb) {
+          db.saveNotebook(cloudNb).catch(() => {});
+        }
+      });
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, 'notebooks');
+    });
+
     return () => {
       unsubscribeQuotes();
       unsubscribeNotes();
+      unsubscribeNotebooks();
     };
   }, [user, quotaExceeded]);
 
@@ -365,6 +378,45 @@ const App: FC = () => {
     } 
   }, [setColorScheme, colorScheme]); // Added colorScheme check to avoid unnecessary updates
   
+  const handleCloseBook = async (bookToClose: BookMetadata | null) => {
+    if (bookToClose && user && !isQuotaExceeded()) {
+      try {
+        const bookKey = getBookUniqueKey(bookToClose.title, bookToClose.author);
+        
+        // Sync notes for this book to Firestore on close
+        const allLocalNotes = await db.getNotes();
+        const matchingNotes = allLocalNotes.filter(
+          n => n.bookId === bookToClose.id || (n.bookTitle && getBookUniqueKey(n.bookTitle, n.author) === bookKey)
+        );
+
+        for (const note of matchingNotes) {
+          const noteRef = doc(firestore, 'users', user.uid, 'notes', note.id);
+          await setDoc(noteRef, { ...note, userId: user.uid }, { merge: true }).catch(e => handleFirestoreError(e, OperationType.CREATE, 'notes'));
+        }
+
+        // Sync notebook for this book to Firestore on close
+        const localNb = await db.getNotebook(bookToClose.id);
+        if (localNb && localNb.pages) {
+          const nbDocId = bookKey || bookToClose.id;
+          const nbRef = doc(firestore, 'users', user.uid, 'notebooks', nbDocId);
+          await setDoc(nbRef, {
+            bookId: bookToClose.id,
+            userId: user.uid,
+            pages: localNb.pages,
+            updatedAt: Date.now(),
+            bookTitle: bookToClose.title,
+            author: bookToClose.author,
+            bookKey
+          }, { merge: true }).catch(e => handleFirestoreError(e, OperationType.CREATE, 'notebooks'));
+        }
+      } catch (err) {
+        console.error('Error syncing book notes to cloud on close:', err);
+      }
+    }
+    setSelectedBook(null);
+    setInitialReaderNav(null);
+  };
+
   const sortedLibrary = useMemo(() => [...library].sort((a, b) => (b.lastOpened || 0) - (a.lastOpened || 0)), [library]);
 
   const handleEnterApp = () => {
@@ -414,9 +466,13 @@ const App: FC = () => {
         setIsUploading(false);
         setToast({ message: `${file.name.toLowerCase().endsWith('.pdf') ? 'PDF' : 'EPUB'} added to library.` });
 
-        // Re-associate existing quotes and notes for this book if re-uploaded
+        // Re-associate existing quotes, notes, and notebooks for this book if re-uploaded
+        const cleanTitle = newBook.title.trim().toLowerCase();
+
         setQuotes(prev => prev.map(q => {
-            if (q.bookTitle && getBookUniqueKey(q.bookTitle, q.author) === newBookKey && q.bookId !== newBook.id) {
+            const qKey = q.bookTitle ? getBookUniqueKey(q.bookTitle, q.author) : '';
+            const isMatch = (qKey && qKey === newBookKey) || (q.bookTitle && q.bookTitle.trim().toLowerCase() === cleanTitle);
+            if (isMatch && q.bookId !== newBook.id) {
                 const updated = { ...q, bookId: newBook.id };
                 db.saveQuote(updated);
                 if (user && !isQuotaExceeded()) {
@@ -427,7 +483,9 @@ const App: FC = () => {
             return q;
         }));
         setNotes(prev => prev.map(n => {
-            if (n.bookTitle && getBookUniqueKey(n.bookTitle, n.author) === newBookKey && n.bookId !== newBook.id) {
+            const nKey = n.bookTitle ? getBookUniqueKey(n.bookTitle, n.author) : '';
+            const isMatch = (nKey && nKey === newBookKey) || (n.bookTitle && n.bookTitle.trim().toLowerCase() === cleanTitle);
+            if (isMatch && n.bookId !== newBook.id) {
                 const updated = { ...n, bookId: newBook.id };
                 db.saveNote(updated);
                 if (user && !isQuotaExceeded()) {
@@ -439,7 +497,9 @@ const App: FC = () => {
         }));
         db.getAllNotebooks().then(allNotebooks => {
             allNotebooks.forEach(async (nb) => {
-                if (nb.bookTitle && getBookUniqueKey(nb.bookTitle, nb.author) === newBookKey && nb.bookId !== newBook.id) {
+                const nbKey = nb.bookKey || (nb.bookTitle ? getBookUniqueKey(nb.bookTitle, nb.author) : '');
+                const isMatch = (nbKey && nbKey === newBookKey) || (nb.bookTitle && nb.bookTitle.trim().toLowerCase() === cleanTitle);
+                if (isMatch && nb.bookId !== newBook.id) {
                     const updatedNb = { ...nb, bookId: newBook.id };
                     await db.saveNotebook(updatedNb);
                     if (user && !isQuotaExceeded()) {
@@ -751,10 +811,10 @@ const App: FC = () => {
             book={selectedBook} 
             theme={theme} 
             quotes={quotes}
-            notes={notes.filter(n => n.bookId === selectedBook.id || (n.bookTitle && getBookUniqueKey(n.bookTitle, n.author) === getBookUniqueKey(selectedBook.title, selectedBook.author)))}
+            notes={notes.filter(n => n.bookId === selectedBook.id || (n.bookTitle && getBookUniqueKey(n.bookTitle, n.author) === getBookUniqueKey(selectedBook.title, selectedBook.author)) || (n.bookTitle && n.bookTitle.trim().toLowerCase() === selectedBook.title.trim().toLowerCase()))}
             initialChapterId={initialReaderNav?.chapterId}
             initialSearchText={initialReaderNav?.searchText}
-            onClose={() => { setSelectedBook(null); setInitialReaderNav(null); }} 
+            onClose={() => handleCloseBook(selectedBook)} 
             onUpdateProgress={async (bid, ci, st, ts, gp) => { 
               const bidx = library.findIndex(b => b.id === bid); 
               if (bidx === -1) return; 
@@ -782,12 +842,8 @@ const App: FC = () => {
           }} onSaveNote={async (t, n, c) => { 
               const nn: Note = { id: crypto.randomUUID(), text: t, note: n, bookTitle: selectedBook.title, author: selectedBook.author, bookId: selectedBook.id, location: c, createdAt: Date.now() }; 
               await db.saveNote(nn); 
-              if (user && !isQuotaExceeded()) {
-                  const noteRef = doc(firestore, 'users', user.uid, 'notes', nn.id);
-                  await setDoc(noteRef, { ...nn, userId: user.uid }).catch(e => handleFirestoreError(e, OperationType.CREATE, 'notes'));
-              }
               setNotes(prev => [nn, ...prev]); 
-              setToast({ message: "Note saved." }); 
+              setToast({ message: "Note saved locally." }); 
           }} onSearch={(queryText) => setSearchQuery(queryText)} onFontSizeChange={(newSize) => setTheme(prev => {
               const next = { ...prev, fontSize: newSize };
               localStorage.setItem('zizhi-theme', JSON.stringify(next));
