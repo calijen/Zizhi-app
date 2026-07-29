@@ -103,9 +103,27 @@ const App: FC = () => {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [user, setUser] = useState<User | null>(null);
-  const [hasEntered, setHasEntered] = useState<boolean | null>(null);
+  const [hasEntered, setHasEntered] = useState<boolean | null>(() => {
+    if (typeof window !== 'undefined' && localStorage.getItem('zizhi-entered') === 'true') {
+      return true;
+    }
+    return null;
+  });
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'library' | 'quotes' | 'profile' | 'settings'>('library');
+  const [activeTab, setActiveTab] = useState<'library' | 'quotes' | 'profile' | 'settings'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('zizhi-active-tab');
+      if (saved === 'library' || saved === 'quotes' || saved === 'profile' || saved === 'settings') {
+        return saved;
+      }
+    }
+    return 'library';
+  });
+
+  const handleSelectTab = useCallback((tab: 'library' | 'quotes' | 'profile' | 'settings') => {
+    setActiveTab(tab);
+    localStorage.setItem('zizhi-active-tab', tab);
+  }, []);
   const [streak, setStreak] = useState(1);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -274,13 +292,30 @@ const App: FC = () => {
           setNotes(mergedNotes);
 
           const storedEntered = localStorage.getItem('zizhi-entered') === 'true';
-          setHasEntered(storedEntered || deduplicatedLocalBooks.length > 0 || mergedQuotes.length > 0 || true);
+          const shouldBeEntered = storedEntered || deduplicatedLocalBooks.length > 0 || mergedQuotes.length > 0 || true;
+          setHasEntered(shouldBeEntered);
+          if (shouldBeEntered) localStorage.setItem('zizhi-entered', 'true');
       } else {
           setLibrary(deduplicatedLocalBooks);
           setQuotes(localQuotes);
           setNotes(localNotes);
           const storedEntered = localStorage.getItem('zizhi-entered') === 'true';
-          setHasEntered(storedEntered || deduplicatedLocalBooks.length > 0);
+          const shouldBeEntered = storedEntered || deduplicatedLocalBooks.length > 0 || localQuotes.length > 0;
+          setHasEntered(shouldBeEntered);
+          if (shouldBeEntered) localStorage.setItem('zizhi-entered', 'true');
+      }
+
+      // Restore last opened book if user was reading before refresh
+      const lastOpenedBookId = localStorage.getItem('zizhi-last-opened-book-id');
+      if (lastOpenedBookId && deduplicatedLocalBooks.length > 0) {
+        const meta = deduplicatedLocalBooks.find(b => b.id === lastOpenedBookId);
+        if (meta) {
+          db.getBookContent(lastOpenedBookId).then(content => {
+            if (content && content.chapters && content.chapters.length > 0) {
+              setSelectedBook({ ...meta, ...content });
+            }
+          }).catch(() => {});
+        }
       }
     } catch (e) { 
         console.error("Load failed", e); 
@@ -293,10 +328,6 @@ const App: FC = () => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
       loadData(u);
-      if (!u) {
-          setHasEntered(false);
-          localStorage.removeItem('zizhi-entered');
-      }
     });
     return () => unsubscribe();
   }, [loadData]);
@@ -415,6 +446,7 @@ const App: FC = () => {
     }
     setSelectedBook(null);
     setInitialReaderNav(null);
+    localStorage.removeItem('zizhi-last-opened-book-id');
   };
 
   const sortedLibrary = useMemo(() => [...library].sort((a, b) => (b.lastOpened || 0) - (a.lastOpened || 0)), [library]);
@@ -527,6 +559,7 @@ const App: FC = () => {
         if (content && content.chapters && content.chapters.length > 0) {
             const latestMeta = library.find(b => b.id === bookId) || meta;
             setSelectedBook({ ...latestMeta, ...content });
+            localStorage.setItem('zizhi-last-opened-book-id', bookId);
         } else {
             console.error(`Book content missing for ID: ${bookId}`);
             setToast({ message: "Book content missing locally. Please re-upload this book." });
@@ -668,10 +701,10 @@ const App: FC = () => {
                 )}
               </div>
               <nav className={`flex-1 ${isSidebarCollapsed ? 'p-2' : 'p-6'} space-y-4`}>
-                  <NavItem tab="library" activeTab={activeTab} onSelect={setActiveTab} icon={IconLibrary} label="Library" collapsed={isSidebarCollapsed} />
-                  <NavItem tab="quotes" activeTab={activeTab} onSelect={setActiveTab} icon={IconQuote} label="Quotes" collapsed={isSidebarCollapsed} />
-                  <NavItem tab="profile" activeTab={activeTab} onSelect={setActiveTab} icon={IconUser} label="Profile" collapsed={isSidebarCollapsed} />
-                  <NavItem tab="settings" activeTab={activeTab} onSelect={setActiveTab} icon={IconSettings} label="Settings" collapsed={isSidebarCollapsed} />
+                  <NavItem tab="library" activeTab={activeTab} onSelect={handleSelectTab} icon={IconLibrary} label="Library" collapsed={isSidebarCollapsed} />
+                  <NavItem tab="quotes" activeTab={activeTab} onSelect={handleSelectTab} icon={IconQuote} label="Quotes" collapsed={isSidebarCollapsed} />
+                  <NavItem tab="profile" activeTab={activeTab} onSelect={handleSelectTab} icon={IconUser} label="Profile" collapsed={isSidebarCollapsed} />
+                  <NavItem tab="settings" activeTab={activeTab} onSelect={handleSelectTab} icon={IconSettings} label="Settings" collapsed={isSidebarCollapsed} />
               </nav>
 
           </aside>
@@ -793,8 +826,8 @@ const App: FC = () => {
           </Box>
           {!isChatOpen && (
             <nav className="fixed bottom-0 left-0 right-0 bg-[var(--color-surface)] h-20 flex items-center justify-around z-[200] border-t-4 border-black md:hidden">
-                <NavItem tab="library" activeTab={activeTab} onSelect={setActiveTab} icon={IconLibrary} label="Library" />
-                <NavItem tab="quotes" activeTab={activeTab} onSelect={setActiveTab} icon={IconQuote} label="Quotes" />
+                <NavItem tab="library" activeTab={activeTab} onSelect={handleSelectTab} icon={IconLibrary} label="Library" />
+                <NavItem tab="quotes" activeTab={activeTab} onSelect={handleSelectTab} icon={IconQuote} label="Quotes" />
                     <Box className="relative -top-6">
                         <>
                           <input type="file" ref={fileInputRef} onChange={handleUpload} accept=".epub,.pdf" className="hidden" />
@@ -803,8 +836,8 @@ const App: FC = () => {
                           </ActionIcon>
                         </>
                     </Box>
-                <NavItem tab="profile" activeTab={activeTab} onSelect={setActiveTab} icon={IconUser} label="Profile" />
-                <NavItem tab="settings" activeTab={activeTab} onSelect={setActiveTab} icon={IconSettings} label="Settings" />
+                <NavItem tab="profile" activeTab={activeTab} onSelect={handleSelectTab} icon={IconUser} label="Profile" />
+                <NavItem tab="settings" activeTab={activeTab} onSelect={handleSelectTab} icon={IconSettings} label="Settings" />
             </nav>
           )}
           {selectedBook && <ReaderView 
