@@ -7,7 +7,7 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38bdf8.svg)](https://tailwindcss.com/)
 [![Firebase](https://img.shields.io/badge/Firebase-Firestore-ffca28.svg)](https://firebase.google.com/)
 
-**Zizhi (資治)** is an elegant, distraction-free online reader and interactive digital notebook designed for book lovers, researchers, and students. Inspired by classic print craftsmanship and modern digital note-taking, Zizhi combines immersive EPUB and PDF reading with freehand sketchpads, AI summaries, quotes management, and cross-device cloud sync.
+**Zizhi (資治)** is an elegant, distraction-free online reader and interactive digital notebook designed for book lovers, researchers, and students. Inspired by classic print craftsmanship and modern digital note-taking, Zizhi combines immersive EPUB and PDF reading with freehand sketchpads, AI summaries, quotes management, and privacy-first cloud sync for user notes and annotations.
 
 ---
 
@@ -26,6 +26,11 @@
 - **Sticky Notes & Photo Stickers**: Add repositionable sticky notes and drag-and-drop image stickers onto notebook pages.
 - **Dark Mode Visibility**: Color swatches and text automatically adjust in dark mode so hand-written and typed notes remain crisp and visible.
 
+### 🔒 **Privacy-First Cloud Sync**
+- **Local Book Storage**: EPUB and PDF book contents are stored strictly locally in your browser (IndexedDB) for privacy and zero cloud bandwidth bloat.
+- **Synced Notes & Quotes**: Your digital notebook pages, annotations, quotes, and reading progress are backed up to Firebase Firestore.
+- **Seamless Cross-Device Re-Upload**: When logging in on a new device, your library begins clean. Simply re-upload your book file, and all previously saved notes, drawings, and highlights automatically restore and attach to the book.
+
 ### 🤖 **AI Reading Assistant (Powered by Gemini)**
 - **Book Summaries**: Generate intelligent executive summaries for any uploaded book or chapter.
 - **Context-Aware Q&A**: Ask Gemini AI questions about what you're reading without leaving the app.
@@ -34,10 +39,6 @@
 ### 🎨 **Paper Aesthetic Themes**
 - **Vintage & Modern Presets**: Sepia, Cream, Slate Dark, Pearl Light, and high-contrast night modes.
 - **Adaptive UI**: High-contrast contrast guarantees comfortable reading day or night.
-
-### ☁️ **Cloud Storage & Sync**
-- **Firebase Firestore Integration**: Sync your library, bookmarks, digital notebooks, quotes, and reading activity across devices.
-- **Offline First**: Works locally in your browser with automatic cloud sync whenever online.
 
 ### 📊 **Reading Analytics & Quotes**
 - **Reading Statistics**: Track daily reading time and build reading streaks.

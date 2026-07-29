@@ -1247,6 +1247,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
             <NotebookSidebar 
                 bookId={book.id} 
                 bookTitle={book.title}
+                author={book.author}
                 isOpen={isNotebookOpen} 
                 onClose={() => setIsNotebookOpen(false)} 
                 theme={theme}

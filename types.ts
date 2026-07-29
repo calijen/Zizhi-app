@@ -164,4 +164,7 @@ export interface NotebookData {
   imageStickers?: string;
   pages?: string; // stringified NotebookPageData[]
   updatedAt: number;
+  bookTitle?: string;
+  author?: string;
+  bookKey?: string;
 }
