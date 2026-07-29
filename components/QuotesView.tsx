@@ -425,7 +425,7 @@ Return a valid JSON object ONLY containing a key "matchedIds" which is a list of
               <button 
                 type="button"
                 onClick={() => handleStartReview(reviewQuery)}
-                className="w-full py-4.5 bg-yellow-400 text-black border-4 border-black font-black uppercase shadow-[6px_6px_0_black] hover:translate-y-[-2px] hover:shadow-[8px_8px_0_black] transition-all active:translate-y-0 active:shadow-[4px_4px_0_black] text-xs"
+                className="w-full h-[60px] bg-yellow-400 text-black border-4 border-black font-black uppercase shadow-[6px_6px_0_black] hover:translate-y-[-2px] hover:shadow-[8px_8px_0_black] transition-all active:translate-y-0 active:shadow-[4px_4px_0_black] text-xs flex items-center justify-center"
               >
                 Begin Review Deck
               </button>
@@ -495,89 +495,67 @@ Return a valid JSON object ONLY containing a key "matchedIds" which is a list of
                       transition={{ duration: 0.5, ease: "easeInOut" }}
                       className="w-full h-full relative [transform-style:preserve-3d]"
                     >
-                      {/* CARD FRONT: The Quote Text centered with beautiful notebook paper styles */}
+                      {/* CARD FRONT: Clean card using the active user theme */}
                       <div 
-                        className="absolute inset-0 w-full h-full p-6 sm:p-10 flex flex-col justify-between border-4 border-black shadow-[8px_8px_0_black] transition-all bg-[#FCFBF4] overflow-hidden"
+                        className="absolute inset-0 w-full h-full p-6 sm:p-8 flex flex-col justify-between border-4 border-black shadow-[8px_8px_0_black] transition-all bg-[var(--color-surface)] overflow-hidden"
                         style={{ 
                           backfaceVisibility: 'hidden',
                           WebkitBackfaceVisibility: 'hidden',
                         }}
                       >
-                        {/* Custom notebook margins and horizontal ruling blue/pink lines */}
-                        <div className="absolute top-0 bottom-0 left-[35px] sm:left-[50px] w-[2px] bg-red-200 pointer-events-none" />
-                        <div 
-                          className="absolute inset-0 pointer-events-none opacity-15" 
-                          style={{
-                            backgroundImage: 'repeating-linear-gradient(transparent, transparent 39px, #60A5FA 39px, #60A5FA 40px)',
-                            backgroundSize: '100% 40px',
-                            top: '44px'
-                          }}
-                        />
-
                         {/* Top index header */}
-                        <div className="relative pl-3 sm:pl-6 flex justify-between items-center">
-                          <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-cyan-600">SCHOLASTIC INDEX CARD</span>
+                        <div className="flex justify-between items-center border-b border-black/10 pb-3">
+                          <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-cyan-500">FLASHCARD INDEX</span>
                           <span className="text-[8px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-pink-500 hover:underline">Flip Card ↻</span>
                         </div>
 
-                        {/* Center Quote body - completely scroll-safe, touch friendly, and dynamically sized font */}
-                        <div className="relative flex-1 flex items-center pl-4 sm:pl-8 pr-1 overflow-y-auto mt-4 sm:mt-6 mb-3 sm:mb-4 max-h-[290px] sm:max-h-[190px] scrollbar-thin scrollbar-thumb-pink-200 scrollbar-track-transparent">
-                          <p className={`w-full text-left font-serif leading-relaxed text-slate-800 tracking-wide ${quoteFontSizeClass}`}>
+                        {/* Center Quote body */}
+                        <div className="flex-1 flex items-center overflow-y-auto my-4 scrollbar-thin scrollbar-thumb-pink-200 scrollbar-track-transparent">
+                          <p className={`w-full text-left font-serif leading-relaxed text-[var(--color-primary-text)] tracking-wide ${quoteFontSizeClass}`}>
                             “{reviewQuotes[activeCardIndex].text}”
                           </p>
                         </div>
 
-                        {/* Bottom note header */}
-                        <div className="relative pl-4 sm:pl-8 flex justify-between items-end border-t border-dashed border-gray-300 pt-2 sm:pt-3">
-                          <span className="text-[8px] sm:text-[9px] font-black uppercase text-gray-400">ZIZHI CADET INSIGHT</span>
-                          <span className="text-[7px] sm:text-[8px] font-mono tracking-widest text-slate-400">KNOWLEDGE ENQUIRY</span>
+                        {/* Bottom note footer */}
+                        <div className="flex justify-between items-end border-t border-black/10 pt-3">
+                          <span className="text-[8px] sm:text-[9px] font-black uppercase text-[var(--color-muted-text)]">ZIZHI INSIGHT CARD</span>
+                          <span className="text-[7px] sm:text-[8px] font-mono tracking-widest text-[var(--color-muted-text)]">KNOWLEDGE REVIEW</span>
                         </div>
                       </div>
 
-                      {/* CARD BACK: Reveal Books and Author Details of the Quote */}
+                      {/* CARD BACK: Reveal Books and Author Details using active user theme */}
                       <div 
-                        className="absolute inset-0 w-full h-full p-6 sm:p-10 flex flex-col justify-between border-4 border-black shadow-[8px_8px_0_black] bg-[#FAF8EF] overflow-hidden"
+                        className="absolute inset-0 w-full h-full p-6 sm:p-8 flex flex-col justify-between border-4 border-black shadow-[8px_8px_0_black] bg-[var(--color-surface)] overflow-hidden"
                         style={{ 
                           backfaceVisibility: 'hidden',
                           WebkitBackfaceVisibility: 'hidden',
                           transform: 'rotateY(180deg)'
                         }}
                       >
-                        {/* Margins layer */}
-                        <div className="absolute top-0 bottom-0 left-[35px] sm:left-[50px] w-[2px] bg-red-200 pointer-events-none" />
-                        <div 
-                          className="absolute inset-0 pointer-events-none opacity-10" 
-                          style={{
-                            backgroundImage: 'repeating-linear-gradient(transparent, transparent 39px, #60A5FA 39px, #60A5FA 40px)',
-                            backgroundSize: '100% 40px',
-                            top: '44px'
-                          }}
-                        />
-
                         {/* Top review header */}
-                        <div className="relative pl-3 sm:pl-6 flex justify-between items-center border-b border-black/10 pb-2">
+                        <div className="flex justify-between items-center border-b border-black/10 pb-3">
                           <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] text-pink-500">SOURCE VERIFICATION</span>
-                          <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.1em] text-slate-500">CARD REVERSED</span>
+                          <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-[0.1em] text-[var(--color-muted-text)]">REVERSED</span>
                         </div>
 
-                        <div className="relative flex-1 pl-4 sm:pl-8 flex flex-col justify-center space-y-4 sm:space-y-6 overflow-y-auto max-h-[290px] sm:max-h-[190px] py-2">
+                        <div className="flex-1 flex flex-col justify-center space-y-4 sm:space-y-6 overflow-y-auto py-2">
                           <div className="space-y-1">
-                            <span className="text-[8px] sm:text-[9px] font-black uppercase text-pink-600 block tracking-widest">AUTHOR / SOURCE</span>
-                            <h4 className="text-lg sm:text-2xl font-black uppercase tracking-tight text-slate-900 leading-tight">
+                            <span className="text-[8px] sm:text-[9px] font-black uppercase text-pink-500 block tracking-widest">AUTHOR / SOURCE</span>
+                            <h4 className="text-lg sm:text-2xl font-black uppercase tracking-tight text-[var(--color-primary-text)] leading-tight">
                               {reviewQuotes[activeCardIndex].author || "Unknown Scholar"}
                             </h4>
                           </div>
 
                           <div className="space-y-1">
-                            <span className="text-[8px] sm:text-[9px] font-black uppercase text-cyan-600 block tracking-widest">VOLUME TITLE</span>
-                            <p className="text-xs sm:text-base font-serif italic text-slate-700 leading-snug">
+                            <span className="text-[8px] sm:text-[9px] font-black uppercase text-cyan-500 block tracking-widest">BOOK TITLE</span>
+                            <p className="text-xs sm:text-base font-serif italic text-[var(--color-secondary-text)] leading-snug">
                               {reviewQuotes[activeCardIndex].bookTitle}
                             </p>
                           </div>
                         </div>
 
                         {/* Bottom action controls */}
-                        <div className="relative pl-4 sm:pl-8 flex justify-between items-center pt-3 sm:pt-4 border-t border-black/10">
+                        <div className="flex justify-between items-center pt-3 border-t border-black/10">
                           <button 
                             type="button"
                             onClick={(e) => {
@@ -589,7 +567,7 @@ Return a valid JSON object ONLY containing a key "matchedIds" which is a list of
                           >
                             📖 Go to source
                           </button>
-                          <span className="text-[8px] font-mono tracking-widest text-slate-400">ARCHIVE REFERENCE</span>
+                          <span className="text-[8px] font-mono tracking-widest text-[var(--color-muted-text)]">ARCHIVE REFERENCE</span>
                         </div>
                       </div>
                     </motion.div>
