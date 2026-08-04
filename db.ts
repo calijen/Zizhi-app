@@ -63,14 +63,26 @@ export const initDB = (): Promise<IDBDatabase> => {
 };
 
 export const saveBook = async (book: Book): Promise<void> => {
-  const db = await initDB();
+  let db: IDBDatabase;
+  try {
+    db = await initDB();
+  } catch (err) {
+    console.error('Error initDB in saveBook:', err);
+    throw err;
+  }
   return new Promise((resolve, reject) => {
     try {
         const transaction = db.transaction([BOOK_STORE, CONTENT_STORE], 'readwrite');
         
         // Extract metadata
         const { chapters, toc, summaryScript, audioSummaryUrl, audioDuration, pdfData, ...metadata } = book;
-        const content = { id: book.id, chapters, toc, summaryScript, audioSummaryUrl, audioDuration, pdfData };
+
+        let safePdfData = pdfData;
+        if (pdfData instanceof Uint8Array) {
+            safePdfData = new Uint8Array(pdfData);
+        }
+
+        const content = { id: book.id, chapters, toc, summaryScript, audioSummaryUrl, audioDuration, pdfData: safePdfData };
         
         // Add flags to metadata
         const metadataWithFlags = {
@@ -90,65 +102,121 @@ export const saveBook = async (book: Book): Promise<void> => {
             resolve();
         };
         transaction.onerror = (event) => {
-            console.error(`Transaction error saving book ${book.id}:`, (event.target as any).error);
-            reject((event.target as any).error);
+            console.error(`Transaction error saving book ${book.id}:`, (event.target as any)?.error);
+            reject((event.target as any)?.error);
         };
         transaction.onabort = (event) => {
-            console.error(`Transaction aborted saving book ${book.id}:`, (event.target as any).error);
-            reject((event.target as any).error);
+            console.error(`Transaction aborted saving book ${book.id}:`, (event.target as any)?.error);
+            reject((event.target as any)?.error);
         };
     } catch (err) {
         console.error(`Error in saveBook for ${book.id}:`, err);
+        dbInstance = null;
+        dbPromise = null;
         reject(err);
     }
   });
 };
 
 export const getBooks = async (): Promise<BookMetadata[]> => {
-    const db = await initDB();
-    return new Promise((resolve) => {
-        const transaction = db.transaction(BOOK_STORE, 'readonly');
-        transaction.objectStore(BOOK_STORE).getAll().onsuccess = (e) => resolve((e.target as any).result);
-    });
+    try {
+        const db = await initDB();
+        return new Promise((resolve) => {
+            try {
+                const transaction = db.transaction(BOOK_STORE, 'readonly');
+                const req = transaction.objectStore(BOOK_STORE).getAll();
+                req.onsuccess = (e) => resolve((e.target as any).result || []);
+                req.onerror = (e) => {
+                    console.error("getBooks req error", e);
+                    resolve([]);
+                };
+                transaction.onerror = (e) => {
+                    console.error("getBooks tx error", e);
+                    resolve([]);
+                };
+            } catch (err) {
+                console.error("getBooks transaction creation error:", err);
+                dbInstance = null;
+                dbPromise = null;
+                resolve([]);
+            }
+        });
+    } catch (e) {
+        console.error("getBooks initDB error:", e);
+        return [];
+    }
 };
 
 export const getBookContent = async (id: string): Promise<BookContent | null> => {
-    const db = await initDB();
-    return new Promise((resolve) => {
-        const transaction = db.transaction(CONTENT_STORE, 'readonly');
-        const request = transaction.objectStore(CONTENT_STORE).get(id);
-        request.onsuccess = () => resolve(request.result || null);
-        request.onerror = () => resolve(null);
-    });
+    try {
+        const db = await initDB();
+        return new Promise((resolve) => {
+            try {
+                const transaction = db.transaction(CONTENT_STORE, 'readonly');
+                const request = transaction.objectStore(CONTENT_STORE).get(id);
+                request.onsuccess = () => resolve(request.result || null);
+                request.onerror = () => resolve(null);
+                transaction.onerror = () => resolve(null);
+            } catch (err) {
+                console.error("getBookContent transaction creation error:", err);
+                dbInstance = null;
+                dbPromise = null;
+                resolve(null);
+            }
+        });
+    } catch (e) {
+        return null;
+    }
 };
 
 export const updateBookMetadata = async (id: string, updates: Partial<BookMetadata>): Promise<void> => {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(BOOK_STORE, 'readwrite');
-        const store = transaction.objectStore(BOOK_STORE);
-        const request = store.get(id);
-        request.onsuccess = () => {
-            const existing = request.result;
-            if (existing) {
-                store.put({ ...existing, ...updates });
+    try {
+        const db = await initDB();
+        return new Promise((resolve, reject) => {
+            try {
+                const transaction = db.transaction(BOOK_STORE, 'readwrite');
+                const store = transaction.objectStore(BOOK_STORE);
+                const request = store.get(id);
+                request.onsuccess = () => {
+                    const existing = request.result;
+                    if (existing) {
+                        store.put({ ...existing, ...updates });
+                    }
+                };
+                request.onerror = () => reject(request.error);
+                transaction.oncomplete = () => resolve();
+                transaction.onerror = (e) => reject(transaction.error || e);
+            } catch (err) {
+                console.error("updateBookMetadata transaction error:", err);
+                dbInstance = null;
+                dbPromise = null;
+                resolve();
             }
-        };
-        request.onerror = () => reject(request.error);
-        transaction.oncomplete = () => resolve();
-        transaction.onerror = () => reject(transaction.error);
-    });
+        });
+    } catch (e) {
+        console.error("updateBookMetadata initDB error:", e);
+    }
 };
 
 export const deleteBook = async (id: string): Promise<void> => {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction([BOOK_STORE, CONTENT_STORE], 'readwrite');
-        transaction.objectStore(BOOK_STORE).delete(id);
-        transaction.objectStore(CONTENT_STORE).delete(id);
-        transaction.oncomplete = () => resolve();
-        transaction.onerror = () => reject();
-    });
+    try {
+        const db = await initDB();
+        return new Promise((resolve, reject) => {
+            try {
+                const transaction = db.transaction([BOOK_STORE, CONTENT_STORE], 'readwrite');
+                transaction.objectStore(BOOK_STORE).delete(id);
+                transaction.objectStore(CONTENT_STORE).delete(id);
+                transaction.oncomplete = () => resolve();
+                transaction.onerror = () => reject();
+            } catch (err) {
+                dbInstance = null;
+                dbPromise = null;
+                resolve();
+            }
+        });
+    } catch (e) {
+        console.error("deleteBook error:", e);
+    }
 };
 
 export const saveQuote = async (quote: Quote): Promise<void> => {

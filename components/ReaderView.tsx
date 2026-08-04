@@ -567,9 +567,11 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
 
             const savedIndex = typeof book.lastChapterIndex === 'number' && book.lastChapterIndex >= 0
                 ? book.lastChapterIndex
-                : (book.progress && book.progress > 0 ? Math.min(book.chapters.length - 1, Math.floor(book.progress * book.chapters.length)) : 0);
+                : (typeof book.progress === 'number' && book.progress > 0 && book.progress <= 1 ? Math.min(book.chapters.length - 1, Math.floor(book.progress * book.chapters.length)) : 0);
 
-            if (savedIndex > 0 || (book.lastScrollTop && book.lastScrollTop > 0)) {
+            const validScrollTop = typeof book.lastScrollTop === 'number' && !isNaN(book.lastScrollTop) && book.lastScrollTop > 0 ? book.lastScrollTop : 0;
+
+            if (savedIndex > 0 || validScrollTop > 0) {
                 setCurrentChapterIndex(savedIndex);
 
                 const elementId = book.isPdf 
@@ -583,13 +585,10 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
                     const targetRect = targetElement.getBoundingClientRect();
                     const scrollOffset = targetRect.top - containerRect.top + viewport.scrollTop;
                     
-                    const targetScrollTop = (book.lastScrollTop && book.lastScrollTop > 0)
-                        ? book.lastScrollTop
-                        : scrollOffset;
-
+                    const targetScrollTop = validScrollTop > 0 ? validScrollTop : scrollOffset;
                     viewport.scrollTo({ top: targetScrollTop, behavior: 'auto' });
-                } else if (book.lastScrollTop && book.lastScrollTop > 0) {
-                    viewport.scrollTo({ top: book.lastScrollTop, behavior: 'auto' });
+                } else if (validScrollTop > 0) {
+                    viewport.scrollTo({ top: validScrollTop, behavior: 'auto' });
                 }
             }
             setIsInitialScrollDone(true);

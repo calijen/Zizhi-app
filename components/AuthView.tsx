@@ -8,9 +8,10 @@ import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'fire
 interface AuthViewProps {
     onClose: () => void;
     onLogin: (user: any) => void;
+    onEnterGuest?: () => void;
 }
 
-const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
+const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin, onEnterGuest }) => {
     const [view, setView] = useState<'login' | 'signup'>('signup');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -139,13 +140,27 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
                     </form>
                 </div>
 
-                <footer className="text-center mt-8 w-full">
+                <footer className="text-center mt-8 w-full space-y-3">
                     <p className="text-[10px] font-black text-[var(--color-muted-text)] uppercase tracking-widest">
                         {view === 'login' ? "New around here?" : "Already a member?"} 
                         <button onClick={() => setView(view === 'login' ? 'signup' : 'login')} className="ml-2 text-[var(--color-primary)] hover:underline decoration-2 underline-offset-4 transition-colors">
                             {view === 'login' ? 'Create Account' : 'Login'}
                         </button>
                     </p>
+                    {onEnterGuest && (
+                        <div>
+                            <button 
+                                type="button" 
+                                onClick={() => {
+                                    onClose();
+                                    onEnterGuest();
+                                }} 
+                                className="text-[10px] font-black uppercase tracking-widest text-[var(--color-primary-text)] hover:underline opacity-80 hover:opacity-100"
+                            >
+                                Continue as Guest →
+                            </button>
+                        </div>
+                    )}
                 </footer>
             </motion.div>
         </motion.div>

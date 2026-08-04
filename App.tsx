@@ -186,34 +186,19 @@ const App: FC = () => {
         db.getNotes().catch(() => [])
       ]);
       
-      // Deduplicate local books by title & author (keeping the most recently opened)
-      const groupedLocal = new Map<string, BookMetadata[]>();
+      // Deduplicate local books strictly by ID, preserving all local entries
+      const localBooksMap = new Map<string, BookMetadata>();
       localBooks.forEach(b => {
-          const key = getBookUniqueKey(b.title, b.author);
-          if (!groupedLocal.has(key)) {
-              groupedLocal.set(key, []);
+        if (b && b.id) {
+          const existing = localBooksMap.get(b.id);
+          if (!existing || (b.lastOpened || 0) >= (existing.lastOpened || 0)) {
+            localBooksMap.set(b.id, b);
           }
-          groupedLocal.get(key)!.push(b);
+        }
       });
+      const deduplicatedLocalBooks = Array.from(localBooksMap.values());
 
-      const deduplicatedLocalBooks: BookMetadata[] = [];
-      const duplicateIdsToDeleteOffline: string[] = [];
-
-      for (const list of groupedLocal.values()) {
-          if (list.length === 1) {
-              deduplicatedLocalBooks.push(list[0]);
-          } else {
-              list.sort((a, b) => (b.lastOpened || 0) - (a.lastOpened || 0));
-              deduplicatedLocalBooks.push(list[0]);
-              for (let i = 1; i < list.length; i++) {
-                  duplicateIdsToDeleteOffline.push(list[i].id);
-              }
-          }
-      }
-
-      if (duplicateIdsToDeleteOffline.length > 0) {
-          duplicateIdsToDeleteOffline.forEach(id => db.deleteBook(id).catch(() => {}));
-      }
+      let loadedBooks: BookMetadata[] = deduplicatedLocalBooks;
 
       if (currentUser && !isQuotaExceeded()) {
           // Sync books, quotes, notes, and notebooks with Firestore
@@ -239,7 +224,7 @@ const App: FC = () => {
           const cloudNotebooks = cloudNotebooksSnap ? cloudNotebooksSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as NotebookData) })) : [];
           const cloudBooks = cloudBooksSnap ? cloudBooksSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as BookMetadata) })) : [];
 
-          // Merge local and cloud books
+          // Merge local and cloud books cleanly without losing progress
           const mergedBooksMap = new Map<string, BookMetadata>();
           deduplicatedLocalBooks.forEach(b => mergedBooksMap.set(b.id, b));
 
@@ -248,9 +233,31 @@ const App: FC = () => {
             if (!local) {
               mergedBooksMap.set(cb.id, cb);
             } else {
-              const preferred = (cb.lastOpened || 0) > (local.lastOpened || 0) ? { ...local, ...cb } : { ...cb, ...local };
-              mergedBooksMap.set(cb.id, preferred);
-              db.updateBookMetadata(cb.id, preferred).catch(() => {});
+              const maxProgress = Math.max(local.progress || 0, cb.progress || 0);
+              const maxReadingTime = Math.max(local.readingTime || 0, cb.readingTime || 0);
+              const latestOpened = Math.max(local.lastOpened || 0, cb.lastOpened || 0);
+              const localIsNewer = (local.lastOpened || 0) >= (cb.lastOpened || 0);
+
+              const preferredScrollTop = localIsNewer 
+                ? (local.lastScrollTop !== undefined ? local.lastScrollTop : cb.lastScrollTop)
+                : (cb.lastScrollTop !== undefined ? cb.lastScrollTop : local.lastScrollTop);
+
+              const preferredChapterIndex = localIsNewer
+                ? (local.lastChapterIndex !== undefined ? local.lastChapterIndex : cb.lastChapterIndex)
+                : (cb.lastChapterIndex !== undefined ? cb.lastChapterIndex : local.lastChapterIndex);
+
+              const merged: BookMetadata = {
+                ...local,
+                ...cb,
+                progress: maxProgress,
+                readingTime: maxReadingTime,
+                lastOpened: latestOpened,
+                lastScrollTop: preferredScrollTop ?? 0,
+                lastChapterIndex: preferredChapterIndex ?? 0
+              };
+
+              mergedBooksMap.set(cb.id, merged);
+              db.updateBookMetadata(cb.id, merged).catch(() => {});
             }
           });
 
@@ -264,6 +271,7 @@ const App: FC = () => {
           });
 
           const mergedBooks = Array.from(mergedBooksMap.values());
+          loadedBooks = mergedBooks;
 
           // Intelligent merge for quotes and notes
           const mergedQuotesMap = new Map<string, Quote>();
@@ -321,7 +329,7 @@ const App: FC = () => {
           setNotes(mergedNotes);
 
           const storedEntered = localStorage.getItem('zizhi-entered') === 'true';
-          const shouldBeEntered = storedEntered || mergedBooks.length > 0 || mergedQuotes.length > 0 || true;
+          const shouldBeEntered = storedEntered || mergedBooks.length > 0 || mergedQuotes.length > 0 || !!currentUser;
           setHasEntered(shouldBeEntered);
           if (shouldBeEntered) localStorage.setItem('zizhi-entered', 'true');
       } else {
@@ -336,8 +344,8 @@ const App: FC = () => {
 
       // Restore last opened book if user was reading before refresh
       const lastOpenedBookId = localStorage.getItem('zizhi-last-opened-book-id');
-      if (lastOpenedBookId && deduplicatedLocalBooks.length > 0) {
-        const meta = deduplicatedLocalBooks.find(b => b.id === lastOpenedBookId);
+      if (lastOpenedBookId) {
+        const meta = loadedBooks.find(b => b.id === lastOpenedBookId) || deduplicatedLocalBooks.find(b => b.id === lastOpenedBookId);
         if (meta) {
           db.getBookContent(lastOpenedBookId).then(content => {
             if (content && content.chapters && content.chapters.length > 0) {
@@ -356,6 +364,10 @@ const App: FC = () => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
+      if (u) {
+        setHasEntered(true);
+        localStorage.setItem('zizhi-entered', 'true');
+      }
       loadData(u);
     });
     return () => unsubscribe();
@@ -889,11 +901,16 @@ const App: FC = () => {
               const bidx = library.findIndex(b => b.id === bid); 
               if (bidx === -1) return; 
               
+              const safeScrollTop = typeof st === 'number' && !isNaN(st) ? st : 0;
+              const safeChapterIndex = typeof ci === 'number' && !isNaN(ci) ? ci : 0;
+              const safeProgress = typeof gp === 'number' && !isNaN(gp) && gp >= 0 && gp <= 1 ? gp : 0;
+              const safeTimeSpent = typeof ts === 'number' && !isNaN(ts) ? ts : 0;
+
               const updates: Partial<BookMetadata> = { 
-                  progress: gp, 
-                  lastScrollTop: st, 
-                  lastChapterIndex: ci,
-                  readingTime: ((library[bidx]?.readingTime) || 0) + ts, 
+                  progress: safeProgress, 
+                  lastScrollTop: safeScrollTop, 
+                  lastChapterIndex: safeChapterIndex,
+                  readingTime: ((library[bidx]?.readingTime) || 0) + safeTimeSpent, 
                   lastOpened: Date.now() 
               }; 
               
