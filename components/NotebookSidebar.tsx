@@ -150,7 +150,19 @@ const getPlainText = (html: string) => {
   return temp.innerText || temp.textContent || "";
 };
 
+const FONT_OPTIONS = [
+  { id: 'serif', name: 'Serif', family: 'var(--font-serif), serif', sample: 'Aa Book' },
+  { id: 'hand', name: 'Handwritten', family: 'var(--font-hand), cursive', sample: 'Aa Notes' },
+  { id: 'sans', name: 'Sans', family: 'var(--font-sans), sans-serif', sample: 'Aa Clean' },
+  { id: 'mono', name: 'Mono', family: 'ui-monospace, monospace', sample: 'Aa Code' },
+  { id: 'display', name: 'Display', family: 'var(--font-display), serif', sample: 'Aa Bold' },
+];
+
 export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTitle, author, onClose, isOpen, theme }) => {
+  const [selectedFont, setSelectedFont] = useState<'serif' | 'hand' | 'sans' | 'mono' | 'display'>(() => {
+    return (localStorage.getItem('zizhi-notebook-font') as any) || 'serif';
+  });
+
   const [notebookThemeId, setNotebookThemeId] = useState<string>(() => {
     return localStorage.getItem('zizhi-notebook-theme-id') || theme?.id || 'warm';
   });
@@ -173,6 +185,7 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
   );
   const [isResizing, setIsResizing] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
+  const isNarrowToolbar = isMobile || sidebarWidth < 430;
   
   useEffect(() => {
     const handleResize = () => {
@@ -214,7 +227,7 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
   const [activeWidth, setActiveWidth] = useState(2.2);
 
   // Dropdown & Popover States
-  const [activeDropdownTool, setActiveDropdownTool] = useState<'type' | 'draw' | 'highlight' | 'theme' | null>(null);
+  const [activeDropdownTool, setActiveDropdownTool] = useState<'type' | 'draw' | 'highlight' | 'theme' | 'font' | null>(null);
   const toolbarContainerRef = useRef<HTMLDivElement>(null);
 
   // Mobile Popover & Bar States
@@ -1126,7 +1139,7 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
 
           {/* UNIVERSAL HEADER */}
           <div 
-            className="h-12 border-b flex items-center justify-between px-3 shrink-0 z-[1260] select-none transition-colors"
+            className="h-12 border-b-2 border-black flex items-center justify-between px-3 shrink-0 z-[1260] select-none transition-colors shadow-xs"
             style={{
               backgroundColor: pageSurfaceColor,
               borderColor: pageBorderColor,
@@ -1134,12 +1147,12 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
             }}
           >
             <div className="flex items-center gap-2">
-              <BookSpiralIcon className="w-5 h-5 opacity-80" />
+              <BookSpiralIcon className="w-5 h-5 opacity-90" />
               <div className="flex flex-col leading-tight">
-                <span className="text-[11px] font-extrabold uppercase tracking-widest opacity-90">
+                <span className="text-[11px] font-black uppercase tracking-widest opacity-90">
                   Notebook
                 </span>
-                <span className="text-[10px] font-semibold opacity-70 line-clamp-1 max-w-[160px]">
+                <span className="text-[10px] font-bold opacity-75 line-clamp-1 max-w-[150px]">
                   {bookTitle}
                 </span>
               </div>
@@ -1147,7 +1160,7 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
 
             <div className="flex items-center gap-2">
               {/* Page Navigator */}
-              <div className="flex items-center gap-1 bg-black/5 dark:bg-white/10 px-2 py-0.5 rounded-md text-[10px] font-bold">
+              <div className="flex items-center gap-1 bg-white dark:bg-zinc-800 border-2 border-black px-2 py-0.5 rounded-md text-[10px] font-black shadow-[2px_2px_0_black]">
                 <button 
                   disabled={activePageIndex === 0} 
                   onClick={() => setActivePageIndex(p => Math.max(0, p - 1))}
@@ -1171,17 +1184,17 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
               <Tooltip label={saveStatus === 'saved' ? 'All changes saved' : saveStatus === 'saving' ? 'Saving pages...' : 'Writing error!'}>
                 <div className="flex items-center">
                   {saveStatus === 'saved' && (
-                    <span className="flex items-center gap-1 text-[9px] font-extrabold uppercase tracking-wider bg-emerald-500/15 text-emerald-600 px-2 py-0.5 rounded border border-emerald-500/30">
+                    <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-wider bg-emerald-300 text-black px-2 py-0.5 rounded border-2 border-black shadow-[1px_1px_0_black]">
                       <Check size={10} strokeWidth={3.5} /> Saved
                     </span>
                   )}
                   {saveStatus === 'saving' && (
-                    <span className="flex items-center gap-1 text-[9px] font-extrabold uppercase tracking-wider bg-amber-500/15 text-amber-600 px-2 py-0.5 rounded border border-amber-500/30">
+                    <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-wider bg-amber-300 text-black px-2 py-0.5 rounded border-2 border-black shadow-[1px_1px_0_black]">
                       <Loader size={8} className="animate-spin" /> Saving
                     </span>
                   )}
                   {saveStatus === 'error' && (
-                    <span className="flex items-center gap-1 text-[9px] font-extrabold uppercase tracking-wider bg-red-500/15 text-red-600 px-2 py-0.5 rounded border border-red-500/30">
+                    <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-wider bg-red-300 text-black px-2 py-0.5 rounded border-2 border-black shadow-[1px_1px_0_black]">
                       Error
                     </span>
                   )}
@@ -1190,7 +1203,7 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
 
               <button
                 onClick={onClose}
-                className="p-1.5 rounded-md hover:bg-black/10 transition-all opacity-80 hover:opacity-100"
+                className="p-1 rounded-md border-2 border-black bg-white hover:bg-amber-100 dark:bg-zinc-800 text-black dark:text-white transition-all shadow-[2px_2px_0_black] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
                 title="Close Notebook"
               >
                 <X size={16} strokeWidth={2.5} />
@@ -1201,7 +1214,7 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
           {/* TOP ACTIONS STATIONERY TOOLBAR */}
           <div 
             ref={toolbarContainerRef}
-            className="px-3 py-2 border-b flex flex-col gap-2 shrink-0 z-[2000] select-none text-xs transition-colors relative"
+            className="px-2.5 py-2 border-b-2 border-black flex flex-col gap-2 shrink-0 z-[2000] select-none text-xs transition-colors relative"
             style={{
               backgroundColor: pageSurfaceColor,
               borderColor: pageBorderColor,
@@ -1213,10 +1226,10 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
               <div className="fixed inset-0 z-[2500]" onClick={() => setActiveDropdownTool(null)} />
             )}
 
-            {/* ROW 1: Stationery Tools & Addable Elements */}
+            {/* ROW 1: Stationery Tools & Font Options */}
             <div className="flex items-center justify-between gap-1.5 flex-wrap">
               {/* Primary Tools Group */}
-              <div className="flex items-center gap-1 bg-black/5 dark:bg-white/10 p-1 rounded-lg border border-black/5 dark:border-white/10 shrink-0">
+              <div className="flex items-center gap-1.5 flex-wrap shrink-0">
                 {/* TEXT TOOL BUTTON WITH DROPDOWN */}
                 <div className="relative shrink-0">
                   <button
@@ -1225,32 +1238,29 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
                       setActiveWidth(2.2);
                       setActiveDropdownTool(v => v === 'type' ? null : 'type');
                     }}
-                    className={`px-2.5 py-1.5 rounded-md text-[11px] font-extrabold flex items-center gap-1.5 transition-all ${
+                    className={`px-2 py-1.5 rounded-lg text-[11px] font-black flex items-center gap-1 border-2 border-black shadow-[2px_2px_0_black] transition-all ${
                       activeTool === 'type'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'hover:bg-black/5 dark:hover:bg-white/10 opacity-80 hover:opacity-100'
+                        ? 'bg-amber-300 text-black translate-x-[1px] translate-y-[1px] shadow-none'
+                        : 'bg-white dark:bg-zinc-800 text-black dark:text-white hover:bg-amber-100'
                     }`}
-                    style={activeTool === 'type' && theme?.colors?.primary ? { backgroundColor: theme.colors.primary, color: '#fff' } : {}}
                     title="Text Tool (Click to select & open color picker)"
                   >
                     <Type size={14} strokeWidth={2.5} />
-                    <span className="flex items-center gap-1">
-                      Text
-                      <div 
-                        className="w-2.5 h-2.5 rounded-full border border-black/20 dark:border-white/20 inline-block shrink-0"
-                        style={{ backgroundColor: textToolColor }}
-                      />
-                    </span>
+                    {!isNarrowToolbar && <span>Text</span>}
+                    <div 
+                      className="w-2.5 h-2.5 rounded-full border border-black inline-block shrink-0"
+                      style={{ backgroundColor: textToolColor }}
+                    />
                     <ChevronDown size={11} className={`opacity-70 transition-transform ${activeDropdownTool === 'type' ? 'rotate-180' : ''}`} />
                   </button>
 
                   {/* Popover for Text Color */}
                   {activeDropdownTool === 'type' && (
-                    <div className="absolute top-full left-0 mt-2 z-[3000] bg-white dark:bg-slate-900 border-2 border-black dark:border-slate-700 rounded-2xl p-3 flex flex-col gap-2 min-w-[280px] shadow-2xl">
-                      <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1 flex justify-between items-center">
+                    <div className="absolute top-full left-0 mt-2 z-[3000] bg-white dark:bg-zinc-900 border-3 border-black rounded-xl p-3 flex flex-col gap-2 min-w-[280px] shadow-[6px_6px_0_black]">
+                      <div className="text-[10px] font-black uppercase tracking-wider text-black dark:text-white px-1 flex justify-between items-center">
                         <span>Text Color</span>
-                        <button onClick={() => setActiveDropdownTool(null)} className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                          <X size={12} />
+                        <button onClick={() => setActiveDropdownTool(null)} className="p-0.5 text-black hover:text-amber-600 dark:text-white">
+                          <X size={12} strokeWidth={3} />
                         </button>
                       </div>
                       <div className="flex flex-col gap-2">
@@ -1266,14 +1276,14 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
                                   selectStationery('type', item.color, activeWidth);
                                   setActiveDropdownTool(null);
                                 }}
-                                className={`w-6 h-6 rounded-full flex items-center justify-center transition-transform hover:scale-110 active:scale-95 ${
-                                  isLight ? 'border border-slate-300 dark:border-slate-600' : ''
+                                className={`w-6 h-6 rounded-full flex items-center justify-center border border-black transition-transform hover:scale-110 active:scale-95 ${
+                                  isLight ? 'border-2 border-black' : ''
                                 }`}
                                 style={{ backgroundColor: item.color }}
                                 title={item.name}
                               >
                                 {isSelected && (
-                                  <Check size={13} strokeWidth={3.5} className={isLight ? 'text-slate-900' : 'text-white'} />
+                                  <Check size={13} strokeWidth={3.5} className={isLight ? 'text-black' : 'text-white'} />
                                 )}
                               </button>
                             );
@@ -1291,14 +1301,14 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
                                   selectStationery('type', item.color, activeWidth);
                                   setActiveDropdownTool(null);
                                 }}
-                                className={`w-6 h-6 rounded-full flex items-center justify-center transition-transform hover:scale-110 active:scale-95 ${
-                                  isLight ? 'border border-slate-300 dark:border-slate-600' : ''
+                                className={`w-6 h-6 rounded-full flex items-center justify-center border border-black transition-transform hover:scale-110 active:scale-95 ${
+                                  isLight ? 'border-2 border-black' : ''
                                 }`}
                                 style={{ backgroundColor: item.color }}
                                 title={item.name}
                               >
                                 {isSelected && (
-                                  <Check size={13} strokeWidth={3.5} className={isLight ? 'text-slate-900' : 'text-white'} />
+                                  <Check size={13} strokeWidth={3.5} className={isLight ? 'text-black' : 'text-white'} />
                                 )}
                               </button>
                             );
@@ -1317,32 +1327,29 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
                       setActiveWidth(2.2);
                       setActiveDropdownTool(v => v === 'draw' ? null : 'draw');
                     }}
-                    className={`px-2.5 py-1.5 rounded-md text-[11px] font-extrabold flex items-center gap-1.5 transition-all ${
+                    className={`px-2 py-1.5 rounded-lg text-[11px] font-black flex items-center gap-1 border-2 border-black shadow-[2px_2px_0_black] transition-all ${
                       activeTool === 'draw'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'hover:bg-black/5 dark:hover:bg-white/10 opacity-80 hover:opacity-100'
+                        ? 'bg-cyan-300 text-black translate-x-[1px] translate-y-[1px] shadow-none'
+                        : 'bg-white dark:bg-zinc-800 text-black dark:text-white hover:bg-cyan-100'
                     }`}
-                    style={activeTool === 'draw' && theme?.colors?.primary ? { backgroundColor: theme.colors.primary, color: '#fff' } : {}}
                     title="Draw Tool (Click to select & open color picker)"
                   >
                     <Pencil size={14} strokeWidth={2.5} />
-                    <span className="flex items-center gap-1">
-                      Draw
-                      <div 
-                        className="w-2.5 h-2.5 rounded-full border border-black/20 dark:border-white/20 inline-block shrink-0"
-                        style={{ backgroundColor: drawToolColor }}
-                      />
-                    </span>
+                    {!isNarrowToolbar && <span>Draw</span>}
+                    <div 
+                      className="w-2.5 h-2.5 rounded-full border border-black inline-block shrink-0"
+                      style={{ backgroundColor: drawToolColor }}
+                    />
                     <ChevronDown size={11} className={`opacity-70 transition-transform ${activeDropdownTool === 'draw' ? 'rotate-180' : ''}`} />
                   </button>
 
                   {/* Popover for Draw Color */}
                   {activeDropdownTool === 'draw' && (
-                    <div className="absolute top-full left-0 mt-2 z-[3000] bg-white dark:bg-slate-900 border-2 border-black dark:border-slate-700 rounded-2xl p-3 flex flex-col gap-2 min-w-[280px] shadow-2xl">
-                      <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1 flex justify-between items-center">
+                    <div className="absolute top-full left-0 mt-2 z-[3000] bg-white dark:bg-zinc-900 border-3 border-black rounded-xl p-3 flex flex-col gap-2 min-w-[280px] shadow-[6px_6px_0_black]">
+                      <div className="text-[10px] font-black uppercase tracking-wider text-black dark:text-white px-1 flex justify-between items-center">
                         <span>Ink Color</span>
-                        <button onClick={() => setActiveDropdownTool(null)} className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                          <X size={12} />
+                        <button onClick={() => setActiveDropdownTool(null)} className="p-0.5 text-black hover:text-cyan-600 dark:text-white">
+                          <X size={12} strokeWidth={3} />
                         </button>
                       </div>
                       <div className="flex flex-col gap-2">
@@ -1358,14 +1365,14 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
                                   selectStationery('draw', item.color, activeWidth);
                                   setActiveDropdownTool(null);
                                 }}
-                                className={`w-6 h-6 rounded-full flex items-center justify-center transition-transform hover:scale-110 active:scale-95 ${
-                                  isLight ? 'border border-slate-300 dark:border-slate-600' : ''
+                                className={`w-6 h-6 rounded-full flex items-center justify-center border border-black transition-transform hover:scale-110 active:scale-95 ${
+                                  isLight ? 'border-2 border-black' : ''
                                 }`}
                                 style={{ backgroundColor: item.color }}
                                 title={item.name}
                               >
                                 {isSelected && (
-                                  <Check size={13} strokeWidth={3.5} className={isLight ? 'text-slate-900' : 'text-white'} />
+                                  <Check size={13} strokeWidth={3.5} className={isLight ? 'text-black' : 'text-white'} />
                                 )}
                               </button>
                             );
@@ -1383,14 +1390,14 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
                                   selectStationery('draw', item.color, activeWidth);
                                   setActiveDropdownTool(null);
                                 }}
-                                className={`w-6 h-6 rounded-full flex items-center justify-center transition-transform hover:scale-110 active:scale-95 ${
-                                  isLight ? 'border border-slate-300 dark:border-slate-600' : ''
+                                className={`w-6 h-6 rounded-full flex items-center justify-center border border-black transition-transform hover:scale-110 active:scale-95 ${
+                                  isLight ? 'border-2 border-black' : ''
                                 }`}
                                 style={{ backgroundColor: item.color }}
                                 title={item.name}
                               >
                                 {isSelected && (
-                                  <Check size={13} strokeWidth={3.5} className={isLight ? 'text-slate-900' : 'text-white'} />
+                                  <Check size={13} strokeWidth={3.5} className={isLight ? 'text-black' : 'text-white'} />
                                 )}
                               </button>
                             );
@@ -1409,32 +1416,29 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
                       setActiveWidth(14);
                       setActiveDropdownTool(v => v === 'highlight' ? null : 'highlight');
                     }}
-                    className={`px-2.5 py-1.5 rounded-md text-[11px] font-extrabold flex items-center gap-1.5 transition-all ${
+                    className={`px-2 py-1.5 rounded-lg text-[11px] font-black flex items-center gap-1 border-2 border-black shadow-[2px_2px_0_black] transition-all ${
                       activeTool === 'highlight'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'hover:bg-black/5 dark:hover:bg-white/10 opacity-80 hover:opacity-100'
+                        ? 'bg-yellow-300 text-black translate-x-[1px] translate-y-[1px] shadow-none'
+                        : 'bg-white dark:bg-zinc-800 text-black dark:text-white hover:bg-yellow-100'
                     }`}
-                    style={activeTool === 'highlight' && theme?.colors?.primary ? { backgroundColor: theme.colors.primary, color: '#fff' } : {}}
                     title="Highlight Tool (Click to select & open color picker)"
                   >
                     <Highlighter size={14} strokeWidth={2.5} />
-                    <span className="flex items-center gap-1">
-                      Highlight
-                      <div 
-                        className="w-2.5 h-2.5 rounded-full border border-black/20 dark:border-white/20 inline-block shrink-0"
-                        style={{ backgroundColor: highlightToolColor === 'transparent' ? '#cbd5e1' : highlightToolColor }}
-                      />
-                    </span>
+                    {!isNarrowToolbar && <span>Highlight</span>}
+                    <div 
+                      className="w-2.5 h-2.5 rounded-full border border-black inline-block shrink-0"
+                      style={{ backgroundColor: highlightToolColor === 'transparent' ? '#cbd5e1' : highlightToolColor }}
+                    />
                     <ChevronDown size={11} className={`opacity-70 transition-transform ${activeDropdownTool === 'highlight' ? 'rotate-180' : ''}`} />
                   </button>
 
                   {/* Popover for Highlight Color */}
                   {activeDropdownTool === 'highlight' && (
-                    <div className="absolute top-full left-0 mt-2 z-[3000] bg-white dark:bg-slate-900 border-2 border-black dark:border-slate-700 rounded-2xl p-3 flex flex-col gap-2 min-w-[280px] shadow-2xl">
-                      <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1 flex justify-between items-center">
+                    <div className="absolute top-full left-0 mt-2 z-[3000] bg-white dark:bg-zinc-900 border-3 border-black rounded-xl p-3 flex flex-col gap-2 min-w-[280px] shadow-[6px_6px_0_black]">
+                      <div className="text-[10px] font-black uppercase tracking-wider text-black dark:text-white px-1 flex justify-between items-center">
                         <span>Highlight Color</span>
-                        <button onClick={() => setActiveDropdownTool(null)} className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                          <X size={12} />
+                        <button onClick={() => setActiveDropdownTool(null)} className="p-0.5 text-black hover:text-yellow-600 dark:text-white">
+                          <X size={12} strokeWidth={3} />
                         </button>
                       </div>
                       <div className="grid grid-cols-9 gap-1.5">
@@ -1448,15 +1452,15 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
                                 selectStationery('highlight', item.color, 14);
                                 setActiveDropdownTool(null);
                               }}
-                              className="w-6 h-6 rounded-full flex items-center justify-center border border-slate-300 dark:border-slate-700 transition-transform hover:scale-110 active:scale-95 relative overflow-hidden"
+                              className="w-6 h-6 rounded-full flex items-center justify-center border-2 border-black transition-transform hover:scale-110 active:scale-95 relative overflow-hidden"
                               style={{ backgroundColor: item.solid === 'transparent' ? '#ffffff' : item.solid }}
                               title={item.name}
                             >
                               {item.color === 'transparent' && (
-                                <div className="w-full h-[1.5px] bg-red-500 rotate-45 absolute" />
+                                <div className="w-full h-[2px] bg-red-500 rotate-45 absolute" />
                               )}
                               {isSelected && (
-                                <Check size={13} strokeWidth={3.5} className="text-slate-900 relative z-10" />
+                                <Check size={13} strokeWidth={3.5} className="text-black relative z-10" />
                               )}
                             </button>
                           );
@@ -1473,37 +1477,80 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
                     setActiveWidth(16);
                     setActiveDropdownTool(null);
                   }}
-                  className={`px-2.5 py-1.5 rounded-md text-[11px] font-extrabold flex items-center gap-1 transition-all ${
+                  className={`px-2 py-1.5 rounded-lg text-[11px] font-black flex items-center gap-1 border-2 border-black shadow-[2px_2px_0_black] transition-all ${
                     activeTool === 'eraser'
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'hover:bg-black/5 dark:hover:bg-white/10 opacity-80 hover:opacity-100'
+                      ? 'bg-pink-300 text-black translate-x-[1px] translate-y-[1px] shadow-none'
+                      : 'bg-white dark:bg-zinc-800 text-black dark:text-white hover:bg-pink-100'
                   }`}
-                  style={activeTool === 'eraser' && theme?.colors?.primary ? { backgroundColor: theme.colors.primary, color: '#fff' } : {}}
                   title="Eraser Tool"
                 >
                   <Eraser size={14} strokeWidth={2.5} />
-                  <span>Eraser</span>
+                  {!isNarrowToolbar && <span>Eraser</span>}
                 </button>
               </div>
 
-              {/* Widgets (Sticky & Photo) */}
+              {/* Widgets & Font Dropdown Group */}
               <div className="flex items-center gap-1.5 shrink-0 ml-auto sm:ml-0">
+                {/* FONT OPTIONS DROPDOWN */}
+                <div className="relative shrink-0">
+                  <button
+                    onClick={() => setActiveDropdownTool(v => v === 'font' ? null : 'font')}
+                    className="px-2 py-1.5 rounded-lg bg-orange-200 text-black hover:bg-orange-300 text-[11px] font-black flex items-center gap-1 border-2 border-black shadow-[2px_2px_0_black] transition-all active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+                    title="Font Options"
+                  >
+                    <Type size={13} strokeWidth={3} />
+                    {!isNarrowToolbar && <span>Font ({FONT_OPTIONS.find(f => f.id === selectedFont)?.name})</span>}
+                    <ChevronDown size={11} className={`opacity-70 transition-transform ${activeDropdownTool === 'font' ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {activeDropdownTool === 'font' && (
+                    <div className="absolute right-0 top-full mt-2 z-[3000] bg-white dark:bg-zinc-900 border-3 border-black rounded-xl p-2.5 flex flex-col gap-1.5 min-w-[180px] shadow-[6px_6px_0_black]">
+                      <div className="text-[10px] font-black uppercase tracking-wider text-black dark:text-white px-1 flex justify-between items-center mb-0.5">
+                        <span>Notebook Font</span>
+                        <button onClick={() => setActiveDropdownTool(null)} className="p-0.5 text-black hover:text-orange-600 dark:text-white">
+                          <X size={12} strokeWidth={3} />
+                        </button>
+                      </div>
+                      {FONT_OPTIONS.map((f) => {
+                        const isSelected = selectedFont === f.id;
+                        return (
+                          <button
+                            key={f.id}
+                            onClick={() => {
+                              setSelectedFont(f.id as any);
+                              localStorage.setItem('zizhi-notebook-font', f.id);
+                              setActiveDropdownTool(null);
+                            }}
+                            className={`w-full px-2.5 py-1.5 rounded-lg flex items-center justify-between text-xs font-bold transition-all border-2 ${
+                              isSelected ? 'border-black bg-orange-300 text-black shadow-[2px_2px_0_black]' : 'border-transparent hover:bg-slate-100 dark:hover:bg-zinc-800 text-black dark:text-white'
+                            }`}
+                            style={{ fontFamily: f.family }}
+                          >
+                            <span className="text-sm">{f.name}</span>
+                            <span className="text-[11px] opacity-70">{f.sample}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
                 <button
                   onClick={handleAddSticky}
-                  className="px-2.5 py-1.5 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 text-[11px] font-extrabold flex items-center gap-1 border border-amber-500/30 transition-all active:scale-95"
+                  className="px-2 py-1.5 rounded-lg bg-emerald-200 text-black hover:bg-emerald-300 text-[11px] font-black flex items-center gap-1 border-2 border-black shadow-[2px_2px_0_black] transition-all active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
                   title="Add Sticky Note"
                 >
-                  <StickyIcon size={13} />
-                  <span>Sticky</span>
+                  <StickyIcon size={13} strokeWidth={2.5} />
+                  {!isNarrowToolbar && <span>Sticky</span>}
                 </button>
 
                 <button
                   onClick={triggerImageUpload}
-                  className="px-2.5 py-1.5 rounded-md bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 hover:bg-cyan-500/25 text-[11px] font-extrabold flex items-center gap-1 border border-cyan-500/30 transition-all active:scale-95"
+                  className="px-2 py-1.5 rounded-lg bg-purple-200 text-black hover:bg-purple-300 text-[11px] font-black flex items-center gap-1 border-2 border-black shadow-[2px_2px_0_black] transition-all active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
                   title="Add Photo Sticker"
                 >
-                  <ImageIcon size={13} />
-                  <span>Photo</span>
+                  <ImageIcon size={13} strokeWidth={2.5} />
+                  {!isNarrowToolbar && <span>Photo</span>}
                 </button>
                 <input 
                   type="file" 
@@ -1515,59 +1562,49 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
               </div>
             </div>
 
-            {/* ROW 2: Canvas Controls & Page Management */}
-            <div className="flex items-center justify-between gap-2 border-t border-black/10 dark:border-white/10 pt-1.5 flex-wrap sm:flex-nowrap">
+            {/* ROW 2: Undo, Download, Theme, Page (Clear Button Removed) */}
+            <div className="flex items-center justify-between gap-2 border-t-2 border-black/10 dark:border-white/10 pt-1.5 flex-wrap sm:flex-nowrap">
               {/* Left Group: Undo & Download PDF */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <button
                   onClick={handleUndoSketch}
-                  className="px-2.5 py-1.5 hover:bg-black/10 dark:hover:bg-white/10 rounded-md transition-all font-bold text-[11px] flex items-center gap-1.5 border border-black/10 dark:border-white/10"
+                  className="px-2 py-1.5 bg-white dark:bg-zinc-800 hover:bg-slate-100 text-black dark:text-white rounded-lg font-black text-[11px] flex items-center gap-1 border-2 border-black shadow-[2px_2px_0_black] transition-all active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
                   title="Undo drawing stroke"
                 >
                   <RotateCcw size={14} strokeWidth={2.5} />
-                  <span>Undo</span>
+                  {!isNarrowToolbar && <span>Undo</span>}
                 </button>
 
                 <button
                   onClick={() => handleExportPDF()}
                   disabled={isExporting}
-                  className="px-2.5 py-1.5 hover:bg-black/10 dark:hover:bg-white/10 rounded-md transition-all font-bold text-[11px] flex items-center gap-1.5 border border-black/10 dark:border-white/10 disabled:opacity-50"
+                  className="px-2 py-1.5 bg-white dark:bg-zinc-800 hover:bg-slate-100 text-black dark:text-white rounded-lg font-black text-[11px] flex items-center gap-1 border-2 border-black shadow-[2px_2px_0_black] transition-all disabled:opacity-50 active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
                   title="Download PDF Notes"
                 >
                   {isExporting ? <Loader size={12} /> : <Download size={14} strokeWidth={2.5} />}
-                  <span>Download</span>
+                  {!isNarrowToolbar && <span>Download</span>}
                 </button>
               </div>
 
-              {/* Right Group: Clear, Tear, Add Page */}
-              <div className="flex items-center gap-2 ml-auto">
-                <button
-                  onClick={handleClearPage}
-                  className="px-2.5 py-1.5 hover:bg-red-500/15 text-red-600 dark:text-red-400 rounded-md transition-all font-bold text-[11px] flex items-center gap-1.5 border border-red-500/20"
-                  title="Clear Active Page"
-                >
-                  <Trash2 size={14} strokeWidth={2.5} />
-                  <span>Clear</span>
-                </button>
-
+              {/* Right Group: Theme & Add Page */}
+              <div className="flex items-center gap-1.5 ml-auto">
                 <div className="relative">
                   <button
                     onClick={() => setActiveDropdownTool(v => v === 'theme' ? null : 'theme')}
-                    className="px-2.5 py-1.5 rounded-md text-[11px] font-extrabold flex items-center gap-1.5 transition-all border border-black/15 dark:border-white/20 hover:bg-black/10 dark:hover:bg-white/10"
-                    style={{ color: pageTextColor }}
-                    title="Change Notebook Theme (Independent of Reader)"
+                    className="px-2 py-1.5 rounded-lg bg-lime-200 text-black hover:bg-lime-300 text-[11px] font-black flex items-center gap-1 border-2 border-black shadow-[2px_2px_0_black] transition-all active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
+                    title="Change Notebook Theme"
                   >
                     <Palette size={14} strokeWidth={2.5} />
-                    <span>Theme ({currentNotebookTheme.name})</span>
+                    {!isNarrowToolbar && <span>Theme ({currentNotebookTheme.name})</span>}
                     <ChevronDown size={11} className={`opacity-70 transition-transform ${activeDropdownTool === 'theme' ? 'rotate-180' : ''}`} />
                   </button>
 
                   {activeDropdownTool === 'theme' && (
-                    <div className="absolute right-0 top-full mt-2 z-[3000] bg-white dark:bg-slate-900 border-2 border-black dark:border-slate-700 rounded-xl p-2.5 flex flex-col gap-1.5 min-w-[170px] shadow-2xl">
-                      <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1 flex justify-between items-center mb-0.5">
+                    <div className="absolute right-0 top-full mt-2 z-[3000] bg-white dark:bg-zinc-900 border-3 border-black rounded-xl p-2.5 flex flex-col gap-1.5 min-w-[170px] shadow-[6px_6px_0_black]">
+                      <div className="text-[10px] font-black uppercase tracking-wider text-black dark:text-white px-1 flex justify-between items-center mb-0.5">
                         <span>Notebook Theme</span>
-                        <button onClick={() => setActiveDropdownTool(null)} className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                          <X size={12} />
+                        <button onClick={() => setActiveDropdownTool(null)} className="p-0.5 text-black hover:text-lime-600 dark:text-white">
+                          <X size={12} strokeWidth={3} />
                         </button>
                       </div>
                       {Object.values(ATMOSPHERES).map((atm) => {
@@ -1580,13 +1617,13 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
                               localStorage.setItem('zizhi-notebook-theme-id', atm.id);
                               setActiveDropdownTool(null);
                             }}
-                            className={`w-full px-2.5 py-1.5 rounded-lg flex items-center justify-between text-xs font-bold transition-all border ${
-                              isSelected ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400' : 'border-transparent hover:bg-slate-100 dark:hover:bg-slate-800'
+                            className={`w-full px-2.5 py-1.5 rounded-lg flex items-center justify-between text-xs font-bold transition-all border-2 ${
+                              isSelected ? 'border-black bg-lime-300 text-black shadow-[2px_2px_0_black]' : 'border-transparent hover:bg-slate-100 dark:hover:bg-zinc-800 text-black dark:text-white'
                             }`}
                           >
                             <div className="flex items-center gap-2">
                               <div 
-                                className="w-4 h-4 rounded-full border border-black/20 shrink-0" 
+                                className="w-4 h-4 rounded-full border border-black shrink-0" 
                                 style={{ backgroundColor: atm.colors.background }}
                               />
                               <span>{atm.name}</span>
@@ -1601,11 +1638,11 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
 
                 <button
                   onClick={addPage}
-                  className="px-2.5 py-1.5 bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-500/30 rounded-md text-[11px] font-extrabold flex items-center gap-1 border border-emerald-500/40 transition-all active:scale-95"
+                  className="px-2.5 py-1.5 bg-amber-400 text-black hover:bg-amber-500 rounded-lg text-[11px] font-black flex items-center gap-1 border-2 border-black shadow-[2px_2px_0_black] transition-all active:translate-x-[1px] active:translate-y-[1px] active:shadow-none"
                   title="Add New Page"
                 >
                   <Plus size={14} strokeWidth={3} />
-                  <span>+ Page</span>
+                  {!isNarrowToolbar && <span>+ Page</span>}
                 </button>
               </div>
             </div>
@@ -1657,6 +1694,7 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
                       isActive={index === activePageIndex}
                       isMobile={isMobile}
                       theme={currentNotebookTheme}
+                      fontFamily={selectedFont}
                     />
                   </div>
                 ))}

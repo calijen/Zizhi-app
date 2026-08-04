@@ -14,6 +14,7 @@ interface NotebookPageProps {
   isActive?: boolean;
   isMobile?: boolean;
   theme?: Theme;
+  fontFamily?: string;
 }
 
 interface NotebookTextSelectionPopupProps {
@@ -144,12 +145,15 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
   isActive = false,
   isMobile = false,
   theme,
+  fontFamily = 'serif',
 }) => {
   const isDarkTheme = theme?.id === 'nocturne' || (theme?.colors?.background && (theme.colors.background === '#0a0a0b' || theme.colors.background.startsWith('#1') || theme.colors.background.startsWith('#0')));
   const pageBgColor = theme?.colors?.background || '#fcfbe3';
   const pageTextColor = theme?.colors?.['primary-text'] || (isDarkTheme ? '#f8fafc' : '#1e293b');
-  const lineGradient = isDarkTheme ? 'rgba(255, 255, 255, 0.12)' : '#e1e0cb';
-  const marginLineColor = isDarkTheme ? 'rgba(239, 68, 68, 0.5)' : '#ffb3b3';
+  const lineGradient = isDarkTheme 
+    ? 'rgba(255, 255, 255, 0.35)' 
+    : 'rgba(96, 165, 250, 0.70)';
+  const marginLineColor = isDarkTheme ? 'rgba(239, 68, 68, 0.6)' : '#ff8080';
   const [isDrawing, setIsDrawing] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -815,7 +819,7 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
           // Adjust for scroll position to find absolute y within the page
           const clickY = e.clientY - rect.top + container.scrollTop;
           
-          const clickedLine = Math.floor((clickY - 30) / 28);
+          const clickedLine = Math.max(0, Math.floor((clickY - 56) / 28));
           
           // Only pad if they click below the existing text lines
           const currentText = editorRef.current.innerText || "";
@@ -850,13 +854,13 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
       >
         <div 
           ref={pageContentRef}
-          className="relative min-h-full w-full pr-4 pl-[48px] pt-[30px] pb-8 select-text"
+          className="relative min-h-full w-full pr-4 pl-[48px] pt-0 pb-8 select-text"
         >
           {/* Background paper lines layout */}
           <div 
             className="pointer-events-none notebook-lines" 
             style={{
-              backgroundImage: `linear-gradient(${lineGradient} 1px, transparent 1px)`,
+              ['--line-gradient-color' as any]: lineGradient,
               ['--margin-line-color' as any]: marginLineColor,
             }}
           />
@@ -908,10 +912,11 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
                 }
               }
             }}
-            data-placeholder={activeTool === 'type' ? 'Start typing directly on notebook lines...' : activeTool === 'highlight' ? 'Drag cursor over text to highlight it...' : ''}
-            className={`outline-none font-sans font-bold text-[14px] leading-[28px] select-text min-h-[1200px] w-full break-words notebook-editor ${isDarkTheme ? 'notebook-editor-dark' : ''} relative z-10`}
+            data-placeholder=""
+            className={`outline-none font-bold text-[14px] leading-[28px] select-text min-h-[1200px] w-full break-words notebook-editor ${isDarkTheme ? 'notebook-editor-dark' : ''} relative z-10`}
             style={{
               color: pageTextColor,
+              fontFamily: fontFamily === 'hand' ? 'var(--font-hand), cursive' : fontFamily === 'serif' ? 'var(--font-serif), serif' : fontFamily === 'sans' ? 'var(--font-sans), sans-serif' : fontFamily === 'mono' ? 'ui-monospace, monospace' : fontFamily === 'display' ? 'var(--font-display), serif' : 'var(--font-serif), serif',
               caretColor: activeTool === 'type' ? (activeColor || pageTextColor) : pageTextColor,
               whiteSpace: 'pre-wrap',
               wordBreak: 'break-word',
@@ -1005,44 +1010,8 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
       )}
 
       <style>{`
-        .notebook-lines {
-          position: absolute;
-          top: 72px;
-          bottom: 48px;
-          left: 0;
-          right: 0;
-          background-image: linear-gradient(#e1e0cb 1px, transparent 1px);
-          background-size: 100% 24px;
-        }
-        .notebook-lines::before {
-          content: '';
-          position: absolute;
-          top: -72px;
-          bottom: -48px;
-          left: 36px;
-          width: 2px;
-          background-color: #ffb3b3;
-        }
         .notebook-editor-scroll::-webkit-scrollbar {
           display: none;
-        }
-        .notebook-editor::first-line {
-          font-size: 20px;
-          line-height: 24px;
-          font-weight: 800;
-          color: #0f172a;
-          letter-spacing: -0.01em;
-        }
-        .notebook-editor > :first-child {
-          font-size: 20px;
-          line-height: 24px;
-          font-weight: 800;
-          color: #0f172a;
-          letter-spacing: -0.01em;
-        }
-        .notebook-editor > :first-child span {
-          font-size: 20px !important;
-          font-weight: 800 !important;
         }
         .notebook-editor:empty::before {
           content: attr(data-placeholder);
@@ -1055,8 +1024,8 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
         .notebook-editor div, .notebook-editor p {
           margin: 0;
           padding: 0;
-          line-height: 24px;
-          min-height: 24px;
+          line-height: 28px !important;
+          min-height: 28px;
         }
         .notebook-editor img, .notebook-embedded-image-wrapper img {
           display: block !important;

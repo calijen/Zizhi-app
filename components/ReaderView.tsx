@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react';
 import { Box, Group, Stack, Text, ActionIcon, ScrollArea, Transition, Loader, Center } from '@mantine/core';
 import type { Book, Chapter, Theme, Quote, Note } from '../types';
+import { getBookUniqueKey } from '../App';
 import { IconChevronLeft, IconMenu, IconClose, IconPlus, IconMinus, IconSettings, IconNote } from './icons';
 import TextSelectionPopup from './TextSelectionPopup';
 import PdfPage from './PdfPage';
@@ -157,6 +158,28 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
     const [isNotebookOpen, setIsNotebookOpen] = useState(false);
     const [clickedImage, setClickedImage] = useState<{ url: string; rect: DOMRect } | null>(null);
     const [toast, setToast] = useState<{ message: string; action?: { label: string; onClick: () => void } } | null>(null);
+
+    const bookQuotes = useMemo(() => {
+        const cleanTitle = (book.title || '').trim().toLowerCase();
+        const bookKey = getBookUniqueKey(book.title, book.author);
+        return quotes.filter(q => {
+            if (q.bookId && q.bookId === book.id) return true;
+            if (q.bookTitle && getBookUniqueKey(q.bookTitle, q.author) === bookKey) return true;
+            if (q.bookTitle && q.bookTitle.trim().toLowerCase() === cleanTitle) return true;
+            return false;
+        });
+    }, [quotes, book.id, book.title, book.author]);
+
+    const bookNotes = useMemo(() => {
+        const cleanTitle = (book.title || '').trim().toLowerCase();
+        const bookKey = getBookUniqueKey(book.title, book.author);
+        return notes.filter(n => {
+            if (n.bookId && n.bookId === book.id) return true;
+            if (n.bookTitle && getBookUniqueKey(n.bookTitle, n.author) === bookKey) return true;
+            if (n.bookTitle && n.bookTitle.trim().toLowerCase() === cleanTitle) return true;
+            return false;
+        });
+    }, [notes, book.id, book.title, book.author]);
 
     const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
         const target = e.target as HTMLElement;
@@ -594,6 +617,8 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
         return () => document.removeEventListener('selectionchange', handleSelection);
     }, []);
 
+    const scrollDebounceTimerRef = useRef<any>(null);
+
     const handleScroll = (position: { x: number; y: number }) => {
         if (!scrollViewportRef.current) return;
         const { scrollHeight, clientHeight } = scrollViewportRef.current;
@@ -632,6 +657,11 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
             progress,
             currentChapterIndex
         };
+
+        if (scrollDebounceTimerRef.current) clearTimeout(scrollDebounceTimerRef.current);
+        scrollDebounceTimerRef.current = setTimeout(() => {
+            flushProgress();
+        }, 1000);
     };
 
     const styleVariables = {
@@ -753,13 +783,13 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
                                 </Stack>
                             ) : (
                                 <Stack gap="xl">
-                                    {notes.length === 0 && quotes.length === 0 ? (
+                                    {bookNotes.length === 0 && bookQuotes.length === 0 ? (
                                         <Center className="h-40 opacity-40">
-                                            <Text className="text-[10px] font-black uppercase text-[var(--sec-text)]">No highlights yet</Text>
+                                            <Text className="text-[10px] font-black uppercase text-[var(--sec-text)]">No highlights for this book yet</Text>
                                         </Center>
                                     ) : (
                                         <>
-                                            {notes.map(note => (
+                                            {bookNotes.map(note => (
                                                 <Box 
                                                     key={note.id} 
                                                     className="border-l-4 border-yellow-300 pl-4 py-1 cursor-pointer hover:bg-black/5 transition-colors"
@@ -771,7 +801,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
                                                     </Box>
                                                 </Box>
                                             ))}
-                                            {quotes.map(quote => (
+                                            {bookQuotes.map(quote => (
                                                 <Box 
                                                     key={quote.id} 
                                                     className="border-l-4 border-cyan-400 pl-4 py-1 cursor-pointer hover:bg-black/5 transition-colors"
@@ -1063,13 +1093,13 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
                                     </Stack>
                                 ) : (
                                     <Stack gap="xl">
-                                        {notes.length === 0 && quotes.length === 0 ? (
+                                        {bookNotes.length === 0 && bookQuotes.length === 0 ? (
                                             <Center className="h-40 opacity-40">
-                                                <Text className="text-[10px] font-black uppercase text-[var(--sec-text)]">No highlights yet</Text>
+                                                <Text className="text-[10px] font-black uppercase text-[var(--sec-text)]">No highlights for this book yet</Text>
                                             </Center>
                                         ) : (
                                             <>
-                                                {notes.map(note => (
+                                                {bookNotes.map(note => (
                                                     <Box 
                                                         key={note.id} 
                                                         className="border-l-4 border-yellow-300 pl-4 py-1 cursor-pointer hover:bg-black/5 transition-colors"
@@ -1081,7 +1111,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
                                                         </Box>
                                                     </Box>
                                                 ))}
-                                                {quotes.map(quote => (
+                                                {bookQuotes.map(quote => (
                                                     <Box 
                                                         key={quote.id} 
                                                         className="border-l-4 border-cyan-400 pl-4 py-1 cursor-pointer hover:bg-black/5 transition-colors"

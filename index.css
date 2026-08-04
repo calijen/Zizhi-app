@@ -144,19 +144,28 @@
 /* Notebook Paper Ruled Lines and Baseline Alignment */
 .notebook-lines {
   position: absolute;
-  top: 0;
+  top: 56px;
   left: 0;
   right: 0;
   bottom: 0;
+  background-image: linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 20px,
+    var(--line-gradient-color, rgba(96, 165, 250, 0.70)) 20px,
+    var(--line-gradient-color, rgba(96, 165, 250, 0.70)) 21px,
+    transparent 21px
+  );
   background-size: 100% 28px;
-  background-position: 0 28px;
+  background-position: 0 0;
+  border-top: 1px solid var(--line-gradient-color, rgba(96, 165, 250, 0.70));
   pointer-events: none;
 }
 
 .notebook-lines::before {
   content: "";
   position: absolute;
-  top: 0;
+  top: -56px;
   bottom: 0;
   left: 42px;
   width: 2px;
@@ -166,12 +175,23 @@
 .notebook-editor {
   line-height: 28px !important;
   font-size: 14px;
+  padding-top: 56px !important;
 }
 
 .notebook-editor p,
 .notebook-editor div,
 .notebook-editor span,
-.notebook-editor font {
+.notebook-editor font,
+.notebook-editor h1,
+.notebook-editor h2,
+.notebook-editor h3,
+.notebook-editor h4,
+.notebook-editor h5,
+.notebook-editor h6,
+.notebook-editor ul,
+.notebook-editor ol,
+.notebook-editor li,
+.notebook-editor blockquote {
   line-height: 28px !important;
   margin: 0 !important;
   padding: 0 !important;
@@ -179,9 +199,6 @@
 
 .notebook-editor:empty::before,
 .notebook-editor[data-placeholder]:empty::before {
-  content: attr(data-placeholder);
-  opacity: 0.45;
-  pointer-events: none;
-  display: block;
+  content: none;
 }
 

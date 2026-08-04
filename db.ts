@@ -10,42 +10,56 @@ const ACTIVITY_STORE = 'reading_activity';
 const CHAT_STORE = 'chat_sessions';
 const NOTEBOOK_STORE = 'notebooks';
 
-let db: IDBDatabase;
+let dbInstance: IDBDatabase | null = null;
+let dbPromise: Promise<IDBDatabase> | null = null;
 
 export const initDB = (): Promise<IDBDatabase> => {
-  return new Promise((resolve, reject) => {
-    if (db) return resolve(db);
+  if (dbInstance) return Promise.resolve(dbInstance);
+  if (dbPromise) return dbPromise;
+
+  dbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onerror = () => reject('Error opening database');
+    request.onerror = (e) => {
+      dbPromise = null;
+      console.error('Error opening IndexedDB:', (e.target as any)?.error);
+      reject((e.target as any)?.error || 'Error opening database');
+    };
     request.onsuccess = () => {
-      db = request.result;
-      resolve(db);
+      dbInstance = request.result;
+      dbInstance.onversionchange = () => {
+        dbInstance?.close();
+        dbInstance = null;
+        dbPromise = null;
+      };
+      resolve(dbInstance);
     };
     request.onupgradeneeded = (event) => {
-      const dbInstance = (event.target as IDBOpenDBRequest).result;
-      if (!dbInstance.objectStoreNames.contains(BOOK_STORE)) {
-        dbInstance.createObjectStore(BOOK_STORE, { keyPath: 'id' });
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(BOOK_STORE)) {
+        db.createObjectStore(BOOK_STORE, { keyPath: 'id' });
       }
-      if (!dbInstance.objectStoreNames.contains(CONTENT_STORE)) {
-        dbInstance.createObjectStore(CONTENT_STORE, { keyPath: 'id' });
+      if (!db.objectStoreNames.contains(CONTENT_STORE)) {
+        db.createObjectStore(CONTENT_STORE, { keyPath: 'id' });
       }
-      if (!dbInstance.objectStoreNames.contains(QUOTE_STORE)) {
-        dbInstance.createObjectStore(QUOTE_STORE, { keyPath: 'id' });
+      if (!db.objectStoreNames.contains(QUOTE_STORE)) {
+        db.createObjectStore(QUOTE_STORE, { keyPath: 'id' });
       }
-      if (!dbInstance.objectStoreNames.contains(NOTE_STORE)) {
-        dbInstance.createObjectStore(NOTE_STORE, { keyPath: 'id' });
+      if (!db.objectStoreNames.contains(NOTE_STORE)) {
+        db.createObjectStore(NOTE_STORE, { keyPath: 'id' });
       }
-      if (!dbInstance.objectStoreNames.contains(ACTIVITY_STORE)) {
-        dbInstance.createObjectStore(ACTIVITY_STORE, { keyPath: 'date' });
+      if (!db.objectStoreNames.contains(ACTIVITY_STORE)) {
+        db.createObjectStore(ACTIVITY_STORE, { keyPath: 'date' });
       }
-      if (!dbInstance.objectStoreNames.contains(CHAT_STORE)) {
-        dbInstance.createObjectStore(CHAT_STORE, { keyPath: 'id' });
+      if (!db.objectStoreNames.contains(CHAT_STORE)) {
+        db.createObjectStore(CHAT_STORE, { keyPath: 'id' });
       }
-      if (!dbInstance.objectStoreNames.contains(NOTEBOOK_STORE)) {
-        dbInstance.createObjectStore(NOTEBOOK_STORE, { keyPath: 'bookId' });
+      if (!db.objectStoreNames.contains(NOTEBOOK_STORE)) {
+        db.createObjectStore(NOTEBOOK_STORE, { keyPath: 'bookId' });
       }
     };
   });
+
+  return dbPromise;
 };
 
 export const saveBook = async (book: Book): Promise<void> => {
@@ -119,10 +133,10 @@ export const updateBookMetadata = async (id: string, updates: Partial<BookMetada
             if (existing) {
                 store.put({ ...existing, ...updates });
             }
-            resolve();
         };
-        request.onerror = () => reject();
+        request.onerror = () => reject(request.error);
         transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
     });
 };
 
