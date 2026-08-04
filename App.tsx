@@ -186,55 +186,92 @@ const App: FC = () => {
         db.getNotes().catch(() => [])
       ]);
       
-      // Deduplicate local books by title & author (keeping the most recently opened)
-      const groupedLocal = new Map<string, BookMetadata[]>();
+      // Deduplicate local books strictly by ID, preserving all local entries
+      const localBooksMap = new Map<string, BookMetadata>();
       localBooks.forEach(b => {
-          const key = getBookUniqueKey(b.title, b.author);
-          if (!groupedLocal.has(key)) {
-              groupedLocal.set(key, []);
+        if (b && b.id) {
+          const existing = localBooksMap.get(b.id);
+          if (!existing || (b.lastOpened || 0) >= (existing.lastOpened || 0)) {
+            localBooksMap.set(b.id, b);
           }
-          groupedLocal.get(key)!.push(b);
+        }
       });
+      const deduplicatedLocalBooks = Array.from(localBooksMap.values());
 
-      const deduplicatedLocalBooks: BookMetadata[] = [];
-      const duplicateIdsToDeleteOffline: string[] = [];
-
-      for (const list of groupedLocal.values()) {
-          if (list.length === 1) {
-              deduplicatedLocalBooks.push(list[0]);
-          } else {
-              list.sort((a, b) => (b.lastOpened || 0) - (a.lastOpened || 0));
-              deduplicatedLocalBooks.push(list[0]);
-              for (let i = 1; i < list.length; i++) {
-                  duplicateIdsToDeleteOffline.push(list[i].id);
-              }
-          }
-      }
-
-      if (duplicateIdsToDeleteOffline.length > 0) {
-          duplicateIdsToDeleteOffline.forEach(id => db.deleteBook(id).catch(() => {}));
-      }
+      let loadedBooks: BookMetadata[] = deduplicatedLocalBooks;
 
       if (currentUser && !isQuotaExceeded()) {
-          // Sync quotes, notes, and notebooks with Firestore (books are stored strictly locally on device)
+          // Sync books, quotes, notes, and notebooks with Firestore
           const quotesRef = collection(firestore, 'users', currentUser.uid, 'quotes');
           const notesRef = collection(firestore, 'users', currentUser.uid, 'notes');
           const notebooksRef = collection(firestore, 'users', currentUser.uid, 'notebooks');
+          const booksRef = collection(firestore, 'users', currentUser.uid, 'books');
 
           const handleDocsError = (e: any) => {
               handleFirestoreError(e, OperationType.LIST, 'user_data');
               return null;
           };
 
-          const [cloudQuotesSnap, cloudNotesSnap, cloudNotebooksSnap] = await Promise.all([
+          const [cloudQuotesSnap, cloudNotesSnap, cloudNotebooksSnap, cloudBooksSnap] = await Promise.all([
               getDocs(quotesRef).catch(handleDocsError),
               getDocs(notesRef).catch(handleDocsError),
-              getDocs(notebooksRef).catch(handleDocsError)
+              getDocs(notebooksRef).catch(handleDocsError),
+              getDocs(booksRef).catch(handleDocsError)
           ]);
 
           const cloudQuotes = cloudQuotesSnap ? cloudQuotesSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as Quote) })) : [];
           const cloudNotes = cloudNotesSnap ? cloudNotesSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as Note) })) : [];
           const cloudNotebooks = cloudNotebooksSnap ? cloudNotebooksSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as NotebookData) })) : [];
+          const cloudBooks = cloudBooksSnap ? cloudBooksSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as BookMetadata) })) : [];
+
+          // Merge local and cloud books cleanly without losing progress
+          const mergedBooksMap = new Map<string, BookMetadata>();
+          deduplicatedLocalBooks.forEach(b => mergedBooksMap.set(b.id, b));
+
+          cloudBooks.forEach(cb => {
+            const local = mergedBooksMap.get(cb.id);
+            if (!local) {
+              mergedBooksMap.set(cb.id, cb);
+            } else {
+              const maxProgress = Math.max(local.progress || 0, cb.progress || 0);
+              const maxReadingTime = Math.max(local.readingTime || 0, cb.readingTime || 0);
+              const latestOpened = Math.max(local.lastOpened || 0, cb.lastOpened || 0);
+              const localIsNewer = (local.lastOpened || 0) >= (cb.lastOpened || 0);
+
+              const preferredScrollTop = localIsNewer 
+                ? (local.lastScrollTop !== undefined ? local.lastScrollTop : cb.lastScrollTop)
+                : (cb.lastScrollTop !== undefined ? cb.lastScrollTop : local.lastScrollTop);
+
+              const preferredChapterIndex = localIsNewer
+                ? (local.lastChapterIndex !== undefined ? local.lastChapterIndex : cb.lastChapterIndex)
+                : (cb.lastChapterIndex !== undefined ? cb.lastChapterIndex : local.lastChapterIndex);
+
+              const merged: BookMetadata = {
+                ...local,
+                ...cb,
+                progress: maxProgress,
+                readingTime: maxReadingTime,
+                lastOpened: latestOpened,
+                lastScrollTop: preferredScrollTop ?? 0,
+                lastChapterIndex: preferredChapterIndex ?? 0
+              };
+
+              mergedBooksMap.set(cb.id, merged);
+              db.updateBookMetadata(cb.id, merged).catch(() => {});
+            }
+          });
+
+          // Asynchronously sync local books missing in cloud
+          deduplicatedLocalBooks.forEach(b => {
+            const inCloud = cloudBooks.some(cb => cb.id === b.id);
+            if (!inCloud && !isQuotaExceeded()) {
+              const bookRef = doc(firestore, 'users', currentUser.uid, 'books', b.id);
+              setDoc(bookRef, { ...b, userId: currentUser.uid }, { merge: true }).catch(() => {});
+            }
+          });
+
+          const mergedBooks = Array.from(mergedBooksMap.values());
+          loadedBooks = mergedBooks;
 
           // Intelligent merge for quotes and notes
           const mergedQuotesMap = new Map<string, Quote>();
@@ -287,12 +324,12 @@ const App: FC = () => {
               }
           });
 
-          setLibrary(deduplicatedLocalBooks);
+          setLibrary(mergedBooks);
           setQuotes(mergedQuotes);
           setNotes(mergedNotes);
 
           const storedEntered = localStorage.getItem('zizhi-entered') === 'true';
-          const shouldBeEntered = storedEntered || deduplicatedLocalBooks.length > 0 || mergedQuotes.length > 0 || true;
+          const shouldBeEntered = storedEntered || mergedBooks.length > 0 || mergedQuotes.length > 0 || !!currentUser;
           setHasEntered(shouldBeEntered);
           if (shouldBeEntered) localStorage.setItem('zizhi-entered', 'true');
       } else {
@@ -307,8 +344,8 @@ const App: FC = () => {
 
       // Restore last opened book if user was reading before refresh
       const lastOpenedBookId = localStorage.getItem('zizhi-last-opened-book-id');
-      if (lastOpenedBookId && deduplicatedLocalBooks.length > 0) {
-        const meta = deduplicatedLocalBooks.find(b => b.id === lastOpenedBookId);
+      if (lastOpenedBookId) {
+        const meta = loadedBooks.find(b => b.id === lastOpenedBookId) || deduplicatedLocalBooks.find(b => b.id === lastOpenedBookId);
         if (meta) {
           db.getBookContent(lastOpenedBookId).then(content => {
             if (content && content.chapters && content.chapters.length > 0) {
@@ -327,6 +364,10 @@ const App: FC = () => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
+      if (u) {
+        setHasEntered(true);
+        localStorage.setItem('zizhi-entered', 'true');
+      }
       loadData(u);
     });
     return () => unsubscribe();
@@ -494,6 +535,11 @@ const App: FC = () => {
         const metaWithFlags = { ...metadata, hasSummary: !!summaryScript, hasAudio: !!audioSummaryUrl };
         setLibrary(prev => [metaWithFlags, ...prev]);
 
+        if (user && !isQuotaExceeded()) {
+          const bookRef = doc(firestore, 'users', user.uid, 'books', newBook.id);
+          setDoc(bookRef, { ...metaWithFlags, userId: user.uid }, { merge: true }).catch(err => handleFirestoreError(err, OperationType.WRITE, 'books'));
+        }
+
         // Release the UI lock
         setIsUploading(false);
         setToast({ message: `${file.name.toLowerCase().endsWith('.pdf') ? 'PDF' : 'EPUB'} added to library.` });
@@ -629,6 +675,9 @@ const App: FC = () => {
     try {
         await db.deleteBook(id);
         setLibrary(prev => prev.filter(b => b.id !== id));
+        if (user && !isQuotaExceeded()) {
+            deleteDoc(doc(firestore, 'users', user.uid, 'books', id)).catch(e => handleFirestoreError(e, OperationType.DELETE, 'books'));
+        }
         setToast({ message: "Book removed." });
     } catch (e) {
         setToast({ message: "Failed to delete book." });
@@ -852,17 +901,28 @@ const App: FC = () => {
               const bidx = library.findIndex(b => b.id === bid); 
               if (bidx === -1) return; 
               
+              const safeScrollTop = typeof st === 'number' && !isNaN(st) ? st : 0;
+              const safeChapterIndex = typeof ci === 'number' && !isNaN(ci) ? ci : 0;
+              const safeProgress = typeof gp === 'number' && !isNaN(gp) && gp >= 0 && gp <= 1 ? gp : 0;
+              const safeTimeSpent = typeof ts === 'number' && !isNaN(ts) ? ts : 0;
+
               const updates: Partial<BookMetadata> = { 
-                  progress: gp, 
-                  lastScrollTop: st, 
-                  lastChapterIndex: ci,
-                  readingTime: (library[bidx].readingTime || 0) + ts, 
+                  progress: safeProgress, 
+                  lastScrollTop: safeScrollTop, 
+                  lastChapterIndex: safeChapterIndex,
+                  readingTime: ((library[bidx]?.readingTime) || 0) + safeTimeSpent, 
                   lastOpened: Date.now() 
               }; 
               
-              // Local update metadata only
+              // Local update metadata
               await db.updateBookMetadata(bid, updates);
               setLibrary(prev => prev.map(b => b.id === bid ? { ...b, ...updates } : b)); 
+              setSelectedBook(prev => prev && prev.id === bid ? { ...prev, ...updates } : prev);
+
+              if (user && !isQuotaExceeded()) {
+                  const bookRef = doc(firestore, 'users', user.uid, 'books', bid);
+                  setDoc(bookRef, { ...updates, userId: user.uid }, { merge: true }).catch(e => handleFirestoreError(e, OperationType.WRITE, 'books'));
+              }
           }} onSaveQuote={async (t, c) => { 
               const nq: Quote = { id: crypto.randomUUID(), text: t, bookTitle: selectedBook.title, author: selectedBook.author, bookId: selectedBook.id, location: c, createdAt: Date.now() }; 
               await db.saveQuote(nq); 

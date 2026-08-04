@@ -32,7 +32,7 @@ const LandingView: React.FC<LandingViewProps> = ({ onEnter, onLogin }) => {
     <div className="min-h-screen bg-[#FFFDF9] text-[var(--color-primary-text)] selection:bg-[var(--color-primary)] selection:text-white overflow-x-hidden relative font-sans">
       <AnimatePresence>
         {showAuth && (
-          <AuthView onClose={() => setShowAuth(false)} onLogin={onLogin} />
+          <AuthView onClose={() => setShowAuth(false)} onLogin={onLogin} onEnterGuest={onEnter} />
         )}
       </AnimatePresence>
 

@@ -14,15 +14,12 @@ export const parsePdf = async (file: File): Promise<Book> => {
 
     const arrayBuffer = await file.arrayBuffer();
     
-    // Use a single Uint8Array for the whole process
-    const pdfData = new Uint8Array(arrayBuffer);
+    // Create isolated copies for parsing vs storage to avoid worker buffer detachment
+    const pdfDataForStorage = new Uint8Array(arrayBuffer.slice(0));
+    const pdfDataForParse = new Uint8Array(arrayBuffer.slice(0));
     
-    // Pass a copy to getDocument to prevent detaching the original buffer
-    // which we need to save to IndexedDB later.
-    // On mobile, we use slice() which is memory intensive but safe.
     const pdf = await pdfjs.getDocument({ 
-        data: pdfData.slice(0),
-        // Disable some features to save memory on mobile
+        data: pdfDataForParse,
         disableAutoFetch: true,
         disableStream: true
     }).promise;
@@ -104,6 +101,6 @@ export const parsePdf = async (file: File): Promise<Book> => {
         lastOpened: Date.now(),
         genre: guessGenre(title) || 'PDF Document',
         isPdf: true,
-        pdfData: pdfData
+        pdfData: pdfDataForStorage
     };
 };
