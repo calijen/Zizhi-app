@@ -62,6 +62,20 @@ export const initDB = (): Promise<IDBDatabase> => {
   return dbPromise;
 };
 
+export const toUint8Array = (data: any): Uint8Array | null => {
+  if (!data) return null;
+  if (data instanceof Uint8Array) return data;
+  if (data instanceof ArrayBuffer) return new Uint8Array(data);
+  if (Array.isArray(data)) return new Uint8Array(data);
+  if (typeof data === 'object') {
+    const values = Object.values(data);
+    if (values.length > 0 && typeof values[0] === 'number') {
+      return new Uint8Array(values as number[]);
+    }
+  }
+  return null;
+};
+
 export const saveBook = async (book: Book): Promise<void> => {
   let db: IDBDatabase;
   try {
@@ -77,10 +91,7 @@ export const saveBook = async (book: Book): Promise<void> => {
         // Extract metadata
         const { chapters, toc, summaryScript, audioSummaryUrl, audioDuration, pdfData, ...metadata } = book;
 
-        let safePdfData = pdfData;
-        if (pdfData instanceof Uint8Array) {
-            safePdfData = new Uint8Array(pdfData);
-        }
+        const safePdfData = toUint8Array(pdfData);
 
         const content = { id: book.id, chapters, toc, summaryScript, audioSummaryUrl, audioDuration, pdfData: safePdfData };
         
@@ -154,7 +165,13 @@ export const getBookContent = async (id: string): Promise<BookContent | null> =>
             try {
                 const transaction = db.transaction(CONTENT_STORE, 'readonly');
                 const request = transaction.objectStore(CONTENT_STORE).get(id);
-                request.onsuccess = () => resolve(request.result || null);
+                request.onsuccess = () => {
+                    const res = request.result;
+                    if (res && res.pdfData) {
+                        res.pdfData = toUint8Array(res.pdfData);
+                    }
+                    resolve(res || null);
+                };
                 request.onerror = () => resolve(null);
                 transaction.onerror = () => resolve(null);
             } catch (err) {
