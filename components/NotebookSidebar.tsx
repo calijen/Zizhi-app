@@ -327,7 +327,8 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
 
             // Try doc ID = bookKey
             if (bookKey) {
-              const docRef = doc(firestore, 'users', userUid, 'notebooks', bookKey);
+              const safeKey = bookKey.replace(/\//g, '_');
+              const docRef = doc(firestore, 'users', userUid, 'notebooks', safeKey);
               const snap = await getDoc(docRef);
               if (snap.exists()) {
                 cloudNb = snap.data() as NotebookData;
@@ -335,7 +336,8 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
             }
             // Try doc ID = bookId
             if (!cloudNb && bookId) {
-              const docRef = doc(firestore, 'users', userUid, 'notebooks', bookId);
+              const safeId = bookId.replace(/\//g, '_');
+              const docRef = doc(firestore, 'users', userUid, 'notebooks', safeId);
               const snap = await getDoc(docRef);
               if (snap.exists()) {
                 cloudNb = snap.data() as NotebookData;
@@ -434,8 +436,11 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
         };
         await db.saveNotebook(notebookObj);
         if (user) {
-          const nbDocId = bookKey || bookId;
-          setDoc(doc(firestore, 'users', user.uid, 'notebooks', nbDocId), { ...notebookObj, userId: user.uid }, { merge: true }).catch(() => {});
+          const rawDocId = bookKey || bookId;
+          const nbDocId = (rawDocId || '').replace(/\//g, '_');
+          if (nbDocId) {
+            setDoc(doc(firestore, 'users', user.uid, 'notebooks', nbDocId), { ...notebookObj, userId: user.uid }, { merge: true }).catch(() => {});
+          }
         }
         setSaveStatus('saved');
       } catch (err) {

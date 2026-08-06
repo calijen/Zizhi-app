@@ -262,9 +262,26 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
         if (book.isPdf && book.pdfData && typeof pdfjsLib !== 'undefined') {
             setIsPdfLoading(true);
             try {
-                const rawData = book.pdfData instanceof Uint8Array 
-                    ? book.pdfData 
-                    : new Uint8Array(book.pdfData);
+                const pdfData = book.pdfData as any;
+                let rawData: Uint8Array | null = null;
+                if (pdfData instanceof Uint8Array) {
+                    rawData = pdfData;
+                } else if (pdfData instanceof ArrayBuffer) {
+                    rawData = new Uint8Array(pdfData);
+                } else if (Array.isArray(pdfData)) {
+                    rawData = new Uint8Array(pdfData);
+                } else if (typeof pdfData === 'object' && pdfData !== null) {
+                    const values = Object.values(pdfData);
+                    if (values.length > 0 && typeof values[0] === 'number') {
+                        rawData = new Uint8Array(values as number[]);
+                    }
+                }
+
+                if (!rawData || rawData.length === 0) {
+                    console.error("PDF data is empty or invalid format.");
+                    setIsPdfLoading(false);
+                    return;
+                }
                 
                 // Always pass a sliced copy so pdf.js worker transfer does not detach the original buffer
                 const dataCopy = rawData.slice(0);
@@ -646,16 +663,17 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, theme, quotes, notes, ini
                 }
             });
 
+            const activeChapIdx = closestIndex !== -1 ? closestIndex : currentChapterIndex;
             if (closestIndex !== -1) {
                 setCurrentChapterIndex(prev => prev !== closestIndex ? closestIndex : prev);
             }
-        }
 
-        latestScrollRef.current = {
-            scrollTop: position.y,
-            progress,
-            currentChapterIndex
-        };
+            latestScrollRef.current = {
+                scrollTop: position.y,
+                progress,
+                currentChapterIndex: activeChapIdx
+            };
+        }
 
         if (scrollDebounceTimerRef.current) clearTimeout(scrollDebounceTimerRef.current);
         scrollDebounceTimerRef.current = setTimeout(() => {
