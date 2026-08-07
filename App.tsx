@@ -23,7 +23,6 @@ import { ref, uploadBytesResumable, getDownloadURL, getBlob } from 'firebase/sto
 import type { Book, BookMetadata, BookContent, Quote, Note, NotebookData, Theme, ThemeFont, GenerationStatus } from './types';
 import { parseEpub } from './epubParser';
 import { parsePdf } from './pdfParser';
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const FONTS: ThemeFont[] = [
     { name: 'Print Serif', sans: 'Inter', serif: 'Gentium Book Plus' },
@@ -622,27 +621,28 @@ const App: FC = () => {
     setGenerationStatuses(prev => ({ ...prev, [bookId]: { stage: 'Checking', progress: 0.1, currentAction: 'Authenticating...' } }));
     
     try {
-        const genAI = new GoogleGenerativeAI(process.env.API_KEY || "");
-        const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
-        
         setGenerationStatuses(prev => ({ ...prev, [bookId]: { stage: 'Thinking', progress: 0.2, currentAction: 'Distilling content...' } }));
 
-        const summaryPrompt = `Synthesize a focused audio summary of the book "${book.title}" by ${book.author}. 
-        Write a continuous narrative script (no headers or markdown). 800 words approx. Clear, insightful, human tone.`;
+        const res = await fetch('/api/gemini/generate-summary', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: book.title, author: book.author }),
+        });
 
-        const scriptRes = await model.generateContent(summaryPrompt);
-        const script = scriptRes.response.text();
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || "Distillation failed.");
+        }
+
+        const data = await res.json();
+        const script = data.script;
+        const base64AudioUrl = data.audioSummaryUrl;
         
         if (!script) throw new Error("Distillation failed: No script generated.");
 
         setGenerationStatuses(prev => ({ ...prev, [bookId]: { stage: 'Talking', progress: 0.6, currentAction: 'Generating voice...' } }));
         
-        // Note: Standard SDK does not support direct TTS via generateContent as used here.
-        // We will mock the audio for now to prevent runtime crashes if the specific model doesn't exist.
-        // In a real scenario, one would use a dedicated TTS API.
-        const base64Audio = "UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA="; // Placeholder silent wave
-        
-        const updatedBook = { ...book, summaryScript: script, audioSummaryUrl: `data:audio/wav;base64,${base64Audio}` };
+        const updatedBook = { ...book, summaryScript: script, audioSummaryUrl: base64AudioUrl };
         await db.saveBook(updatedBook); 
         
         // Update library state (metadata only)

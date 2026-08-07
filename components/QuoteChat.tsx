@@ -1,7 +1,6 @@
 
 import { FC, useState, useRef, useEffect, useCallback } from 'react';
 import { Box, Stack, Text, Group, ActionIcon, Loader, ScrollArea, Avatar, Divider, Badge } from '@mantine/core';
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { motion, AnimatePresence } from 'framer-motion';
 import { IconSend, IconSparkles, IconClose, IconTrash, IconPlus, IconChevronLeft, IconQuote, IconHistory } from './icons';
 import type { Quote, ChatMessage, ChatSession } from '../types';
@@ -27,8 +26,6 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-  
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
   const loadSessions = useCallback(async () => {
     const data = await db.getChatSessions();
@@ -98,29 +95,21 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
     setIsLoading(true);
 
     try {
-      const context = quotes.map(q => `Book: ${q.bookTitle} by ${q.author}\nQuote: "${q.text}"`).join('\n\n');
-      const systemInstruction = `You are Zizhi, an insightful AI librarian for the Zizhi app. You have access to the following collection of highlights from the user's books. 
-      Your goal is to help the user identify themes, answer questions, and explore their personal library of quotes. 
-      Be sophisticated, warm, and encourage deep thinking. If the user's question cannot be answered by the quotes, let them know, but try to offer related wisdom from the authors present in their library.
-      
-      USER'S QUOTES:
-      ${context}`;
-
-      const model = genAI.getGenerativeModel({ 
-        model: "gemini-3.5-flash",
-        systemInstruction,
+      const res = await fetch('/api/gemini/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quotes,
+          messages: session.messages,
+        }),
       });
 
-      const response = await model.generateContent({
-        contents: [
-          ...session.messages.map(m => ({ role: m.role, parts: [{ text: m.content }] })),
-        ],
-        generationConfig: {
-          temperature: 0.7,
-        }
-      });
+      if (!res.ok) {
+        throw new Error('Failed to generate response from server');
+      }
 
-      const modelResponseText = response.response.text() || "I'm sorry, I couldn't process that request.";
+      const data = await res.json();
+      const modelResponseText = data.reply || "I'm sorry, I couldn't process that request.";
       const modelMessage: ChatMessage = {
         role: 'model',
         content: modelResponseText,
