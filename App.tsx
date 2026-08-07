@@ -103,6 +103,8 @@ const App: FC = () => {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [user, setUser] = useState<User | null>(null);
+  const [isAppLoading, setIsAppLoading] = useState(true);
+  const [loadingBookId, setLoadingBookId] = useState<string | null>(null);
   const [hasEntered, setHasEntered] = useState<boolean | null>(() => {
     if (typeof window !== 'undefined' && localStorage.getItem('zizhi-entered') === 'true') {
       return true;
@@ -176,6 +178,7 @@ const App: FC = () => {
   }, []);
 
   const loadData = useCallback(async (currentUser: User | null) => {
+    setIsAppLoading(true);
     try {
       updateStreak();
       
@@ -319,17 +322,22 @@ const App: FC = () => {
       if (lastOpenedBookId) {
         const meta = loadedBooks.find(b => b.id === lastOpenedBookId) || deduplicatedLocalBooks.find(b => b.id === lastOpenedBookId);
         if (meta) {
-          db.getBookContent(lastOpenedBookId).then(content => {
+          try {
+            const content = await db.getBookContent(lastOpenedBookId);
             if (content && content.chapters && content.chapters.length > 0) {
               setSelectedBook({ ...meta, ...content });
             }
-          }).catch(() => {});
+          } catch (err) {
+            console.error("Failed to restore last opened book:", err);
+          }
         }
       }
     } catch (e) { 
         console.error("Load failed", e); 
         const storedEntered = localStorage.getItem('zizhi-entered') === 'true';
         setHasEntered(storedEntered); 
+    } finally {
+        setIsAppLoading(false);
     }
   }, [updateStreak]);
 
@@ -569,6 +577,7 @@ const App: FC = () => {
         console.error(`Book metadata not found for ID: ${bookId}`);
         return;
     }
+    setLoadingBookId(bookId);
     try {
         const content = await db.getBookContent(bookId);
         if (content && content.chapters && content.chapters.length > 0) {
@@ -582,17 +591,26 @@ const App: FC = () => {
     } catch (err) {
         console.error(`Error loading book content for ID: ${bookId}:`, err);
         setToast({ message: "Failed to load book." });
+    } finally {
+        setLoadingBookId(null);
     }
   };
 
   const handleViewSummary = async (bookId: string) => {
     const meta = library.find(b => b.id === bookId);
     if (!meta) return;
-    const content = await db.getBookContent(bookId);
-    if (content) {
-        setSummaryBook({ ...meta, ...content });
-    } else {
-        setToast({ message: "Summary content missing." });
+    setLoadingBookId(bookId);
+    try {
+        const content = await db.getBookContent(bookId);
+        if (content) {
+            setSummaryBook({ ...meta, ...content });
+        } else {
+            setToast({ message: "Summary content missing." });
+        }
+    } catch (err) {
+        setToast({ message: "Failed to load summary." });
+    } finally {
+        setLoadingBookId(null);
     }
   };
 
@@ -663,14 +681,19 @@ const App: FC = () => {
     '--font-sans': theme.font.sans 
   } as React.CSSProperties;
 
-  if (hasEntered === null) {
+  if (hasEntered === null || isAppLoading) {
     return (
-      <Box className="h-[100dvh] w-full flex flex-col items-center justify-center bg-[#fdf6e3]" style={{ fontFamily: '"Gentium Book Plus", serif' }}>
-          <Logo className="mb-8 scale-125" />
-          <Group gap="xs">
-              <IconSpinner className="w-5 h-5 text-[#a0522d] animate-spin" />
-              <Text className="text-[10px] font-black uppercase tracking-widest text-[#a0522d]">Initializing Reading Room...</Text>
-          </Group>
+      <Box className="h-[100dvh] w-full flex flex-col items-center justify-center bg-[#FDF6E3] p-6 text-[#2b2b2b] select-none" style={{ fontFamily: '"Gentium Book Plus", serif' }}>
+        <div className="relative border-4 border-black p-8 md:p-12 bg-[#FFFDF5] shadow-[12px_12px_0_#000] max-w-md w-full flex flex-col items-center text-center">
+          <Logo className="mb-6 scale-125" />
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#8b4513] mb-6 border-y-2 border-black/10 py-2 w-full">
+            Local-First Reader & Annotator
+          </p>
+          <div className="flex items-center gap-3 text-xs font-black uppercase text-[#2b2b2b] bg-[#f8f1e1] border-2 border-black px-5 py-3 shadow-[3px_3px_0_#000]">
+            <IconSpinner className="w-5 h-5 animate-spin text-[#8b4513] flex-shrink-0" />
+            <span>Loading library & notes...</span>
+          </div>
+        </div>
       </Box>
     );
   }
@@ -765,6 +788,7 @@ const App: FC = () => {
                           theme={theme} 
                           onBookSelect={handleBookSelect} 
                           isLoading={isUploading} 
+                          loadingBookId={loadingBookId}
                           error={null} 
                           onDelete={(id) => setDeleteConfirm(id)} 
                           onGenerateSummary={handleGenerateSummary} 
@@ -788,12 +812,19 @@ const App: FC = () => {
                               meta = library.find(b => getBookUniqueKey(b.title, b.author) === qKey);
                           }
                           if (meta) {
-                              const content = await db.getBookContent(meta.id);
-                              if (content) {
-                                  setInitialReaderNav({ chapterId: q.location, searchText: q.text });
-                                  setSelectedBook({ ...meta, ...content });
-                              } else {
-                                  setToast({ message: "Book content missing locally. Please re-upload this book." });
+                              setLoadingBookId(meta.id);
+                              try {
+                                  const content = await db.getBookContent(meta.id);
+                                  if (content) {
+                                      setInitialReaderNav({ chapterId: q.location, searchText: q.text });
+                                      setSelectedBook({ ...meta, ...content });
+                                  } else {
+                                      setToast({ message: "Book content missing locally. Please re-upload this book." });
+                                  }
+                              } catch (e) {
+                                  setToast({ message: "Failed to load book." });
+                              } finally {
+                                  setLoadingBookId(null);
                               }
                           } else {
                               setToast({ message: `Re-upload "${q.bookTitle}" to read in context.` });
@@ -939,6 +970,23 @@ const App: FC = () => {
                     </Group>
                 </Box>
             </Box>
+          )}
+
+          {loadingBookId && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex flex-col items-center justify-center animate-fade-in p-6">
+              <div className="bg-[var(--color-surface)] border-4 border-black p-8 shadow-[12px_12px_0_#000] max-w-sm w-full text-center flex flex-col items-center">
+                <IconSpinner className="w-10 h-10 animate-spin mb-4 text-cyan-400" />
+                <h3 className="font-black text-lg text-[var(--color-primary-text)] uppercase tracking-wider mb-1">
+                  Opening Book
+                </h3>
+                <p className="text-xs font-bold text-[var(--color-secondary-text)] uppercase tracking-widest truncate max-w-full">
+                  {library.find(b => b.id === loadingBookId)?.title || 'Preparing text & chapters...'}
+                </p>
+                <span className="text-[10px] font-bold text-cyan-900 bg-cyan-100 border border-cyan-300 px-3 py-1 mt-4 uppercase tracking-wider">
+                  Initializing Reader
+                </span>
+              </div>
+            </div>
           )}
         </Box>
       )}
