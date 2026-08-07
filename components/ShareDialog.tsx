@@ -279,6 +279,14 @@ const ShareDialog: FC<ShareDialogProps> = ({ text, bookTitle, author, coverImage
         }
     }, [selectedPreset, widthMode, text, step]);
 
+    useEffect(() => {
+        const prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = prevOverflow;
+        };
+    }, []);
+
     const handleDownload = () => {
         const link = document.createElement('a');
         link.download = `zizhi-insight-${Date.now()}.png`;
@@ -322,63 +330,63 @@ const ShareDialog: FC<ShareDialogProps> = ({ text, bookTitle, author, coverImage
     };
 
     return (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 md:p-6 bg-black/80 backdrop-blur-md animate-fade-in overflow-y-auto">
-            <div className="w-full max-w-lg bg-white border-8 border-black shadow-[12px_12px_0_black] flex flex-col relative animate-pop-in my-8 max-h-[90vh]">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-fade-in overflow-hidden h-[100dvh] w-full">
+            <div className="w-full max-w-lg bg-white border-4 sm:border-8 border-black shadow-[6px_6px_0_black] sm:shadow-[12px_12px_0_black] flex flex-col relative animate-pop-in max-h-[88dvh] sm:max-h-[85vh] my-auto overflow-hidden">
                 
                 {/* Always-accessible Internal Close Button */}
                 <button 
                     onClick={onClose} 
-                    className="absolute top-3 right-3 w-10 h-10 bg-red-500 border-4 border-black text-white flex items-center justify-center shadow-[3px_3px_0_black] hover:translate-y-0.5 active:shadow-none transition-all z-50 hover:bg-red-600"
+                    className="absolute top-2 right-2 sm:top-3 sm:right-3 w-8 h-8 sm:w-10 sm:h-10 bg-red-500 border-2 sm:border-4 border-black text-white flex items-center justify-center shadow-[2px_2px_0_black] sm:shadow-[3px_3px_0_black] hover:translate-y-0.5 active:shadow-none transition-all z-50 hover:bg-red-600"
                     aria-label="Close dialog"
                 >
-                    <IconClose className="w-5 h-5 font-black" />
+                    <IconClose className="w-4 h-4 sm:w-5 sm:h-5 font-black" />
                 </button>
 
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-auto min-h-0">
                     {step === 'choice' && (
-                        <div className="p-6 md:p-10 space-y-8">
-                            <header className="text-center space-y-2 pr-10">
-                                <h2 className="text-3xl font-black uppercase tracking-tighter italic text-left">Share Insight</h2>
+                        <div className="p-5 sm:p-8 space-y-5 sm:space-y-8">
+                            <header className="text-center space-y-1.5 pr-8 sm:pr-10">
+                                <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tighter italic text-left">Share Insight</h2>
                                 <p className="text-[10px] font-black uppercase text-black/60 tracking-widest text-left">Select your sharing medium</p>
                             </header>
                             
-                            <div className="grid grid-cols-1 gap-4">
+                            <div className="grid grid-cols-1 gap-3 sm:gap-4">
                                 <button 
                                     onClick={() => setStep('image')}
-                                    className="group p-6 border-4 border-black bg-cyan-400 shadow-[4px_4px_0_black] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_black] active:translate-y-0.5 active:shadow-none transition-all flex flex-col items-center gap-3 text-left"
+                                    className="group p-4 sm:p-6 border-3 sm:border-4 border-black bg-cyan-400 shadow-[3px_3px_0_black] sm:shadow-[4px_4px_0_black] hover:translate-y-[-2px] hover:shadow-[5px_5px_0_black] active:translate-y-0.5 active:shadow-none transition-all flex flex-col items-center gap-2 sm:gap-3 text-left"
                                 >
-                                    <IconDownload className="w-8 h-8 text-black" />
-                                    <span className="font-black uppercase tracking-widest text-sm text-black">Generate Notebook Card</span>
+                                    <IconDownload className="w-6 h-6 sm:w-8 sm:h-8 text-black" />
+                                    <span className="font-black uppercase tracking-widest text-xs sm:text-sm text-black">Generate Notebook Card</span>
                                 </button>
                                 <button 
                                     onClick={() => setStep('social')}
-                                    className="group p-6 border-4 border-black bg-white shadow-[4px_4px_0_black] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_black] active:translate-y-0.5 active:shadow-none transition-all flex flex-col items-center gap-3"
+                                    className="group p-4 sm:p-6 border-3 sm:border-4 border-black bg-white shadow-[3px_3px_0_black] sm:shadow-[4px_4px_0_black] hover:translate-y-[-2px] hover:shadow-[5px_5px_0_black] active:translate-y-0.5 active:shadow-none transition-all flex flex-col items-center gap-2 sm:gap-3"
                                 >
-                                    <IconShare className="w-8 h-8 text-black" />
-                                    <span className="font-black uppercase tracking-widest text-sm text-black">Post to Social Hubs</span>
+                                    <IconShare className="w-6 h-6 sm:w-8 sm:h-8 text-black" />
+                                    <span className="font-black uppercase tracking-widest text-xs sm:text-sm text-black">Post to Social Hubs</span>
                                 </button>
                             </div>
                         </div>
                     )}
 
                     {step === 'social' && (
-                        <div className="p-6 md:p-8 space-y-6">
-                            <header className="flex items-center justify-between border-b-2 border-black pb-3 pr-10">
+                        <div className="p-4 sm:p-8 space-y-4 sm:space-y-6">
+                            <header className="flex items-center justify-between border-b-2 border-black pb-3 pr-8 sm:pr-10">
                                 <button onClick={() => setStep('choice')} className="text-[11px] font-black uppercase underline hover:text-cyan-600 transition-colors">← Back</button>
-                                <h3 className="text-lg font-black uppercase italic">Social Hub</h3>
+                                <h3 className="text-base sm:text-lg font-black uppercase italic">Social Hub</h3>
                                 <div className="w-4"></div>
                             </header>
                             
-                            <div className="p-5 bg-slate-50 border-4 border-black font-serif italic text-sm text-black shadow-inner max-h-36 overflow-y-auto">
+                            <div className="p-3.5 sm:p-5 bg-slate-50 border-3 sm:border-4 border-black font-serif italic text-xs sm:text-sm text-black shadow-inner max-h-28 sm:max-h-36 overflow-y-auto">
                                 “{text}”
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                                 {socialPlatforms.map(platform => (
                                     <button 
                                         key={platform.name}
                                         onClick={() => handleSocialShare(platform)}
-                                        className="p-3.5 border-4 border-black font-black uppercase text-[10px] flex items-center justify-between hover:bg-slate-100 active:translate-y-0.5 transition-all shadow-[2px_2px_0_black]"
+                                        className="p-2.5 sm:p-3.5 border-3 sm:border-4 border-black font-black uppercase text-[10px] flex items-center justify-between hover:bg-slate-100 active:translate-y-0.5 transition-all shadow-[2px_2px_0_black]"
                                         style={{ color: 'black' }}
                                     >
                                         <span>{platform.name}</span>
@@ -391,7 +399,7 @@ const ShareDialog: FC<ShareDialogProps> = ({ text, bookTitle, author, coverImage
 
                             <button 
                                 onClick={copyToClipboard}
-                                className="w-full py-4 bg-yellow-400 border-4 border-black font-black uppercase tracking-widest shadow-[4px_4px_0_black] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_black] active:translate-y-0.5 active:shadow-none transition-all flex items-center justify-center gap-2 text-black text-xs"
+                                className="w-full py-3 sm:py-4 bg-yellow-400 border-3 sm:border-4 border-black font-black uppercase tracking-widest shadow-[3px_3px_0_black] sm:shadow-[4px_4px_0_black] hover:translate-y-[-2px] hover:shadow-[5px_5px_0_black] active:translate-y-0.5 active:shadow-none transition-all flex items-center justify-center gap-2 text-black text-xs"
                             >
                                 <IconCopy className="w-4 h-4" /> Copy Quote Text
                             </button>
@@ -400,24 +408,24 @@ const ShareDialog: FC<ShareDialogProps> = ({ text, bookTitle, author, coverImage
 
                     {step === 'image' && (
                         <div className="flex flex-col">
-                            <div className="p-4 border-b-4 border-black flex items-center justify-between bg-white pr-12 shrink-0">
+                            <div className="p-3 sm:p-4 border-b-2 sm:border-b-4 border-black flex items-center justify-between bg-white pr-10 sm:pr-12 shrink-0">
                                 <button onClick={() => setStep('choice')} className="text-[11px] font-black uppercase underline hover:text-cyan-600 transition-colors">← Back</button>
-                                <h3 className="text-[11px] font-black uppercase tracking-widest italic text-center">Visual Customizer</h3>
+                                <h3 className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest italic text-center">Visual Customizer</h3>
                                 <div className="w-4"></div>
                             </div>
 
                             {/* Canvas Preview Box */}
-                            <div className="p-4 bg-slate-200 border-b-4 border-black flex flex-col items-center justify-center min-h-[220px] max-h-[300px] overflow-y-auto relative">
+                            <div className="p-3 sm:p-4 bg-slate-200 border-b-2 sm:border-b-4 border-black flex flex-col items-center justify-center min-h-[150px] max-h-[220px] sm:max-h-[280px] overflow-hidden relative shrink-0">
                                 {text.length > MAX_IMAGE_CHARS && (
-                                    <div className="absolute inset-0 z-10 bg-red-500/90 flex flex-col items-center justify-center p-6 text-center space-y-3">
-                                        <h4 className="text-xl font-black uppercase text-white italic tracking-tighter">Text Too Long</h4>
-                                        <p className="text-white font-bold text-xs leading-snug uppercase max-w-xs">
+                                    <div className="absolute inset-0 z-10 bg-red-500/90 flex flex-col items-center justify-center p-4 sm:p-6 text-center space-y-2 sm:space-y-3">
+                                        <h4 className="text-lg sm:text-xl font-black uppercase text-white italic tracking-tighter">Text Too Long</h4>
+                                        <p className="text-white font-bold text-[11px] sm:text-xs leading-snug uppercase max-w-xs">
                                             Visual cards are limited to {MAX_IMAGE_CHARS} characters for notebook readability. 
                                             Yours is {text.length}.
                                         </p>
                                         <button 
                                             onClick={() => setStep('choice')}
-                                            className="px-4 py-2.5 bg-black text-white border-4 border-black font-black uppercase text-[10px] shadow-[3px_3px_0_white] hover:translate-y-0.5 hover:shadow-none transition-all"
+                                            className="px-3 py-2 bg-black text-white border-2 sm:border-4 border-black font-black uppercase text-[10px] shadow-[2px_2px_0_white] hover:translate-y-0.5 hover:shadow-none transition-all"
                                         >
                                             Go Back & Copy Text Instead
                                         </button>
@@ -425,23 +433,23 @@ const ShareDialog: FC<ShareDialogProps> = ({ text, bookTitle, author, coverImage
                                 )}
                                 <canvas ref={canvasRef} className="hidden" />
                                 {previewUrl && (
-                                    <img src={previewUrl} className="w-full h-auto border-4 border-black shadow-[6px_6px_0_black] bg-white max-h-[240px] object-contain" alt="Notebook card preview" />
+                                    <img src={previewUrl} className="w-full h-auto border-2 sm:border-4 border-black shadow-[4px_4px_0_black] sm:shadow-[6px_6px_0_black] bg-white max-h-[190px] sm:max-h-[240px] object-contain" alt="Notebook card preview" />
                                 )}
                             </div>
 
                             {/* Options controls */}
-                            <div className="p-5 space-y-4 bg-white">
+                            <div className="p-3 sm:p-5 space-y-3 sm:space-y-4 bg-white">
                                 {/* Preset circles/squares */}
                                 <div className="flex flex-col gap-1.5">
                                     <span className="text-[9px] uppercase tracking-wider font-sans font-black text-black/60 block text-center">
                                         Paper Type presets
                                     </span>
-                                    <div className="flex flex-wrap gap-2 justify-center">
+                                    <div className="flex flex-wrap gap-1.5 sm:gap-2 justify-center">
                                         {PRESETS.map((p) => (
                                             <button 
                                                 key={p.name}
                                                 onClick={() => setSelectedPreset(p)}
-                                                className={`px-2.5 py-1.5 rounded-none border-2 border-black font-black uppercase text-[9px] tracking-wider transition-all ${selectedPreset.id === p.id ? 'bg-yellow-300 shadow-[2px_2px_0_black] -translate-y-0.5' : 'bg-transparent text-black/70 hover:text-black hover:border-black'}`}
+                                                className={`px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-none border-2 border-black font-black uppercase text-[9px] tracking-wider transition-all ${selectedPreset.id === p.id ? 'bg-yellow-300 shadow-[2px_2px_0_black] -translate-y-0.5' : 'bg-transparent text-black/70 hover:text-black hover:border-black'}`}
                                                 style={{ borderLeftColor: p.accent, borderLeftWidth: '4px' }}
                                                 title={p.name}
                                             >
@@ -452,18 +460,18 @@ const ShareDialog: FC<ShareDialogProps> = ({ text, bookTitle, author, coverImage
                                 </div>
 
                                 <div className="grid grid-cols-1 gap-2">
-                                    <div className="flex items-center justify-between border-t border-black/10 pt-2.5">
+                                    <div className="flex items-center justify-between border-t border-black/10 pt-2">
                                         <span className="text-[9px] uppercase font-black text-black/50">Width Mode:</span>
                                         <div className="flex gap-1">
                                             <button 
                                                 onClick={() => setWidthMode('wide')}
-                                                className={`px-3 py-1 border-2 border-black text-[9px] font-black uppercase ${widthMode === 'wide' ? 'bg-black text-white' : 'bg-transparent text-black'}`}
+                                                className={`px-2.5 py-1 border-2 border-black text-[9px] font-black uppercase ${widthMode === 'wide' ? 'bg-black text-white' : 'bg-transparent text-black'}`}
                                             >
                                                 Wide (800px)
                                             </button>
                                             <button 
                                                 onClick={() => setWidthMode('square')}
-                                                className={`px-3 py-1 border-2 border-black text-[9px] font-black uppercase ${widthMode === 'square' ? 'bg-black text-white' : 'bg-transparent text-black'}`}
+                                                className={`px-2.5 py-1 border-2 border-black text-[9px] font-black uppercase ${widthMode === 'square' ? 'bg-black text-white' : 'bg-transparent text-black'}`}
                                             >
                                                 Square (640px)
                                             </button>
@@ -474,7 +482,7 @@ const ShareDialog: FC<ShareDialogProps> = ({ text, bookTitle, author, coverImage
                                 <button 
                                     onClick={handleDownload}
                                     disabled={text.length > MAX_IMAGE_CHARS}
-                                    className={`w-full py-3.5 font-black uppercase tracking-widest text-xs border-4 border-black transition-all flex items-center justify-center gap-2 ${text.length > MAX_IMAGE_CHARS ? 'bg-gray-150 text-gray-400 cursor-not-allowed opacity-50' : 'bg-black text-white shadow-[4px_4px_0_cyan] hover:translate-y-[-1px] hover:shadow-[5px_5px_0_cyan] active:translate-y-0.5 active:shadow-none'}`}
+                                    className={`w-full py-3 sm:py-3.5 font-black uppercase tracking-widest text-xs border-3 sm:border-4 border-black transition-all flex items-center justify-center gap-2 ${text.length > MAX_IMAGE_CHARS ? 'bg-gray-150 text-gray-400 cursor-not-allowed opacity-50' : 'bg-black text-white shadow-[3px_3px_0_cyan] sm:shadow-[4px_4px_0_cyan] hover:translate-y-[-1px] hover:shadow-[5px_5px_0_cyan] active:translate-y-0.5 active:shadow-none'}`}
                                 >
                                     <IconDownload className="w-4 h-4" /> Export Notebook Page
                                 </button>

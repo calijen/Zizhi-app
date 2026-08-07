@@ -9,6 +9,7 @@ interface LibraryProps {
   theme: Theme;
   onBookSelect: (bookId: string) => void;
   isLoading: boolean;
+  loadingBookId?: string | null;
   error: string | null;
   onDelete: (bookId: string) => void;
   onGenerateSummary: (bookId: string) => void;
@@ -102,19 +103,26 @@ const BookCard: FC<{
     onViewSummary: (id: string) => void;
     status?: GenerationStatus;
     viewMode: 'grid' | 'list';
-}> = ({ book, theme, onSelect, onDelete, onGenerateSummary, onViewSummary, status, viewMode }) => {
+    isLoadingBook?: boolean;
+}> = ({ book, theme, onSelect, onDelete, onGenerateSummary, onViewSummary, status, viewMode, isLoadingBook }) => {
     const isList = viewMode === 'list';
     const progressPercent = Math.round((book.progress || 0) * 100);
 
     return (
         <Box bg="var(--color-surface)" className="relative group border-4 border-[var(--color-border-color)] shadow-[4px_4px_0_var(--color-border-color)] hover:translate-x-[-1px] transition-all overflow-hidden h-full flex flex-col">
             <Box className={`h-full ${isList ? 'flex flex-row' : 'flex flex-col flex-1'}`}>
-                <Box className={`relative cursor-pointer overflow-hidden flex-shrink-0 ${isList ? 'w-28 md:w-36 aspect-[3/4] border-r-4 border-[var(--color-border-color)]' : 'w-full aspect-[3/4] border-b-4 border-[var(--color-border-color)]'}`} onClick={() => onSelect(book.id)}>
+                <Box className={`relative cursor-pointer overflow-hidden flex-shrink-0 ${isList ? 'w-28 md:w-36 aspect-[3/4] border-r-4 border-[var(--color-border-color)]' : 'w-full aspect-[3/4] border-b-4 border-[var(--color-border-color)]'}`} onClick={() => !isLoadingBook && onSelect(book.id)}>
                     {book.coverImageUrl ? (
                         <img src={book.coverImageUrl} className="w-full h-full object-cover aspect-[3/4] block" alt={book.title || 'Book Cover'} />
                     ) : (
                         <Box className="w-full h-full aspect-[3/4] bg-slate-100 flex items-center justify-center font-black text-slate-300 text-xs uppercase">
                             {book.isPdf ? 'PDF' : 'EPUB'}
+                        </Box>
+                    )}
+                    {isLoadingBook && (
+                        <Box className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex flex-col items-center justify-center p-2 text-center text-white z-10 animate-fade-in">
+                            <IconSpinner className="w-7 h-7 animate-spin mb-1 text-amber-400" />
+                            <Text className="text-[10px] font-black uppercase tracking-widest text-amber-300">Loading...</Text>
                         </Box>
                     )}
                 </Box>
@@ -135,7 +143,16 @@ const BookCard: FC<{
                         </Group>
                         <Progress value={progressPercent} size="sm" radius={0} color="var(--color-primary-text)" className="border-2 border-[var(--color-border-color)] h-2 bg-transparent" />
                         <Group gap="xs" mt={4} grow>
-                            <Button variant="filled" color="cyan" className="border-2 border-black rounded-none shadow-[2px_2px_0_#000] h-8 p-0 text-[10px] font-black uppercase text-black" onClick={() => onSelect(book.id)}>Open</Button>
+                            <Button 
+                                variant="filled" 
+                                color="cyan" 
+                                disabled={isLoadingBook}
+                                loading={isLoadingBook}
+                                className="border-2 border-black rounded-none shadow-[2px_2px_0_#000] h-8 p-0 text-[10px] font-black uppercase text-black" 
+                                onClick={() => onSelect(book.id)}
+                            >
+                                {isLoadingBook ? 'Opening...' : 'Open'}
+                            </Button>
                             {book.hasAudio || book.hasSummary ? (
                                 <Button variant="filled" color="yellow" className="border-2 border-black rounded-none shadow-[2px_2px_0_#000] h-8 p-0 text-[10px] font-black uppercase text-black" onClick={(e) => { e.stopPropagation(); onViewSummary(book.id); }} leftSection={<IconPlay className="w-3 h-3" />}>Summary</Button>
                             ) : (
@@ -149,7 +166,7 @@ const BookCard: FC<{
     );
 };
 
-const LibraryView: FC<LibraryProps> = ({ books, theme, onBookSelect, isLoading, onDelete, onGenerateSummary, generationStatuses, onViewSummary, viewMode, isCloudSynced }) => {
+const LibraryView: FC<LibraryProps> = ({ books, theme, onBookSelect, isLoading, loadingBookId, onDelete, onGenerateSummary, generationStatuses, onViewSummary, viewMode, isCloudSynced }) => {
   return (
     <Box className="py-4 md:py-8 animate-fade-in pb-32">
         <header className="mb-10 border-b-4 border-[var(--color-border-color)] pb-6 flex justify-between items-end">
@@ -172,7 +189,20 @@ const LibraryView: FC<LibraryProps> = ({ books, theme, onBookSelect, isLoading, 
             </Box>
         )}
         <SimpleGrid cols={viewMode === 'list' ? { base: 1, md: 2 } : { base: 2, sm: 2, md: 3, lg: 4, xl: 4 }} spacing="xl">
-            {books.map(book => <BookCard key={book.id} book={book} theme={theme} onSelect={onBookSelect} onDelete={onDelete} onGenerateSummary={onGenerateSummary} onViewSummary={onViewSummary} status={generationStatuses[book.id]} viewMode={viewMode} />)}
+            {books.map(book => (
+                <BookCard 
+                    key={book.id} 
+                    book={book} 
+                    theme={theme} 
+                    onSelect={onBookSelect} 
+                    onDelete={onDelete} 
+                    onGenerateSummary={onGenerateSummary} 
+                    onViewSummary={onViewSummary} 
+                    status={generationStatuses[book.id]} 
+                    viewMode={viewMode} 
+                    isLoadingBook={loadingBookId === book.id}
+                />
+            ))}
         </SimpleGrid>
     </Box>
   );
