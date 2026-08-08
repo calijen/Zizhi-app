@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Box, Stack, Text } from '@mantine/core';
 import type { BookMetadata, ReadingActivity } from '../types';
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { IconSpinner } from './icons';
 
 interface ProfileViewProps {
@@ -327,47 +326,17 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, streak, library, onShow
             setError(null);
             
             try {
-                // Ensure proper instantiating format
-                const genAI = new GoogleGenerativeAI(process.env.API_KEY || "");
-                const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
+                const res = await fetch('/api/gemini/recommendations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ library }),
+                });
                 
-                // Represent library items to Gemini clearly
-                const bookBriefs = library
-                    .slice(0, 10)
-                    .map(b => `"${b.title}" by ${b.author} (original category: ${b.genre || 'None'})`)
-                    .join('\n');
+                if (!res.ok) {
+                    throw new Error("Failed to fetch recommendations from server");
+                }
                 
-                const prompt = `
-You are a highly perceptive literary archivist and librarian for the Zizhi Scholar’s Academy.
-Analyze the user's current reading library.
-The library contains the following books:
-${bookBriefs}
-
-Based on these books, determine their true academic study interests to expand their horizons.
-
-Task 1: Determine the user's top 3-4 literary or scientific study domains/genres (e.g. "Philosophy", "Political Science", "Classic Fiction", "Post-Modernism", "Existentialism", "Theoretical Physics", "History", etc.). Avoid generic tags like "PDF Document", "Epub", "Textbook".
-Task 2: Evaluate their overall reading mix and profile them with a witty, profound personal "Scholarly Archetype" (e.g., "The Existential Explorer", "The Scientific Realist", "The Classical Humanist", "The Speculative Thinker") with a 1-sentence description that celebrates their intellectual journey.
-Task 3: Curate exactly 6 recommended readings. For each, give its title, author, its primary genre, and a profound 1-sentence explanation of why it will expand their specific horizon based on what they are already reading.
-
-You must return a valid JSON object ONLY. Do not output any thinking block, comments, or surrounding markdown blocks (such as \`\`\`json). The JSON must conform strictly to this structure:
-{
-  "genres": ["Philosophy", "Existentialism", "Classic Fiction"], 
-  "archetypeTitle": "The Existential Explorer",
-  "archetypeDesc": "You seek fundamental truths of humans, traversing paths of ontological enquiry and classical human ethics.",
-  "recommendations": [
-    {
-      "title": "Thus Spoke Zarathustra",
-      "author": "Friedrich Nietzsche",
-      "reason": "Expands on existential and philosophical questions raised in your reading of classics.",
-      "genre": "Philosophy"
-    }
-  ]
-}
-`;
-                const result = await model.generateContent(prompt);
-                const text = result.response.text();
-                
-                const aiResult = safeJsonParse(text);
+                const aiResult = await res.json();
                 if (aiResult) {
                     setAiData(aiResult);
                     setRecommendations(aiResult.recommendations || []);
@@ -375,7 +344,7 @@ You must return a valid JSON object ONLY. Do not output any thinking block, comm
                         localStorage.setItem(cacheKey, JSON.stringify(aiResult));
                     }
                 } else {
-                    throw new Error("Invalid json format returned from AI model");
+                    throw new Error("Invalid format returned from AI recommendations endpoint");
                 }
             } catch (e: any) {
                 console.error("Profile optimization failed", e);

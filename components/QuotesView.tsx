@@ -4,7 +4,6 @@ import { Text, Group, ActionIcon, Box, Stack } from '@mantine/core';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Quote, Theme, BookMetadata } from '../types';
 import { IconTrash, IconSearch, IconShare, IconSparkles, IconSpinner, IconChevronLeft } from './icons';
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import ShareDialog from './ShareDialog';
 
 interface QuotesViewProps {
@@ -157,52 +156,15 @@ const QuotesView: FC<QuotesViewProps> = ({ quotes, library = [], theme, onDelete
 
   const runAiFilter = async (qText: string): Promise<string[] | null> => {
     try {
-      const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
-      if (!apiKey) return null;
-
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
-      
-      const payload = quotes.map(q => ({
-        id: q.id,
-        text: q.text,
-        author: q.author,
-        bookTitle: q.bookTitle
-      }));
-
-      const prompt = `
-You are a scholar's library assistant database engine.
-The user wants to construct a customized review session for a reader application. They specified the focus of today's review session: "${qText}"
-
-Here are the user's saved quotes represented as a JSON array:
-${JSON.stringify(payload)}
-
-Your objective is to identify and filter which of these quotes fit or are semantically relevant to the user's criteria. E.g.:
-- If they type an author name, find quotes by that author.
-- If they type a book title, find quotes from that book.
-- If they type a topic or conceptual field ("philosophy", "minds", "consciousness", "truth", "ethics"), find all quotes that touch on these topics semantically.
-
-Return a valid JSON object ONLY containing a key "matchedIds" which is a list of quote IDs that matching this focus area. Do not write markdown wraps, code blocks, or thinking. Strictly format as:
-{"matchedIds": ["some-id-one", "some-id-two"]}
-`;
-      const result = await model.generateContent(prompt);
-      const responseText = result.response.text();
-      
-      // Clean JSON blocks if AI added markdown tags
-      let cleanText = responseText.trim();
-      if (cleanText.startsWith("```json")) {
-        cleanText = cleanText.substring(7);
-      } else if (cleanText.startsWith("```")) {
-        cleanText = cleanText.substring(3);
-      }
-      if (cleanText.endsWith("```")) {
-        cleanText = cleanText.substring(0, cleanText.length - 3);
-      }
-      cleanText = cleanText.trim();
-
-      const parsed = JSON.parse(cleanText);
-      if (parsed && Array.isArray(parsed.matchedIds)) {
-        return parsed.matchedIds;
+      const res = await fetch('/api/gemini/filter-quotes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qText, quotes }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data && Array.isArray(data.matchedIds)) {
+        return data.matchedIds;
       }
     } catch (e) {
       console.error("AI matching failed, falling back to local search engine:", e);
