@@ -127,9 +127,9 @@ const BookCard: FC<{
                     )}
                 </Box>
                 <Stack p="md" gap="xs" className="flex-1 justify-between min-w-0">
-                    <Stack gap={2}>
+                    <Stack gap={2} className="cursor-pointer" onClick={() => !isLoadingBook && onSelect(book.id)}>
                         <Group justify="space-between" align="start" wrap="nowrap">
-                            <Text className="font-black text-[14px] md:text-[16px] leading-tight truncate text-[var(--color-primary-text)]" title={book.title}>{book.title}</Text>
+                            <Text className="font-black text-[14px] md:text-[16px] leading-tight truncate text-[var(--color-primary-text)] hover:underline" title={book.title}>{book.title}</Text>
                             <ActionIcon variant="filled" color="red" size="sm" className="border-2 border-black rounded-none flex-shrink-0" onClick={(e) => { e.stopPropagation(); onDelete(book.id); }}>
                                 <IconClose className="w-4 h-4 text-white" />
                             </ActionIcon>
@@ -143,16 +143,6 @@ const BookCard: FC<{
                         </Group>
                         <Progress value={progressPercent} size="sm" radius={0} color="var(--color-primary-text)" className="border-2 border-[var(--color-border-color)] h-2 bg-transparent" />
                         <Group gap="xs" mt={4} grow>
-                            <Button 
-                                variant="filled" 
-                                color="cyan" 
-                                disabled={isLoadingBook}
-                                loading={isLoadingBook}
-                                className="border-2 border-black rounded-none shadow-[2px_2px_0_#000] h-8 p-0 text-[10px] font-black uppercase text-black" 
-                                onClick={() => onSelect(book.id)}
-                            >
-                                {isLoadingBook ? 'Opening...' : 'Open'}
-                            </Button>
                             {book.hasAudio || book.hasSummary ? (
                                 <Button variant="filled" color="yellow" className="border-2 border-black rounded-none shadow-[2px_2px_0_#000] h-8 p-0 text-[10px] font-black uppercase text-black" onClick={(e) => { e.stopPropagation(); onViewSummary(book.id); }} leftSection={<IconPlay className="w-3 h-3" />}>Summary</Button>
                             ) : (

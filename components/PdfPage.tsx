@@ -103,7 +103,7 @@ const PdfPage: React.FC<PdfPageProps> = ({ pdfDocument, pageNumber, scale = 1.5 
               disableCombineTextItems: false
             });
             const textLayerTask = pdfjs.renderTextLayer({
-              textContent: textContent,
+              textContentSource: textContent,
               container: textLayerRef.current,
               viewport: viewport,
               textDivs: []

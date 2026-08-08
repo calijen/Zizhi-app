@@ -92,7 +92,9 @@ const QuoteCard: FC<{ quote: Quote; onDelete: (id: string) => void; onGoToQuote:
             </div>
             <p className="text-lg font-serif leading-tight text-[var(--color-primary-text)] cursor-pointer hover:opacity-80 transition-opacity mb-2" onClick={() => onGoToQuote(quote)}>“{displayText}”</p>
             {isLong && <button className="text-[9px] font-black uppercase text-cyan-600 hover:underline inline-block mb-3 self-start" onClick={() => setExpanded(!expanded)}>{expanded ? 'Less' : 'More'}</button>}
-            <div className="mt-auto pt-2 border-t border-black/10"><Text className="text-[8px] font-black text-[var(--color-muted-text)] uppercase truncate">{quote.bookTitle}</Text></div>
+            <div className="mt-auto pt-3 border-t border-black/10 flex justify-between items-center gap-2">
+                <Text className="text-[8px] font-black text-[var(--color-muted-text)] uppercase truncate flex-1 cursor-pointer hover:underline" onClick={() => onGoToQuote(quote)}>{quote.bookTitle}</Text>
+            </div>
         </div>
     );
 };
@@ -160,14 +162,14 @@ const QuotesView: FC<QuotesViewProps> = ({ quotes, library = [], theme, onDelete
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ qText, quotes }),
-      });
-      if (!res.ok) return null;
-      const data = await res.json();
+      }).catch(() => null);
+      if (!res || !res.ok) return null;
+      const data = await res.json().catch(() => null);
       if (data && Array.isArray(data.matchedIds)) {
         return data.matchedIds;
       }
     } catch (e) {
-      console.error("AI matching failed, falling back to local search engine:", e);
+      // Local fallback silently active
     }
     return null;
   };
@@ -315,9 +317,9 @@ const QuotesView: FC<QuotesViewProps> = ({ quotes, library = [], theme, onDelete
                 <p className="text-[12px] font-black text-[var(--color-muted-text)] uppercase">Save text in a book to see it here.</p>
               </div>
             ) : (
-              filteredQuotes.map(quote => (
+              filteredQuotes.map((quote, idx) => (
                 <QuoteCard 
-                  key={quote.id} 
+                  key={`quote-${quote.id || idx}-${idx}`} 
                   quote={quote} 
                   onDelete={onDelete} 
                   onGoToQuote={onGoToQuote} 
