@@ -86,8 +86,8 @@ const NotesView: FC<NotesViewProps> = ({ notes, library = [], theme, onDelete, o
                 <p className="text-[12px] font-black text-[var(--color-muted-text)] uppercase">Add notes to text in a book to see them here.</p>
             </div>
         ) : (
-            filteredNotes.map(note => (
-                <NoteCard key={note.id} note={note} onDelete={onDelete} onGoToNote={onGoToNote} />
+            filteredNotes.map((note, idx) => (
+                <NoteCard key={`note-${note.id || idx}-${idx}`} note={note} onDelete={onDelete} onGoToNote={onGoToNote} />
             ))
         )}
       </div>

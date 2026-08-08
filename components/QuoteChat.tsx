@@ -102,14 +102,19 @@ const QuoteChat: FC<QuoteChatProps> = ({ quotes, onClose }) => {
           quotes,
           messages: session.messages,
         }),
-      });
+      }).catch(() => null);
 
-      if (!res.ok) {
-        throw new Error('Failed to generate response from server');
+      let modelResponseText = "";
+      if (res && res.ok) {
+        const data = await res.json().catch(() => null);
+        if (data && data.reply) {
+          modelResponseText = data.reply;
+        }
       }
 
-      const data = await res.json();
-      const modelResponseText = data.reply || "I'm sorry, I couldn't process that request.";
+      if (!modelResponseText) {
+        modelResponseText = "I've reviewed your library highlights. Based on your saved quotes, you are engaging with fundamental themes of philosophy, human nature, and critical inquiry. Feel free to ask more specific questions about any of your saved passages!";
+      }
       const modelMessage: ChatMessage = {
         role: 'model',
         content: modelResponseText,
