@@ -129,6 +129,7 @@ export interface StickyNote {
   x: number;
   y: number;
   rotation: number;
+  isCollapsed?: boolean;
 }
 
 export interface ImageSticker {

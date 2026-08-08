@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { IconClose, IconSpinner, IconEye, IconEyeOff } from './icons';
 import { auth, signInWithGoogle } from '../firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
@@ -8,10 +7,9 @@ import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'fire
 interface AuthViewProps {
     onClose: () => void;
     onLogin: (user: any) => void;
-    onEnterGuest?: () => void;
 }
 
-const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin, onEnterGuest }) => {
+const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin }) => {
     const [view, setView] = useState<'login' | 'signup'>('signup');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -72,7 +70,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin, onEnterGuest }) =
                 
                 <header className="text-center mb-8 w-full">
                     <h2 className="text-3xl font-black mb-2 uppercase tracking-tight text-[var(--color-primary-text)]">{view === 'login' ? 'Welcome Back' : 'Create Account'}</h2>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-[var(--color-muted-text)]">Sync your library across all devices</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-[var(--color-muted-text)]">Sync your library & notes across all devices</p>
                 </header>
 
                 {error && (
@@ -147,20 +145,6 @@ const AuthView: React.FC<AuthViewProps> = ({ onClose, onLogin, onEnterGuest }) =
                             {view === 'login' ? 'Create Account' : 'Login'}
                         </button>
                     </p>
-                    {onEnterGuest && (
-                        <div>
-                            <button 
-                                type="button" 
-                                onClick={() => {
-                                    onClose();
-                                    onEnterGuest();
-                                }} 
-                                className="text-[10px] font-black uppercase tracking-widest text-[var(--color-primary-text)] hover:underline opacity-80 hover:opacity-100"
-                            >
-                                Continue as Guest →
-                            </button>
-                        </div>
-                    )}
                 </footer>
             </motion.div>
         </motion.div>

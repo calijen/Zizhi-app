@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Group, Text, ActionIcon, Tooltip, Portal } from '@mantine/core';
-import { Trash2, X, Palette, GripHorizontal, Bold, Italic, Underline, Strikethrough, Highlighter } from 'lucide-react';
+import { Trash2, X, Palette, GripHorizontal, Bold, Italic, Underline, Strikethrough, Highlighter, Star, Bookmark } from 'lucide-react';
 import type { DrawingPath, StickyNote, ImageSticker, NotebookPageData, Theme } from '../types';
 
 interface NotebookPageProps {
@@ -284,7 +284,7 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
         wrapper.contentEditable = 'false';
         wrapper.style.float = 'right';
         wrapper.style.width = '45%';
-        wrapper.style.margin = '8px 0 8px 16px';
+        wrapper.style.margin = '12px 0 12px 20px';
         wrapper.style.position = 'relative';
         wrapper.style.display = 'inline-block';
         wrapper.style.userSelect = 'none';
@@ -327,7 +327,7 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
       wrapper.contentEditable = 'false';
       wrapper.style.float = 'right';
       wrapper.style.width = '45%';
-      wrapper.style.margin = '8px 0 8px 16px';
+      wrapper.style.margin = '12px 0 12px 20px';
       wrapper.style.position = 'relative';
       wrapper.style.display = 'inline-block';
       wrapper.style.userSelect = 'none';
@@ -654,6 +654,11 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
     onChange({ ...pageData, stickyNotes: updated });
   };
 
+  const toggleStickyCollapse = (id: string) => {
+    const updated = pageData.stickyNotes.map(n => n.id === id ? { ...n, isCollapsed: !n.isCollapsed } : n);
+    onChange({ ...pageData, stickyNotes: updated });
+  };
+
   const cycleStickyColor = (id: string) => {
     const updated = pageData.stickyNotes.map(n => {
       if (n.id === id) {
@@ -940,6 +945,54 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
           {/* Sticky Notes Layer */}
           {pageData.stickyNotes.map((sticky) => {
             const colorMeta = STICKY_COLORS.find(c => c.name === sticky.color) || STICKY_COLORS[0];
+            const isCollapsed = sticky.isCollapsed;
+
+            if (isCollapsed) {
+              return (
+                <div
+                  key={sticky.id}
+                  className="absolute z-30 group interactive-sticker select-none cursor-pointer"
+                  style={{
+                    left: `${sticky.x * 100}%`,
+                    top: `${sticky.y * 100}%`,
+                    transform: `translate(-50%, -50%) rotate(${sticky.rotation}deg)`,
+                  }}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    toggleStickyCollapse(sticky.id);
+                  }}
+                  title="Double-click to expand sticky note"
+                >
+                  <div
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 border-2 border-black rounded-full shadow-[3px_3px_0_black] hover:scale-105 transition-all"
+                    style={{ backgroundColor: colorMeta.bg, color: colorMeta.text }}
+                  >
+                    <div 
+                      onMouseDown={(e) => handleDragStart(e, sticky.id, 'sticky')}
+                      onTouchStart={(e) => handleDragStart(e, sticky.id, 'sticky')}
+                      className="cursor-move flex items-center justify-center pr-0.5 border-r border-black/20"
+                      title="Drag bookmark"
+                    >
+                      <Star size={12} fill="currentColor" strokeWidth={2} />
+                    </div>
+                    <span className="text-[10px] font-black max-w-[80px] truncate leading-none">
+                      {sticky.text.trim() || 'Bookmark'}
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleStickyCollapse(sticky.id);
+                      }}
+                      className="text-[9px] font-black px-1 rounded bg-black/10 hover:bg-black/20 transition-colors"
+                      title="Expand note"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              );
+            }
+
             return (
               <div
                 key={sticky.id}
@@ -950,6 +1003,12 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
                   transform: `translate(-50%, -50%) rotate(${sticky.rotation}deg)`,
                   width: '135px',
                 }}
+                onDoubleClick={(e) => {
+                  // Only collapse on double click if not typing inside textarea directly
+                  if ((e.target as HTMLElement).tagName !== 'TEXTAREA') {
+                    toggleStickyCollapse(sticky.id);
+                  }
+                }}
               >
                 <div 
                   className="border-2 border-black p-2 shadow-[4px_4px_0_black] flex flex-col h-28 relative text-left"
@@ -959,11 +1018,25 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
                   <div 
                     onMouseDown={(e) => handleDragStart(e, sticky.id, 'sticky')}
                     onTouchStart={(e) => handleDragStart(e, sticky.id, 'sticky')}
-                    className="h-3.5 absolute top-0 left-0 right-0 cursor-move border-b border-black/10 flex items-center justify-center"
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      toggleStickyCollapse(sticky.id);
+                    }}
+                    className="h-3.5 absolute top-0 left-0 right-0 cursor-move border-b border-black/10 flex items-center justify-between px-1"
                     style={{ backgroundColor: colorMeta.border }}
-                    title="Drag to move sticky"
+                    title="Drag to move, double-tap to collapse into bookmark"
                   >
                     <GripHorizontal size={10} className="text-black/30" />
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleStickyCollapse(sticky.id);
+                      }}
+                      className="p-0.5 hover:scale-110 active:scale-95 transition-transform"
+                      title="Collapse to bookmark"
+                    >
+                      <Star size={9} fill="currentColor" className="text-black/60" />
+                    </button>
                   </div>
 
                   {/* Editable note content */}
@@ -977,6 +1050,13 @@ export const NotebookPage: React.FC<NotebookPageProps> = ({
 
                   {/* Inline action selectors */}
                   <div className="absolute bottom-1 right-1 flex gap-1 bg-white/80 border border-black/10 rounded-sm p-0.5 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => toggleStickyCollapse(sticky.id)}
+                      className="w-3.5 h-3.5 rounded-full border border-black bg-amber-300 flex items-center justify-center hover:scale-105 active:scale-95 transition-all"
+                      title="Collapse note"
+                    >
+                      <Star size={7} fill="currentColor" className="text-black" />
+                    </button>
                     <button
                       onClick={() => cycleStickyColor(sticky.id)}
                       className="w-3.5 h-3.5 rounded-full border border-black bg-white flex items-center justify-center hover:scale-105 active:scale-95 transition-all"
@@ -1122,11 +1202,11 @@ const ImageStickerComponent: React.FC<ImageStickerComponentProps> = ({
     };
   }, [isResizing, handleResizeMove, handleResizeEnd]);
 
-  let alignClass = 'float-right ml-4 mb-4';
+  let alignClass = 'float-right ml-6 mb-6 mt-2';
   if (align === 'left') {
-    alignClass = 'float-left mr-4 mb-4';
+    alignClass = 'float-left mr-6 mb-6 mt-2';
   } else if (align === 'center') {
-    alignClass = 'mx-auto block my-4 clear-both';
+    alignClass = 'mx-auto block my-6 clear-both';
   }
 
   return (

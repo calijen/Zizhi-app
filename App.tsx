@@ -105,10 +105,10 @@ const App: FC = () => {
   const [isAppLoading, setIsAppLoading] = useState(true);
   const [loadingBookId, setLoadingBookId] = useState<string | null>(null);
   const [hasEntered, setHasEntered] = useState<boolean | null>(() => {
-    if (typeof window !== 'undefined' && localStorage.getItem('zizhi-entered') === 'true') {
+    if (typeof window !== 'undefined' && auth.currentUser) {
       return true;
     }
-    return null;
+    return false;
   });
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'library' | 'quotes' | 'profile' | 'settings'>(() => {
@@ -302,23 +302,21 @@ const App: FC = () => {
           setQuotes(mergedQuotes);
           setNotes(mergedNotes);
 
-          const storedEntered = localStorage.getItem('zizhi-entered') === 'true';
-          const shouldBeEntered = storedEntered || loadedBooks.length > 0 || mergedQuotes.length > 0 || !!currentUser;
-          setHasEntered(shouldBeEntered);
-          if (shouldBeEntered) localStorage.setItem('zizhi-entered', 'true');
+          setHasEntered(!!currentUser);
+          if (currentUser) localStorage.setItem('zizhi-entered', 'true');
+          else localStorage.removeItem('zizhi-entered');
       } else {
           setLibrary(deduplicatedLocalBooks);
           setQuotes(localQuotes);
           setNotes(localNotes);
-          const storedEntered = localStorage.getItem('zizhi-entered') === 'true';
-          const shouldBeEntered = storedEntered || deduplicatedLocalBooks.length > 0 || localQuotes.length > 0;
-          setHasEntered(shouldBeEntered);
-          if (shouldBeEntered) localStorage.setItem('zizhi-entered', 'true');
+          setHasEntered(!!currentUser);
+          if (currentUser) localStorage.setItem('zizhi-entered', 'true');
+          else localStorage.removeItem('zizhi-entered');
       }
 
       // Restore last opened book if user was reading before refresh
       const lastOpenedBookId = localStorage.getItem('zizhi-last-opened-book-id');
-      if (lastOpenedBookId) {
+      if (lastOpenedBookId && currentUser) {
         const meta = loadedBooks.find(b => b.id === lastOpenedBookId) || deduplicatedLocalBooks.find(b => b.id === lastOpenedBookId);
         if (meta) {
           try {
@@ -333,8 +331,7 @@ const App: FC = () => {
       }
     } catch (e) { 
         console.error("Load failed", e); 
-        const storedEntered = localStorage.getItem('zizhi-entered') === 'true';
-        setHasEntered(storedEntered); 
+        setHasEntered(!!currentUser); 
     } finally {
         setIsAppLoading(false);
     }
@@ -346,6 +343,9 @@ const App: FC = () => {
       if (u) {
         setHasEntered(true);
         localStorage.setItem('zizhi-entered', 'true');
+      } else {
+        setHasEntered(false);
+        localStorage.removeItem('zizhi-entered');
       }
       loadData(u);
     });
@@ -830,7 +830,7 @@ const App: FC = () => {
                               setToast({ message: `Re-upload "${q.bookTitle}" to read in context.` });
                           }
                       }} />}
-                      {activeTab === 'profile' && <ProfileView user={user} streak={streak} library={library} onShowAuth={() => setIsAuthModalOpen(true)} activity={[]} onSignOut={async () => { await firebaseLogout(); setUser(null); }} />}
+                      {activeTab === 'profile' && <ProfileView user={user} streak={streak} library={library} onShowAuth={() => setIsAuthModalOpen(true)} activity={[]} onSignOut={async () => { await firebaseLogout(); setUser(null); setHasEntered(false); setSelectedBook(null); localStorage.removeItem('zizhi-entered'); }} />}
                       {activeTab === 'settings' && <SettingsView currentTheme={theme} onThemeChange={(t) => { setTheme(t); setColorScheme(t.id === 'nocturne' ? 'dark' : 'light'); localStorage.setItem('zizhi-theme', JSON.stringify(t)); }} themes={ATMOSPHERES} fonts={FONTS} textures={{}} />}
                   </Box>
               </main>
