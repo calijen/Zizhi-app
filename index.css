@@ -28,7 +28,7 @@
     @apply font-display;
   }
   h2 {
-    @apply leading-[88px];
+    @apply leading-tight;
   }
 }
 

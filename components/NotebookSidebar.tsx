@@ -1261,15 +1261,15 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
 
                   {/* Popover for Text Color */}
                   {activeDropdownTool === 'type' && (
-                    <div className="absolute top-full left-0 mt-2 z-[3000] bg-white dark:bg-zinc-900 border-3 border-black rounded-xl p-3 flex flex-col gap-2 min-w-[280px] shadow-[6px_6px_0_black]">
+                    <div className="absolute top-full left-0 sm:left-0 -left-12 mt-2 z-[3000] bg-white dark:bg-zinc-900 border-3 border-black rounded-xl p-3 flex flex-col gap-2 min-w-[260px] max-w-[calc(100vw-2rem)] shadow-[6px_6px_0_black]">
                       <div className="text-[10px] font-black uppercase tracking-wider text-black dark:text-white px-1 flex justify-between items-center">
                         <span>Text Color</span>
                         <button onClick={() => setActiveDropdownTool(null)} className="p-0.5 text-black hover:text-amber-600 dark:text-white">
                           <X size={12} strokeWidth={3} />
                         </button>
                       </div>
-                      <div className="flex flex-col gap-2">
-                        <div className="grid grid-cols-10 gap-1.5">
+                      <div className="flex flex-col gap-2 overflow-x-auto p-0.5">
+                        <div className="grid grid-cols-10 gap-1.5 min-w-[240px]">
                           {GRID_GRAYSCALE.map((item, idx) => {
                             const isSelected = isColorMatch(textToolColor, item.color);
                             const isLight = isLightColor(item.color);
@@ -1294,7 +1294,7 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
                             );
                           })}
                         </div>
-                        <div className="grid grid-cols-10 gap-1.5">
+                        <div className="grid grid-cols-10 gap-1.5 min-w-[240px]">
                           {GRID_VIBRANT.map((item, idx) => {
                             const isSelected = isColorMatch(textToolColor, item.color);
                             const isLight = isLightColor(item.color);
@@ -1350,15 +1350,15 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
 
                   {/* Popover for Draw Color */}
                   {activeDropdownTool === 'draw' && (
-                    <div className="absolute top-full left-0 mt-2 z-[3000] bg-white dark:bg-zinc-900 border-3 border-black rounded-xl p-3 flex flex-col gap-2 min-w-[280px] shadow-[6px_6px_0_black]">
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 sm:left-0 sm:translate-x-0 mt-2 z-[3000] bg-white dark:bg-zinc-900 border-3 border-black rounded-xl p-3 flex flex-col gap-2 min-w-[260px] max-w-[calc(100vw-2rem)] shadow-[6px_6px_0_black]">
                       <div className="text-[10px] font-black uppercase tracking-wider text-black dark:text-white px-1 flex justify-between items-center">
                         <span>Ink Color</span>
                         <button onClick={() => setActiveDropdownTool(null)} className="p-0.5 text-black hover:text-cyan-600 dark:text-white">
                           <X size={12} strokeWidth={3} />
                         </button>
                       </div>
-                      <div className="flex flex-col gap-2">
-                        <div className="grid grid-cols-10 gap-1.5">
+                      <div className="flex flex-col gap-2 overflow-x-auto p-0.5">
+                        <div className="grid grid-cols-10 gap-1.5 min-w-[240px]">
                           {GRID_GRAYSCALE.map((item, idx) => {
                             const isSelected = isColorMatch(drawToolColor, item.color);
                             const isLight = isLightColor(item.color);
@@ -1383,7 +1383,7 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
                             );
                           })}
                         </div>
-                        <div className="grid grid-cols-10 gap-1.5">
+                        <div className="grid grid-cols-10 gap-1.5 min-w-[240px]">
                           {GRID_VIBRANT.map((item, idx) => {
                             const isSelected = isColorMatch(drawToolColor, item.color);
                             const isLight = isLightColor(item.color);
@@ -1439,14 +1439,14 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
 
                   {/* Popover for Highlight Color */}
                   {activeDropdownTool === 'highlight' && (
-                    <div className="absolute top-full left-0 mt-2 z-[3000] bg-white dark:bg-zinc-900 border-3 border-black rounded-xl p-3 flex flex-col gap-2 min-w-[280px] shadow-[6px_6px_0_black]">
+                    <div className="absolute top-full right-0 sm:right-auto sm:left-1/2 sm:-translate-x-1/2 mt-2 z-[3000] bg-white dark:bg-zinc-900 border-3 border-black rounded-xl p-3 flex flex-col gap-2 min-w-[220px] max-w-[calc(100vw-1.5rem)] shadow-[6px_6px_0_black]">
                       <div className="text-[10px] font-black uppercase tracking-wider text-black dark:text-white px-1 flex justify-between items-center">
                         <span>Highlight Color</span>
                         <button onClick={() => setActiveDropdownTool(null)} className="p-0.5 text-black hover:text-yellow-600 dark:text-white">
                           <X size={12} strokeWidth={3} />
                         </button>
                       </div>
-                      <div className="grid grid-cols-9 gap-1.5">
+                      <div className="grid grid-cols-5 sm:grid-cols-9 gap-1.5 max-h-[180px] overflow-y-auto p-0.5">
                         {HIGHLIGHT_GRID.map((item, idx) => {
                           const isSelected = isColorMatch(highlightToolColor, item.color);
                           return (
@@ -1457,7 +1457,7 @@ export const NotebookSidebar: React.FC<NotebookSidebarProps> = ({ bookId, bookTi
                                 selectStationery('highlight', item.color, 14);
                                 setActiveDropdownTool(null);
                               }}
-                              className="w-6 h-6 rounded-full flex items-center justify-center border-2 border-black transition-transform hover:scale-110 active:scale-95 relative overflow-hidden"
+                              className="w-6 h-6 rounded-full flex items-center justify-center border-2 border-black transition-transform hover:scale-110 active:scale-95 relative overflow-hidden shrink-0"
                               style={{ backgroundColor: item.solid === 'transparent' ? '#ffffff' : item.solid }}
                               title={item.name}
                             >
