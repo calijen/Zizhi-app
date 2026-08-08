@@ -143,6 +143,16 @@ const BookCard: FC<{
                         </Group>
                         <Progress value={progressPercent} size="sm" radius={0} color="var(--color-primary-text)" className="border-2 border-[var(--color-border-color)] h-2 bg-transparent" />
                         <Group gap="xs" mt={4} grow>
+                            <Button 
+                                variant="filled" 
+                                color="cyan" 
+                                disabled={isLoadingBook}
+                                loading={isLoadingBook}
+                                className="border-2 border-black rounded-none shadow-[2px_2px_0_#000] h-8 p-0 text-[10px] font-black uppercase text-black" 
+                                onClick={() => onSelect(book.id)}
+                            >
+                                {isLoadingBook ? 'Opening...' : 'Open'}
+                            </Button>
                             {book.hasAudio || book.hasSummary ? (
                                 <Button variant="filled" color="yellow" className="border-2 border-black rounded-none shadow-[2px_2px_0_#000] h-8 p-0 text-[10px] font-black uppercase text-black" onClick={(e) => { e.stopPropagation(); onViewSummary(book.id); }} leftSection={<IconPlay className="w-3 h-3" />}>Summary</Button>
                             ) : (
